@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+.env.local
+bun.lockb
+.DS_Store
+*.log
+.vite
+.idea
+.vscode
+.sample_code_do_not_copy
+styled-system/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
