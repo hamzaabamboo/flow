@@ -1,11 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { eq, and } from 'drizzle-orm';
 import { boards, columns } from '../../../drizzle/schema';
-import { db } from '../db';
+import { withAuth } from '../auth/withAuth';
 
 export const boardRoutes = new Elysia({ prefix: '/boards' })
-  .decorate('db', db)
-  // Get all boards for a user in a space
+  .use(withAuth())
   .get(
     '/',
     async ({ query, db, user }) => {
@@ -15,42 +14,33 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         .where(
           and(eq(boards.userId, user.id), eq(boards.space, query.space as 'work' | 'personal'))
         );
-
       return userBoards;
     },
     {
-      query: t.Object({
-        space: t.String()
-      })
+      query: t.Object({ space: t.String() })
     }
   )
-  // Get a single board with columns
   .get(
     '/:boardId',
-    async ({ params, db }) => {
-      const [board] = await db.select().from(boards).where(eq(boards.id, params.boardId));
+    async ({ params, db, user }) => {
+      const [board] = await db
+        .select()
+        .from(boards)
+        .where(and(eq(boards.id, params.boardId), eq(boards.userId, user.id)));
 
-      if (!board) {
-        throw new Error('Board not found');
-      }
+      if (!board) throw new Error('Board not found');
 
       const boardColumns = await db
         .select()
         .from(columns)
         .where(eq(columns.boardId, params.boardId));
 
-      return {
-        ...board,
-        columns: boardColumns
-      };
+      return { ...board, columns: boardColumns };
     },
     {
-      params: t.Object({
-        boardId: t.String()
-      })
+      params: t.Object({ boardId: t.String() })
     }
   )
-  // Create a new board
   .post(
     '/',
     async ({ body, db, user }) => {
@@ -59,11 +49,10 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         .values({
           ...body,
           space: body.space as 'work' | 'personal',
-          userId: user.id // Use authenticated user's ID
+          userId: user.id
         })
         .returning();
 
-      // Create default columns
       const defaultColumns = ['To Do', 'In Progress', 'Done'];
       const newColumns = await db
         .insert(columns)
@@ -76,62 +65,17 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         )
         .returning();
 
-      // Update board with column order
       await db
         .update(boards)
-        .set({
-          columnOrder: newColumns.map((col: { id: string }) => col.id)
-        })
+        .set({ columnOrder: newColumns.map((col) => col.id) })
         .where(eq(boards.id, newBoard.id));
 
-      return {
-        ...newBoard,
-        columns: newColumns
-      };
+      return { ...newBoard, columns: newColumns };
     },
     {
       body: t.Object({
         name: t.String(),
         space: t.String()
-      })
-    }
-  )
-  // Update a board
-  .patch(
-    '/:boardId',
-    async ({ params, body, db }) => {
-      const [updatedBoard] = await db
-        .update(boards)
-        .set({
-          ...body,
-          updatedAt: new Date()
-        })
-        .where(eq(boards.id, params.boardId))
-        .returning();
-
-      return updatedBoard;
-    },
-    {
-      params: t.Object({
-        boardId: t.String()
-      }),
-      body: t.Object({
-        name: t.Optional(t.String()),
-        columnOrder: t.Optional(t.Array(t.String()))
-      })
-    }
-  )
-  // Delete a board
-  .delete(
-    '/:boardId',
-    async ({ params, db }) => {
-      await db.delete(boards).where(eq(boards.id, params.boardId));
-
-      return { success: true };
-    },
-    {
-      params: t.Object({
-        boardId: t.String()
       })
     }
   );

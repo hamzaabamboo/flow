@@ -26,6 +26,7 @@ interface Task {
   columnId?: string;
   labels?: string[];
   recurringPattern?: string;
+  recurringEndDate?: string;
   subtasks?: Subtask[];
   createReminder?: boolean;
 }
@@ -74,30 +75,46 @@ export function TaskDialog({
   defaultColumnId
 }: TaskDialogProps) {
   const isEdit = mode === 'edit';
-  const [labels, setLabels] = useState<string[]>(task?.labels || []);
-  const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks || []);
+  const [labels, setLabels] = useState<string[]>([]);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
-  const [createReminder, setCreateReminder] = useState(task?.createReminder || false);
-  const [recurringPattern, setRecurringPattern] = useState(task?.recurringPattern || '');
+  const [newLabel, setNewLabel] = useState('');
+  const [createReminder, setCreateReminder] = useState(false);
+  const [recurringPattern, setRecurringPattern] = useState('');
+  const [recurringEndDate, setRecurringEndDate] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Reset state when dialog opens/closes or task changes
   useEffect(() => {
-    if (task) {
-      setLabels(task.labels || []);
-      setSubtasks(task.subtasks || []);
-      setCreateReminder(task.createReminder || false);
-      setRecurringPattern(task.recurringPattern || '');
+    if (open) {
+      setLabels(task?.labels || []);
+      setSubtasks(task?.subtasks || []);
+      setCreateReminder(task?.createReminder || false);
+      setRecurringPattern(task?.recurringPattern || '');
+      setRecurringEndDate(task?.recurringEndDate || '');
+      setNewSubtask('');
+      setNewLabel('');
       // Show advanced if any advanced features are used
       setShowAdvanced(
         !!(
-          task.labels?.length ||
-          task.subtasks?.length ||
-          task.recurringPattern ||
-          task.createReminder
+          task?.labels?.length ||
+          task?.subtasks?.length ||
+          task?.recurringPattern ||
+          task?.createReminder
         )
       );
+    } else {
+      // Reset when dialog closes
+      setLabels([]);
+      setSubtasks([]);
+      setCreateReminder(false);
+      setRecurringPattern('');
+      setRecurringEndDate('');
+      setNewSubtask('');
+      setNewLabel('');
+      setShowAdvanced(false);
     }
-  }, [task]);
+  }, [open, task]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -126,6 +143,13 @@ export function TaskDialog({
     recurringInput.value = recurringPattern;
     form.appendChild(recurringInput);
 
+    // Add recurring end date
+    const recurringEndInput = document.createElement('input');
+    recurringEndInput.type = 'hidden';
+    recurringEndInput.name = 'recurringEndDate';
+    recurringEndInput.value = recurringEndDate;
+    form.appendChild(recurringEndInput);
+
     // Add reminder flag
     const reminderInput = document.createElement('input');
     reminderInput.type = 'hidden';
@@ -140,6 +164,7 @@ export function TaskDialog({
     form.removeChild(labelsInput);
     form.removeChild(subtasksInput);
     form.removeChild(recurringInput);
+    form.removeChild(recurringEndInput);
     form.removeChild(reminderInput);
   };
 
@@ -147,6 +172,7 @@ export function TaskDialog({
     if (newSubtask.trim()) {
       setSubtasks([...subtasks, { title: newSubtask, completed: false }]);
       setNewSubtask('');
+      setShowAdvanced(true); // Auto-show when subtask is added
     }
   };
 
@@ -163,11 +189,26 @@ export function TaskDialog({
   const handleAddLabel = (label: string) => {
     if (label && !labels.includes(label)) {
       setLabels([...labels, label]);
+      setShowAdvanced(true); // Auto-show when label is added
     }
   };
 
   const handleRemoveLabel = (label: string) => {
     setLabels(labels.filter((l) => l !== label));
+  };
+
+  const handleRecurringChange = (value: string) => {
+    setRecurringPattern(value);
+    if (value) {
+      setShowAdvanced(true); // Auto-show when recurring pattern is set
+    }
+  };
+
+  const handleReminderChange = (checked: boolean) => {
+    setCreateReminder(checked);
+    if (checked) {
+      setShowAdvanced(true); // Auto-show when reminder is enabled
+    }
   };
 
   return (
@@ -319,7 +360,7 @@ export function TaskDialog({
                       <HStack gap="2">
                         <Checkbox
                           checked={createReminder}
-                          onCheckedChange={(e) => setCreateReminder(e.checked as boolean)}
+                          onCheckedChange={(e) => handleReminderChange(e.checked as boolean)}
                         />
                         <Text fontSize="sm">
                           <Bell size={14} style={{ display: 'inline', marginRight: '4px' }} />
@@ -357,7 +398,7 @@ export function TaskDialog({
                         <Select.Root
                           collection={recurringOptions}
                           value={[recurringPattern]}
-                          onValueChange={(e) => setRecurringPattern(e.value[0] || '')}
+                          onValueChange={(e) => handleRecurringChange(e.value[0] || '')}
                         >
                           <Select.Control>
                             <Select.Trigger w="full">
@@ -375,6 +416,35 @@ export function TaskDialog({
                           </Select.Positioner>
                         </Select.Root>
                       </Box>
+
+                      {/* Recurring End Date */}
+                      {recurringPattern && recurringPattern !== '' && (
+                        <Box w="full">
+                          <Text mb="1" fontSize="sm" fontWeight="medium">
+                            <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                            End Date (optional)
+                          </Text>
+                          <Input
+                            type="date"
+                            value={
+                              recurringEndDate
+                                ? new Date(recurringEndDate).toISOString().split('T')[0]
+                                : ''
+                            }
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setRecurringEndDate(
+                                e.target.value ? new Date(e.target.value).toISOString() : ''
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Leave empty for indefinite"
+                          />
+                          <Text mt="1" color="fg.muted" fontSize="xs">
+                            Leave empty to repeat indefinitely
+                          </Text>
+                        </Box>
+                      )}
 
                       {/* Labels */}
                       <Box w="full">
@@ -397,7 +467,12 @@ export function TaskDialog({
                               <IconButton
                                 size="xs"
                                 variant="ghost"
-                                onClick={() => handleRemoveLabel(label)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleRemoveLabel(label);
+                                }}
+                                type="button"
                               >
                                 <X size={12} />
                               </IconButton>
@@ -406,11 +481,14 @@ export function TaskDialog({
                           <Input
                             placeholder="Add label..."
                             size="sm"
+                            value={newLabel}
+                            onChange={(e) => setNewLabel(e.target.value)}
                             onKeyPress={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleAddLabel((e.target as HTMLInputElement).value);
-                                (e.target as HTMLInputElement).value = '';
+                                e.stopPropagation();
+                                handleAddLabel(newLabel);
+                                setNewLabel('');
                               }
                             }}
                             maxW="150px"
@@ -433,7 +511,10 @@ export function TaskDialog({
                               <Checkbox
                                 size="sm"
                                 checked={subtask.completed}
-                                onCheckedChange={() => toggleSubtask(index)}
+                                onCheckedChange={(e) => {
+                                  e.stopPropagation?.();
+                                  toggleSubtask(index);
+                                }}
                               />
                               <Text
                                 flex="1"
@@ -446,7 +527,11 @@ export function TaskDialog({
                               <IconButton
                                 size="xs"
                                 variant="ghost"
-                                onClick={() => removeSubtask(index)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  removeSubtask(index);
+                                }}
                               >
                                 <X size={14} />
                               </IconButton>
@@ -461,11 +546,21 @@ export function TaskDialog({
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
+                                  e.stopPropagation();
                                   handleAddSubtask();
                                 }
                               }}
                             />
-                            <IconButton size="sm" onClick={handleAddSubtask} variant="outline">
+                            <IconButton
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAddSubtask();
+                              }}
+                              variant="outline"
+                              type="button"
+                            >
                               <Plus size={14} />
                             </IconButton>
                           </HStack>

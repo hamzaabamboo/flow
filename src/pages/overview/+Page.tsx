@@ -190,7 +190,7 @@ export default function OverviewPage() {
       <VStack gap="6" justifyContent="flex-start" w="full">
         <Box w="full">
           <Heading size="3xl" mb="2">
-            Task Overview
+            Tasks
           </Heading>
           <Text color="fg.muted">Comprehensive view of all your tasks across all boards</Text>
         </Box>
@@ -417,7 +417,9 @@ export default function OverviewPage() {
                           });
                         }}
                       >
-                        <Checkbox.Control />
+                        <Checkbox.Control>
+                          <Checkbox.Indicator>✓</Checkbox.Indicator>
+                        </Checkbox.Control>
                         <Checkbox.HiddenInput />
                       </Checkbox.Root>
 

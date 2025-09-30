@@ -54,7 +54,6 @@ export function ColumnDialog({
                       defaultValue={columnName}
                       placeholder="Enter column name"
                       required
-                      autoFocus
                     />
                   </Box>
 

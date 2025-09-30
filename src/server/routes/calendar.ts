@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import type { SQL } from 'drizzle-orm';
 import { and, eq, gte, lte, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { tasks, boards, columns, reminders, pomodoroSessions } from '../../../drizzle/schema';
+import { tasks, boards, reminders, pomodoroSessions } from '../../../drizzle/schema';
+import { withAuth } from '../auth/withAuth';
 
 // Helper function to format date for iCal
 function formatICalDate(date: Date): string {
@@ -27,14 +27,9 @@ function generateEventId(id: string, domain: string = 'hamflow.local'): string {
   return `${id}@${domain}`;
 }
 
-interface User {
-  id: string;
-  email: string;
-}
-
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
+  .use(withAuth())
   .decorate('db', db)
-
   // Get iCal feed URL (returns the URL for subscription)
   .get('/feed-url', ({ user }) => {
     // Generate a secure token for the user's calendar feed
@@ -76,6 +71,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           dueDate: tasks.dueDate,
           priority: tasks.priority,
           completed: tasks.completed,
+          recurringPattern: tasks.recurringPattern,
+          recurringEndDate: tasks.recurringEndDate,
           boardId: boards.id,
           boardName: boards.name,
           space: boards.space
@@ -150,6 +147,31 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           ical.push('STATUS:COMPLETED');
         } else {
           ical.push('STATUS:CONFIRMED');
+        }
+
+        // Add RRULE for recurring tasks
+        if (task.recurringPattern) {
+          const pattern = task.recurringPattern.toLowerCase();
+          let rrule = '';
+          if (pattern === 'daily') {
+            rrule = 'RRULE:FREQ=DAILY';
+          } else if (pattern === 'weekly') {
+            rrule = 'RRULE:FREQ=WEEKLY';
+          } else if (pattern === 'monthly') {
+            rrule = 'RRULE:FREQ=MONTHLY';
+          } else if (pattern === 'yearly') {
+            rrule = 'RRULE:FREQ=YEARLY';
+          }
+
+          // Add UNTIL parameter if recurring end date is set
+          if (rrule && task.recurringEndDate) {
+            const endDate = new Date(task.recurringEndDate);
+            rrule += `;UNTIL=${formatICalDate(endDate)}`;
+          }
+
+          if (rrule) {
+            ical.push(rrule);
+          }
         }
 
         ical.push(`CATEGORIES:${task.space || 'work'},${task.boardName || 'tasks'}`);
@@ -277,32 +299,122 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       const startDate = new Date(start);
       const endDate = new Date(end);
 
-      // Fetch tasks with due dates in range
-      const whereConditions: (SQL<unknown> | undefined)[] = [
-        eq(tasks.userId, user.id),
-        gte(tasks.dueDate, startDate),
-        lte(tasks.dueDate, endDate)
-      ];
+      // Fetch all tasks with subtasks using relational query
+      const allTasks = await db.query.tasks.findMany({
+        where: eq(tasks.userId, user.id),
+        with: {
+          subtasks: true,
+          column: {
+            with: {
+              board: true
+            }
+          }
+        }
+      });
 
-      if (space !== 'all') {
-        whereConditions.push(eq(boards.space, space));
+      // Expand recurring tasks into individual instances
+      const taskEvents = [];
+      for (const task of allTasks) {
+        if (!task.dueDate) continue;
+
+        const taskDueDate = new Date(task.dueDate);
+
+        // Format task with space from nested board
+        const formattedTask = {
+          ...task,
+          space: task.column?.board?.space,
+          type: 'task' as const
+        };
+
+        // If no recurring pattern, only show if within range
+        if (!task.recurringPattern) {
+          if (taskDueDate >= startDate && taskDueDate <= endDate) {
+            taskEvents.push(formattedTask);
+          }
+          continue;
+        }
+
+        // Expand recurring tasks
+        const pattern = task.recurringPattern.toLowerCase();
+
+        // Determine the effective end date for recurring expansion
+        const recurringEndDate = task.recurringEndDate ? new Date(task.recurringEndDate) : null;
+        const effectiveEndDate =
+          recurringEndDate && recurringEndDate < endDate ? recurringEndDate : endDate;
+
+        if (pattern === 'daily') {
+          // Generate daily instances - one per day from task start date onwards
+          // Get just the date part (ignore time) for iteration
+          const startDay = new Date(startDate);
+          startDay.setHours(0, 0, 0, 0);
+
+          const endDay = new Date(endDate);
+          endDay.setHours(23, 59, 59, 999);
+
+          const taskStartDay = new Date(taskDueDate);
+          taskStartDay.setHours(0, 0, 0, 0);
+
+          // Start from max(task start date, query start date)
+          const currentDay = taskStartDay < startDay ? new Date(startDay) : new Date(taskStartDay);
+          currentDay.setHours(0, 0, 0, 0);
+
+          // Generate one instance per day (respect effectiveEndDate)
+          const effectiveEndDay =
+            recurringEndDate && recurringEndDate < endDate
+              ? new Date(recurringEndDate)
+              : new Date(endDay);
+          effectiveEndDay.setHours(23, 59, 59, 999);
+
+          while (currentDay <= effectiveEndDay) {
+            // Create instance with original time of day
+            const instance = new Date(currentDay);
+            instance.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+            taskEvents.push({
+              ...formattedTask,
+              dueDate: instance
+            });
+
+            currentDay.setDate(currentDay.getDate() + 1);
+          }
+        } else if (pattern === 'weekly') {
+          // Generate weekly instances
+          const current = new Date(Math.max(taskDueDate.getTime(), startDate.getTime()));
+          current.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+          while (current <= effectiveEndDate) {
+            if (current >= startDate && current.getDay() === taskDueDate.getDay()) {
+              taskEvents.push({
+                ...formattedTask,
+                dueDate: new Date(current)
+              });
+            }
+            current.setDate(current.getDate() + 1);
+          }
+        } else if (pattern === 'monthly') {
+          // Generate monthly instances (same day of month)
+          const current = new Date(taskDueDate);
+          current.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+          while (current <= effectiveEndDate) {
+            if (current >= startDate) {
+              taskEvents.push({
+                ...formattedTask,
+                dueDate: new Date(current)
+              });
+            }
+            current.setMonth(current.getMonth() + 1);
+          }
+        } else {
+          // Unknown pattern, treat as non-recurring
+          if (taskDueDate >= startDate && taskDueDate <= endDate) {
+            taskEvents.push({
+              ...formattedTask,
+              dueDate: task.dueDate
+            });
+          }
+        }
       }
-
-      const taskEvents = await db
-        .select({
-          id: tasks.id,
-          title: tasks.title,
-          description: tasks.description,
-          dueDate: tasks.dueDate,
-          priority: tasks.priority,
-          completed: tasks.completed,
-          type: sql<string>`'task'`,
-          space: boards.space
-        })
-        .from(tasks)
-        .leftJoin(columns, eq(tasks.columnId, columns.id))
-        .leftJoin(boards, eq(columns.boardId, boards.id))
-        .where(and(...whereConditions.filter(Boolean)));
 
       // Fetch reminders in range
       const reminderEvents = await db

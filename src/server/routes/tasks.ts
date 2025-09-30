@@ -1,31 +1,129 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, inArray } from 'drizzle-orm';
-import { tasks } from '../../../drizzle/schema';
-import { db } from '../db';
+import { eq, and, or, sql, ilike, desc, asc } from 'drizzle-orm';
+import { withAuth } from '../auth/withAuth';
+import { boards, columns, tasks, subtasks, reminders } from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
 
-interface User {
-  id: string;
-  email: string;
-}
+export const tasksRoutes = new Elysia({ prefix: '/tasks' })
+  .use(withAuth())
+  .get(
+    '/',
+    async ({ query, db, user }) => {
+      // Build where conditions
+      const conditions = [eq(tasks.userId, user.id)];
 
-export const taskRoutes = new Elysia({ prefix: '/tasks' })
-  .decorate('db', db)
-  // Get all tasks for a column
+      // Space filter
+      if (query.space && query.space !== 'all') {
+        conditions.push(eq(boards.space, query.space as 'work' | 'personal'));
+      }
+
+      // Search filter
+      if (query.search) {
+        conditions.push(
+          or(
+            ilike(tasks.title, `%${query.search}%`),
+            ilike(tasks.description, `%${query.search}%`)
+          )!
+        );
+      }
+
+      // Priority filter
+      if (query.priority) {
+        conditions.push(eq(tasks.priority, query.priority));
+      }
+
+      // Label filter
+      if (query.label) {
+        conditions.push(sql`${tasks.labels}::jsonb @> ${JSON.stringify([query.label])}::jsonb`);
+      }
+
+      // Due date filter
+      if (query.dueBefore) {
+        conditions.push(sql`${tasks.dueDate} <= ${new Date(query.dueBefore)}`);
+      }
+      if (query.dueAfter) {
+        conditions.push(sql`${tasks.dueDate} >= ${new Date(query.dueAfter)}`);
+      }
+
+      // Build order by
+      let orderByClause;
+      switch (query.sortBy) {
+        case 'priority':
+          orderByClause = [
+            sql`CASE
+              WHEN ${tasks.priority} = 'urgent' THEN 1
+              WHEN ${tasks.priority} = 'high' THEN 2
+              WHEN ${tasks.priority} = 'medium' THEN 3
+              WHEN ${tasks.priority} = 'low' THEN 4
+              ELSE 5
+            END`,
+            tasks.createdAt
+          ];
+          break;
+        case 'dueDate':
+          orderByClause = [tasks.dueDate, tasks.createdAt];
+          break;
+        case 'createdAt':
+          orderByClause =
+            query.sortOrder === 'asc' ? [asc(tasks.createdAt)] : [desc(tasks.createdAt)];
+          break;
+        case 'updatedAt':
+        default:
+          orderByClause =
+            query.sortOrder === 'asc' ? [asc(tasks.updatedAt)] : [desc(tasks.updatedAt)];
+          break;
+      }
+
+      const userTasks = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          completed: tasks.completed,
+          columnId: tasks.columnId,
+          labels: tasks.labels,
+          recurringPattern: tasks.recurringPattern,
+          parentTaskId: tasks.parentTaskId,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          columnName: columns.name,
+          boardName: boards.name,
+          boardId: boards.id,
+          boardSpace: boards.space
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(...conditions))
+        .orderBy(...orderByClause);
+
+      return userTasks;
+    },
+    {
+      query: t.Object({
+        space: t.Optional(t.String()),
+        search: t.Optional(t.String()),
+        priority: t.Optional(t.String()),
+        label: t.Optional(t.String()),
+        dueBefore: t.Optional(t.String()),
+        dueAfter: t.Optional(t.String()),
+        sortBy: t.Optional(t.String()),
+        sortOrder: t.Optional(t.String())
+      })
+    }
+  )
   .get(
     '/:columnId',
     async ({ params, db }) => {
       const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, params.columnId));
-
       return columnTasks;
     },
     {
-      params: t.Object({
-        columnId: t.String()
-      })
+      params: t.Object({ columnId: t.String() })
     }
   )
-  // Create a new task
   .post(
     '/',
     async ({ body, db, user }) => {
@@ -33,13 +131,38 @@ export const taskRoutes = new Elysia({ prefix: '/tasks' })
         .insert(tasks)
         .values({
           ...body,
+          userId: user.id,
+          priority: body.priority as 'low' | 'medium' | 'high' | 'urgent',
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
-          userId: user.id // Use authenticated user's ID
+          labels: body.labels || [],
+          recurringPattern: body.recurringPattern,
+          recurringEndDate: body.recurringEndDate ? new Date(body.recurringEndDate) : null,
+          parentTaskId: body.parentTaskId
         })
         .returning();
 
+      // Create reminder if due date is set
+      if (body.dueDate && body.createReminder) {
+        const reminderTime = new Date(body.dueDate);
+        reminderTime.setHours(reminderTime.getHours() - 1);
+
+        await db.insert(reminders).values({
+          userId: user.id,
+          taskId: String(newTask.id),
+          reminderTime,
+          message: `Task "${String(newTask.title)}" is due soon`,
+          platform: 'discord'
+        });
+      }
+
+      // Handle recurring task creation
+      if (body.recurringPattern && body.dueDate) {
+        // This would be handled by a cron job that checks for recurring tasks
+        // and creates new instances when needed
+      }
+
       // Broadcast task creation
-      wsManager.broadcastTaskUpdate(newTask.id, body.columnId, 'created');
+      wsManager.broadcastTaskUpdate(newTask.id, newTask.columnId, 'created');
 
       return newTask;
     },
@@ -49,167 +172,148 @@ export const taskRoutes = new Elysia({ prefix: '/tasks' })
         title: t.String(),
         description: t.Optional(t.String()),
         dueDate: t.Optional(t.String()),
-        priority: t.Optional(t.String())
+        priority: t.Optional(t.String()),
+        completed: t.Optional(t.Boolean()),
+        labels: t.Optional(t.Array(t.String())),
+        subtasks: t.Optional(t.Any()),
+        recurringPattern: t.Optional(t.Union([t.String(), t.Null()])),
+        recurringEndDate: t.Optional(t.Union([t.String(), t.Null()])),
+        parentTaskId: t.Optional(t.String()),
+        createReminder: t.Optional(t.Boolean())
       })
     }
   )
-  // Update a task
   .patch(
-    '/:taskId',
-    async ({ params, body, db }) => {
-      const [updatedTask] = await db
+    '/:id',
+    async ({ params, body, db, user }) => {
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date()
+      };
+
+      // Handle specific field updates
+      if (body.title !== undefined) updateData.title = body.title;
+      if (body.description !== undefined) updateData.description = body.description;
+      if (body.columnId !== undefined) updateData.columnId = body.columnId;
+      if (body.priority !== undefined) updateData.priority = body.priority;
+      if (body.completed !== undefined) updateData.completed = body.completed;
+      if (body.labels !== undefined) updateData.labels = body.labels;
+      if (body.recurringPattern !== undefined) updateData.recurringPattern = body.recurringPattern;
+      if (body.recurringEndDate !== undefined)
+        updateData.recurringEndDate = body.recurringEndDate
+          ? new Date(body.recurringEndDate)
+          : null;
+      if (body.dueDate !== undefined) {
+        updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+      }
+
+      const [updated] = await db
         .update(tasks)
-        .set({
-          ...body,
-          dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
-          updatedAt: new Date()
-        })
-        .where(eq(tasks.id, params.taskId))
+        .set(updateData)
+        .where(eq(tasks.id, params.id))
         .returning();
 
-      // Broadcast task update
-      wsManager.broadcastTaskUpdate(
-        params.taskId,
-        body.columnId || updatedTask.columnId,
-        'updated'
-      );
+      // Handle subtasks separately (foreign key relation)
+      if (body.subtasks !== undefined) {
+        // Delete existing subtasks
+        await db.delete(subtasks).where(eq(subtasks.taskId, params.id));
 
-      return updatedTask;
+        // Insert new subtasks
+        if (Array.isArray(body.subtasks) && body.subtasks.length > 0) {
+          await db.insert(subtasks).values(
+            body.subtasks.map(
+              (subtask: { title: string; completed?: boolean; order?: number }, index: number) => ({
+                taskId: params.id,
+                title: subtask.title,
+                completed: subtask.completed ?? false,
+                order: subtask.order ?? index
+              })
+            )
+          );
+        }
+      }
+
+      // Update reminder if due date changed
+      if (body.dueDate !== undefined && body.updateReminder) {
+        // Delete existing reminder
+        await db.delete(reminders).where(eq(reminders.taskId, params.id));
+
+        // Create new reminder if due date is set
+        if (body.dueDate) {
+          const reminderTime = new Date(body.dueDate);
+          reminderTime.setHours(reminderTime.getHours() - 1);
+
+          await db.insert(reminders).values({
+            userId: user.id,
+            taskId: params.id,
+            reminderTime,
+            message: `Task "${String(updated.title)}" is due soon`,
+            platform: 'discord'
+          });
+        }
+      }
+
+      // Broadcast task update
+      wsManager.broadcastTaskUpdate(updated.id, updated.columnId, 'updated');
+
+      return updated;
     },
     {
-      params: t.Object({
-        taskId: t.String()
-      }),
+      params: t.Object({ id: t.String() }),
       body: t.Object({
+        columnId: t.Optional(t.String()),
         title: t.Optional(t.String()),
         description: t.Optional(t.String()),
         dueDate: t.Optional(t.String()),
         priority: t.Optional(t.String()),
         completed: t.Optional(t.Boolean()),
-        columnId: t.Optional(t.String())
+        labels: t.Optional(t.Array(t.String())),
+        subtasks: t.Optional(t.Any()),
+        recurringPattern: t.Optional(t.String()),
+        recurringEndDate: t.Optional(t.String()),
+        updateReminder: t.Optional(t.Boolean())
       })
     }
   )
-  // Archive a task (mark as completed and move to a special column)
-  .post(
-    '/:taskId/archive',
+  .delete(
+    '/:id',
     async ({ params, db }) => {
-      const [archivedTask] = await db
-        .update(tasks)
-        .set({
-          completed: true,
-          updatedAt: new Date()
-        })
-        .where(eq(tasks.id, params.taskId))
-        .returning();
+      const [deleted] = await db.delete(tasks).where(eq(tasks.id, params.id)).returning();
 
-      // Broadcast task update
-      wsManager.broadcastTaskUpdate(params.taskId, archivedTask.columnId, 'updated');
+      // Broadcast task deletion
+      wsManager.broadcastTaskUpdate(deleted.id, deleted.columnId, 'deleted');
 
-      return { success: true, task: archivedTask };
+      return deleted;
     },
     {
-      params: t.Object({
-        taskId: t.String()
-      })
+      params: t.Object({ id: t.String() })
     }
   )
-
-  // Unarchive a task
   .post(
-    '/:taskId/unarchive',
-    async ({ params, db }) => {
-      const [unarchivedTask] = await db
-        .update(tasks)
-        .set({
-          completed: false,
-          updatedAt: new Date()
-        })
-        .where(eq(tasks.id, params.taskId))
-        .returning();
-
-      // Broadcast task update
-      wsManager.broadcastTaskUpdate(params.taskId, unarchivedTask.columnId, 'updated');
-
-      return { success: true, task: unarchivedTask };
-    },
-    {
-      params: t.Object({
-        taskId: t.String()
-      })
-    }
-  )
-
-  // Get archived tasks
-  .get(
-    '/archived',
-    async ({ query, db, user }) => {
-      const { space: _space = 'all', limit = 50 } = query;
-
-      const archivedTasks = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.userId, user.id), eq(tasks.completed, true)))
-        .limit(limit);
-
-      return archivedTasks;
-    },
-    {
-      query: t.Object({
-        space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])),
-        limit: t.Optional(t.Number())
-      })
-    }
-  )
-
-  // Bulk archive tasks
-  .post(
-    '/archive-bulk',
+    '/reorder',
     async ({ body, db, user }) => {
-      const { taskIds } = body;
+      const { columnId, taskIds } = body;
 
-      const archivedTasks = await db
-        .update(tasks)
-        .set({
-          completed: true,
-          updatedAt: new Date()
-        })
-        .where(and(eq(tasks.userId, user.id), inArray(tasks.id, taskIds)))
-        .returning();
+      // Verify user owns the column
+      const [column] = await db
+        .select()
+        .from(columns)
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(eq(columns.id, columnId), eq(boards.userId, user.id)));
 
-      // Broadcast updates for each task
-      archivedTasks.forEach((task: typeof tasks.$inferSelect) => {
-        wsManager.broadcastTaskUpdate(task.id, task.columnId, 'updated');
-      });
+      if (!column) throw new Error('Column not found');
 
-      return { success: true, count: archivedTasks.length };
+      // Update the column's task order
+      await db.update(columns).set({ taskOrder: taskIds }).where(eq(columns.id, columnId));
+
+      // Broadcast task reorder
+      wsManager.broadcastTaskUpdate('', columnId, 'updated');
+
+      return { success: true, taskOrder: taskIds };
     },
     {
       body: t.Object({
+        columnId: t.String(),
         taskIds: t.Array(t.String())
-      })
-    }
-  )
-
-  // Delete a task
-  .delete(
-    '/:taskId',
-    async ({ params, db }) => {
-      // Get task before deletion to know the column
-      const [task] = await db.select().from(tasks).where(eq(tasks.id, params.taskId)).limit(1);
-
-      await db.delete(tasks).where(eq(tasks.id, params.taskId));
-
-      // Broadcast task deletion
-      if (task) {
-        wsManager.broadcastTaskUpdate(params.taskId, task.columnId, 'deleted');
-      }
-
-      return { success: true };
-    },
-    {
-      params: t.Object({
-        taskId: t.String()
       })
     }
   );

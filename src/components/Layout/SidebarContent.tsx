@@ -10,8 +10,9 @@ import {
   Command,
   Timer,
   LogOut,
-  Activity
+  CheckSquare
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
@@ -25,20 +26,36 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  badge?: number;
+  badgeKey?: 'inbox' | 'agenda' | 'tasks';
 }
 
 const navItems: NavItem[] = [
-  { label: 'Overview', href: '/overview', icon: Activity },
+  { label: 'Agenda', href: '/agenda', icon: Calendar, badgeKey: 'agenda' },
+  { label: 'Tasks', href: '/overview', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Boards', href: '/', icon: LayoutGrid },
-  { label: 'Agenda', href: '/agenda', icon: Calendar },
-  { label: 'Inbox', href: '/inbox', icon: Inbox, badge: 3 },
+  { label: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'inbox' },
   { label: 'Habits', href: '/habits', icon: Target },
   { label: 'Analytics', href: '/analytics', icon: BarChart3 }
 ];
 
 interface SidebarContentProps {
   onNavigate?: () => void;
+}
+
+interface InboxItem {
+  id: string;
+  content: string;
+}
+
+interface Task {
+  id: string;
+  completed: boolean;
+  dueDate: string | null;
+}
+
+interface Habit {
+  id: string;
+  completedToday: boolean;
 }
 
 function isActiveRoute(href: string, currentPath: string): boolean {
@@ -52,6 +69,61 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { currentSpace, toggleSpace } = useSpace();
   const { user, logout } = useAuth();
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+
+  // Get today's date for queries
+  const today = new Date().toISOString().split('T')[0];
+
+  // Fetch inbox count
+  const { data: inboxItems = [] } = useQuery<InboxItem[]>({
+    queryKey: ['inbox', currentSpace],
+    queryFn: async () => {
+      const response = await fetch(`/api/inbox?space=${currentSpace}`);
+      if (!response.ok) return [];
+      return response.json();
+    }
+  });
+
+  // Fetch today's tasks (incomplete with due date today or overdue)
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ['tasks', currentSpace],
+    queryFn: async () => {
+      const response = await fetch(`/api/tasks?space=${currentSpace}`);
+      if (!response.ok) return [];
+      return response.json();
+    }
+  });
+
+  // Fetch today's habits (incomplete)
+  const { data: habits = [] } = useQuery<Habit[]>({
+    queryKey: ['habits', today, currentSpace],
+    queryFn: async () => {
+      const response = await fetch(`/api/habits?date=${today}&space=${currentSpace}`);
+      if (!response.ok) return [];
+      return response.json();
+    }
+  });
+
+  // Calculate badge counts
+  const inboxCount = inboxItems.length;
+
+  const incompleteTasks = tasks.filter((task) => {
+    if (task.completed) return false;
+    if (!task.dueDate) return false;
+    const dueDate = new Date(task.dueDate);
+    const todayDate = new Date(today);
+    return dueDate <= todayDate; // Today or overdue
+  });
+
+  const incompleteHabits = habits.filter((habit) => !habit.completedToday);
+
+  const agendaCount = incompleteTasks.length + incompleteHabits.length;
+  const tasksCount = tasks.filter((task) => !task.completed).length;
+
+  const badgeCounts: Record<string, number> = {
+    inbox: inboxCount,
+    agenda: agendaCount,
+    tasks: tasksCount
+  };
 
   return (
     <VStack gap="0" h="full">
@@ -85,6 +157,8 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
         {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = isActiveRoute(item.href, currentPath);
+          const badgeCount = item.badgeKey ? badgeCounts[item.badgeKey] : undefined;
+          const showBadge = badgeCount !== undefined && badgeCount > 0;
 
           return (
             <Link key={item.href} href={item.href} onClick={onNavigate} style={{ width: '100%' }}>
@@ -101,7 +175,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
               >
                 <IconComponent style={{ marginRight: '12px' }} width="20" height="20" />
                 {item.label}
-                {item.badge && (
+                {showBadge && (
                   <Box
                     colorPalette="red"
                     borderRadius="full"
@@ -113,7 +187,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                     fontWeight="bold"
                     bg="colorPalette.default"
                   >
-                    {item.badge}
+                    {badgeCount}
                   </Box>
                 )}
               </Button>

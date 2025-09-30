@@ -1,249 +1,180 @@
 import { Elysia, t } from 'elysia';
-import { and, eq, gte, lte, desc, inArray } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { db } from '../db';
+import { eq, and, gte } from 'drizzle-orm';
+import { withAuth } from '../auth/withAuth';
 import { habits, habitLogs } from '../../../drizzle/schema';
 
-interface User {
-  id: string;
-  email: string;
-}
+export const habitsRoutes = new Elysia({ prefix: '/habits' })
+  .use(withAuth())
+  .get('/', async ({ query, db, user }) => {
+    // Get space filter from query
+    const space = query.space || 'work';
 
-export const habitRoutes = new Elysia({ prefix: '/habits' })
-  .decorate('db', db)
+    // If date is provided, only show active habits (Agenda view)
+    // If no date, show all habits including disabled (Habits management page)
+    const conditions = [eq(habits.userId, user.id), eq(habits.space, space)];
+    if (query.date) {
+      conditions.push(eq(habits.active, true));
+    }
 
-  // Get all habits for user
-  .get('/', async ({ db, user }) => {
-    const userHabits = await db
+    // Fetch habits for the user filtered by space
+    const allHabits = await db
       .select()
       .from(habits)
-      .where(eq(habits.userId, user.id))
+      .where(and(...conditions))
       .orderBy(habits.name);
 
-    // Get today's logs for each habit
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // If date is provided, filter by day of week for weekly habits (Agenda view)
+    // If no date, return all habits (Habits management page)
+    let userHabits = allHabits;
 
-    const todayLogs = await db
-      .select()
-      .from(habitLogs)
-      .where(
-        and(
-          inArray(
-            habitLogs.habitId,
-            userHabits.map((h) => h.id)
-          ),
-          gte(habitLogs.date || habitLogs.completedAt, today),
-          lte(habitLogs.date || habitLogs.completedAt, tomorrow)
-        )
-      );
+    if (query.date) {
+      const queryDate = new Date(String(query.date));
+      queryDate.setHours(0, 0, 0, 0);
+      const dayOfWeek = queryDate.getDay(); // 0 = Sun, 1 = Mon, etc.
 
-    // Calculate streaks for each habit
+      // Filter habits based on frequency and target days
+      userHabits = allHabits.filter((habit) => {
+        if (habit.frequency === 'daily') return true;
+        if (habit.frequency === 'weekly' && habit.targetDays) {
+          return habit.targetDays.includes(dayOfWeek);
+        }
+        return false;
+      });
+    }
+
+    // Check completion status for each habit
+    // Use query date if provided, otherwise use today for completion check
+    const checkDate = query.date ? new Date(String(query.date)) : new Date();
+    checkDate.setHours(0, 0, 0, 0);
+
     const habitsWithStatus = await Promise.all(
       userHabits.map(async (habit) => {
-        const todayLog = todayLogs.find((log) => log.habitId === habit.id);
-        const streak = await calculateStreak(db, habit.id);
+        const [log] = await db
+          .select()
+          .from(habitLogs)
+          .where(and(eq(habitLogs.habitId, habit.id), gte(habitLogs.date, checkDate)))
+          .limit(1);
 
-        return { ...habit, completedToday: todayLog?.completed || false, currentStreak: streak };
+        return {
+          ...habit,
+          completedToday: log?.completed || false,
+          currentStreak: 0
+        };
       })
     );
 
     return habitsWithStatus;
   })
-
-  // Create a new habit
   .post(
     '/',
     async ({ body, db, user }) => {
       const [newHabit] = await db
         .insert(habits)
         .values({
-          ...body,
+          name: body.name,
+          description: body.description,
+          space: body.space || 'work',
           userId: user.id,
-          space: body.space || 'personal'
+          frequency: body.frequency as 'daily' | 'weekly',
+          targetDays: body.targetDays || [],
+          reminderTime: body.reminderTime || null,
+          color: body.color || '#3b82f6'
         })
         .returning();
-
       return newHabit;
     },
     {
       body: t.Object({
         name: t.String(),
         description: t.Optional(t.String()),
-        frequency: t.Union([t.Literal('daily'), t.Literal('weekly')]),
-        targetDays: t.Optional(t.Array(t.Number())), // For weekly habits: [0,1,2,3,4] = weekdays
-        color: t.Optional(t.String()),
-        space: t.Optional(t.Union([t.Literal('work'), t.Literal('personal')]))
-      })
-    }
-  )
-
-  // Update a habit
-  .patch(
-    '/:habitId',
-    async ({ params, body, db, user }) => {
-      const [updatedHabit] = await db
-        .update(habits)
-        .set(body)
-        .where(and(eq(habits.id, params.habitId), eq(habits.userId, user.id)))
-        .returning();
-
-      return updatedHabit;
-    },
-    {
-      params: t.Object({ habitId: t.String() }),
-      body: t.Object({
-        name: t.Optional(t.String()),
-        description: t.Optional(t.String()),
-        frequency: t.Optional(t.Union([t.Literal('daily'), t.Literal('weekly')])),
+        frequency: t.String(),
+        space: t.Optional(t.String()),
         targetDays: t.Optional(t.Array(t.Number())),
+        reminderTime: t.Optional(t.String()),
         color: t.Optional(t.String())
       })
     }
   )
+  .patch(
+    '/:id',
+    async ({ params, body, db, user }) => {
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date()
+      };
 
-  // Delete a habit
-  .delete(
-    '/:habitId',
-    async ({ params, db, user }) => {
-      await db.delete(habits).where(and(eq(habits.id, params.habitId), eq(habits.userId, user.id)));
+      if (body.name !== undefined) updateData.name = body.name;
+      if (body.description !== undefined) updateData.description = body.description;
+      if (body.frequency !== undefined) updateData.frequency = body.frequency as 'daily' | 'weekly';
+      if (body.targetDays !== undefined) updateData.targetDays = body.targetDays;
+      if (body.reminderTime !== undefined) updateData.reminderTime = body.reminderTime;
+      if (body.color !== undefined) updateData.color = body.color;
+      if (body.active !== undefined) updateData.active = body.active;
 
-      return { success: true };
+      const [updated] = await db
+        .update(habits)
+        .set(updateData)
+        .where(and(eq(habits.id, params.id), eq(habits.userId, user.id)))
+        .returning();
+      return updated;
     },
-    { params: t.Object({ habitId: t.String() }) }
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        name: t.Optional(t.String()),
+        description: t.Optional(t.String()),
+        frequency: t.Optional(t.String()),
+        targetDays: t.Optional(t.Array(t.Number())),
+        reminderTime: t.Optional(t.String()),
+        color: t.Optional(t.String()),
+        active: t.Optional(t.Boolean())
+      })
+    }
   )
-
-  // Toggle habit completion for today
+  .delete('/:id', async ({ params, db, user }) => {
+    await db
+      .update(habits)
+      .set({ active: false })
+      .where(and(eq(habits.id, params.id), eq(habits.userId, user.id)));
+    return { success: true };
+  })
   .post(
-    '/:habitId/toggle',
-    async ({ params, db }) => {
+    '/:id/log',
+    async ({ params, db, _user }) => {
+      // Check if already logged today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Check if log exists for today
       const [existingLog] = await db
         .select()
         .from(habitLogs)
-        .where(and(eq(habitLogs.habitId, params.habitId), eq(habitLogs.date, today)))
-        .limit(1);
+        .where(and(eq(habitLogs.habitId, params.id), gte(habitLogs.date, today)));
 
       if (existingLog) {
-        // Toggle existing log
-        const [updatedLog] = await db
+        // Toggle completion
+        const [updated] = await db
           .update(habitLogs)
-          .set({ completed: !existingLog.completed })
+          .set({
+            completed: !existingLog.completed,
+            completedAt: !existingLog.completed ? new Date() : existingLog.completedAt
+          })
           .where(eq(habitLogs.id, existingLog.id))
           .returning();
-
-        return updatedLog;
-      } else {
-        // Create new log
-        const [newLog] = await db
-          .insert(habitLogs)
-          .values({
-            habitId: params.habitId,
-            date: today,
-            completedAt: today,
-            completed: true
-          })
-          .returning();
-
-        return newLog;
+        return updated;
       }
+
+      // Create new log
+      const [newLog] = await db
+        .insert(habitLogs)
+        .values({
+          habitId: params.id,
+          date: today,
+          completedAt: new Date(),
+          completed: true
+        })
+        .returning();
+      return newLog;
     },
-    { params: t.Object({ habitId: t.String() }) }
-  )
-
-  // Get habit history
-  .get(
-    '/:habitId/history',
-    async ({ params, query, db }) => {
-      const { days = 30 } = query;
-
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      startDate.setHours(0, 0, 0, 0);
-
-      const logs = await db
-        .select()
-        .from(habitLogs)
-        .where(and(eq(habitLogs.habitId, params.habitId), gte(habitLogs.date, startDate)))
-        .orderBy(desc(habitLogs.completedAt));
-
-      return logs;
-    },
-    { params: t.Object({ habitId: t.String() }), query: t.Object({ days: t.Optional(t.Number()) }) }
-  )
-
-  // Get habit statistics
-  .get('/stats', async ({ db, user }) => {
-    const userHabits = await db.select().from(habits).where(eq(habits.userId, user.id));
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const habitIds = userHabits.map((h) => h.id);
-    const logs = await db
-      .select()
-      .from(habitLogs)
-      .where(and(inArray(habitLogs.habitId, habitIds), gte(habitLogs.completedAt, thirtyDaysAgo)));
-
-    // Calculate statistics
-    const stats = {
-      totalHabits: userHabits.length,
-      completedToday: logs.filter((log) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const logDate = log.date || log.completedAt;
-        return logDate && logDate >= today && log.completed;
-      }).length,
-      completionRate:
-        logs.length > 0
-          ? Math.round((logs.filter((l) => l.completed).length / logs.length) * 100)
-          : 0,
-      longestStreak: 0, // Would need more complex calculation
-      currentStreaks: await Promise.all(
-        userHabits.map(async (habit) => ({
-          habitName: habit.name,
-          streak: await calculateStreak(db, habit.id)
-        }))
-      )
-    };
-
-    return stats;
-  });
-
-// Helper function to calculate current streak
-async function calculateStreak(db: PostgresJsDatabase, habitId: string): Promise<number> {
-  const logs = await db
-    .select()
-    .from(habitLogs)
-    .where(eq(habitLogs.habitId, habitId))
-    .orderBy(desc(habitLogs.completedAt));
-
-  let streak = 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  for (let i = 0; i < logs.length; i++) {
-    const logDateValue = logs[i].date || logs[i].completedAt;
-    if (!logDateValue) continue;
-
-    const logDate = new Date(logDateValue);
-    const expectedDate = new Date(today);
-    expectedDate.setDate(expectedDate.getDate() - i);
-
-    if (logDate.toDateString() === expectedDate.toDateString() && logs[i].completed) {
-      streak++;
-    } else if (i === 0 && logDate < today) {
-      // If no log for today yet, check yesterday
-      continue;
-    } else {
-      break;
+    {
+      params: t.Object({ id: t.String() })
     }
-  }
-
-  return streak;
-}
+  );

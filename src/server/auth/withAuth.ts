@@ -22,7 +22,7 @@ export const withAuth = () =>
         secret: process.env.JWT_SECRET || 'your-secret-key'
       })
     )
-    .derive(async ({ cookie, jwt, db, set }) => {
+    .derive({ as: 'global' }, async ({ cookie, jwt, db, set }) => {
       const token = cookie.auth?.value;
 
       if (!token) {
@@ -56,7 +56,7 @@ export const withAuth = () =>
             name: user.name
           } as AuthUser
         };
-      } catch (_error) {
+      } catch {
         set.status = 401;
         throw new Error('Authentication failed');
       }

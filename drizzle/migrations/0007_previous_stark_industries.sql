@@ -1,0 +1,1 @@
+ALTER TABLE "habits" ADD COLUMN "reminder_time" varchar(5);

@@ -277,12 +277,25 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
   const handleTaskSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
+
+    // Parse JSON fields
+    const labelsStr = formData.get('labels') as string;
+    const subtasksStr = formData.get('subtasks') as string;
+    const recurringPattern = formData.get('recurringPattern') as string;
+    const recurringEndDate = formData.get('recurringEndDate') as string;
+    const createReminder = formData.get('createReminder') === 'true';
+
+    const data: Partial<Task> = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
       priority: formData.get('priority') as Task['priority'],
       dueDate: formData.get('dueDate') as string,
-      columnId: formData.get('columnId') as string
+      columnId: formData.get('columnId') as string,
+      labels: labelsStr ? JSON.parse(labelsStr) : undefined,
+      subtasks: subtasksStr ? JSON.parse(subtasksStr) : undefined,
+      recurringPattern: recurringPattern || undefined,
+      recurringEndDate: recurringEndDate || undefined,
+      createReminder: createReminder || undefined
     };
 
     if (editingTask) {

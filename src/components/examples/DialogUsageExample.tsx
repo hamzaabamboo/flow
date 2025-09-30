@@ -36,7 +36,7 @@ export function SimpleDialogExample() {
 export function TaskDialogExample() {
   const taskDialog = Dialog.useDialogContext();
 
-  const handleTaskSubmit = (taskData: any) => {
+  const handleTaskSubmit = (taskData: Record<string, unknown>) => {
     console.log('Task submitted:', taskData);
     // Handle task creation/update here
   };

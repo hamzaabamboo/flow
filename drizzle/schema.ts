@@ -7,8 +7,10 @@ import {
   varchar,
   boolean,
   integer,
-  pgEnum
+  pgEnum,
+  type AnyPgColumn
 } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 export const spaceEnum = pgEnum('space_enum', ['work', 'personal']);
 
@@ -65,7 +67,10 @@ export const tasks = pgTable('tasks', {
   completed: boolean('completed').default(false),
   labels: jsonb('labels').$type<string[]>().default([]), // Array of label strings
   recurringPattern: varchar('recurring_pattern', { length: 100 }), // 'daily', 'weekly', 'monthly', 'custom:cron'
-  parentTaskId: uuid('parent_task_id').references(() => tasks.id, { onDelete: 'cascade' }), // For recurring task instances
+  recurringEndDate: timestamp('recurring_end_date'), // When to stop recurring (optional)
+  parentTaskId: uuid('parent_task_id').references((): AnyPgColumn => tasks.id, {
+    onDelete: 'cascade'
+  }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -122,6 +127,7 @@ export const habits = pgTable('habits', {
   description: text('description'),
   frequency: varchar('frequency', { length: 50 }).notNull(), // 'daily', 'weekly'
   targetDays: integer('target_days').array(), // For weekly habits: [0,1,2,3,4] = weekdays
+  reminderTime: varchar('reminder_time', { length: 5 }), // Optional time in HH:mm format (e.g., "07:00", "18:30")
   space: varchar('space', { length: 20 }).notNull(), // 'work' or 'personal'
   color: text('color'),
   active: boolean('active').default(true).notNull(),
@@ -174,3 +180,31 @@ export const calendarIntegrations = pgTable('calendar_integrations', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
+
+// Relations
+export const tasksRelations = relations(tasks, ({ many, one }) => ({
+  subtasks: many(subtasks),
+  column: one(columns, {
+    fields: [tasks.columnId],
+    references: [columns.id]
+  })
+}));
+
+export const subtasksRelations = relations(subtasks, ({ one }) => ({
+  task: one(tasks, {
+    fields: [subtasks.taskId],
+    references: [tasks.id]
+  })
+}));
+
+export const columnsRelations = relations(columns, ({ one, many }) => ({
+  board: one(boards, {
+    fields: [columns.boardId],
+    references: [boards.id]
+  }),
+  tasks: many(tasks)
+}));
+
+export const boardsRelations = relations(boards, ({ many }) => ({
+  columns: many(columns)
+}));

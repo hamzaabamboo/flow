@@ -9,8 +9,17 @@ import { connect } from 'elysia-connect-middleware';
 import { db } from './db';
 import { webhookRoutes } from './routes/webhook';
 import { calendarRoutes } from './routes/calendar';
+import { boardRoutes } from './routes/boards';
+import { columnsRoutes } from './routes/columns';
+import { tasksRoutes } from './routes/tasks';
+import { subtasksRoutes } from './routes/subtasks';
+import { inboxRoutes } from './routes/inbox';
+import { pomodoroRoutes } from './routes/pomodoro';
+import { habitsRoutes } from './routes/habits';
+import { commandRoutes } from './routes/command';
+import { searchRoutes } from './routes/search';
+import { settingsRoutes } from './routes/settings';
 import { simpleAuth } from './auth/simple-auth';
-import { apiRoutes } from './apiRoutes';
 import { reminderCron } from './cron';
 import { wsManager } from './websocket';
 
@@ -55,6 +64,20 @@ app
   .use(calendarRoutes)
   // Cron jobs
   .use(reminderCron)
+  // Protected API Routes
+  .group('/api', (api) =>
+    api
+      .use(boardRoutes)
+      .use(columnsRoutes)
+      .use(tasksRoutes)
+      .use(subtasksRoutes)
+      .use(inboxRoutes)
+      .use(pomodoroRoutes)
+      .use(habitsRoutes)
+      .use(commandRoutes)
+      .use(searchRoutes)
+      .use(settingsRoutes)
+  )
   // WebSocket for real-time updates
   .ws('/ws', {
     open(ws) {
@@ -72,7 +95,7 @@ app
       }, 30000);
 
       // Store interval ID for cleanup
-      ws.data = { pingInterval };
+      (ws as { data?: { pingInterval: NodeJS.Timeout } }).data = { pingInterval };
     },
     message(ws, message) {
       // Broadcast updates to all clients
@@ -82,23 +105,23 @@ app
       console.log(`WebSocket client disconnected (code: ${code}, reason: ${reason})`);
 
       // Clean up ping interval
-      if (ws.data?.pingInterval) {
-        clearInterval(ws.data.pingInterval);
+      const wsData = (ws as { data?: { pingInterval: NodeJS.Timeout } }).data;
+      if (wsData?.pingInterval) {
+        clearInterval(wsData.pingInterval);
       }
 
       ws.unsubscribe('hamflow');
     },
-    error(ws, error) {
+    error(ws: unknown, error: Error) {
       console.error('WebSocket error:', error);
 
       // Clean up ping interval on error
-      if (ws.data?.pingInterval) {
-        clearInterval(ws.data.pingInterval);
+      const wsData = (ws as { data?: { pingInterval: NodeJS.Timeout } }).data;
+      if (wsData?.pingInterval) {
+        clearInterval(wsData.pingInterval);
       }
     }
   })
-  // Protected API Routes
-  .use(apiRoutes)
   // Catch-all route for SSR (must be last)
   .get('/*', async ({ request }) => {
     const pageContextInit = { urlOriginal: request.url };

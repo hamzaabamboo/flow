@@ -1,5 +1,5 @@
+import { withAuth } from '../auth/withAuth';
 import { Elysia, t } from 'elysia';
-import { db } from '../db';
 import { inboxItems, reminders } from '../../../drizzle/schema';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
 
@@ -9,7 +9,7 @@ interface User {
 }
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
-  .decorate('db', db)
+  .use(withAuth())
   // Process a natural language command
   .post(
     '/',
