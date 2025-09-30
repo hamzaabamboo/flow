@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { FileText, Bell, Target, Calendar } from 'lucide-react';
-import { Container } from '../../../styled-system/jsx';
-import { VStack, HStack } from '../../../styled-system/jsx';
+import { Container, Box, VStack, HStack } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -229,26 +228,103 @@ export default function AgendaPage() {
             Object.entries(groupedEvents).map(([dateKey, dayEvents]) => {
               const date = new Date(dateKey);
               const isToday = isSameDay(date, new Date());
+              const isPast = date < new Date() && !isToday;
 
               return (
-                <Card.Root key={dateKey} minH="400px" bg={isToday ? 'bg.muted' : 'bg.default'}>
-                  <Card.Header pb="2">
-                    <Text color="fg.default" fontWeight="semibold">
-                      {format(date, 'EEE d')}
-                    </Text>
+                <Card.Root
+                  key={dateKey}
+                  minH="300px"
+                  borderWidth="2px"
+                  borderColor={isToday ? 'blue.default' : 'border.default'}
+                  bg={isPast ? 'bg.subtle' : 'bg.default'}
+                  opacity={isPast ? 0.75 : 1}
+                >
+                  <Card.Header pb="3" borderBottomWidth="1px">
+                    <VStack gap="1" alignItems="start">
+                      <Text
+                        color={isToday ? 'blue.default' : 'fg.default'}
+                        fontWeight="bold"
+                        fontSize="sm"
+                      >
+                        {format(date, 'EEE')}
+                      </Text>
+                      <Text
+                        color={isToday ? 'blue.default' : 'fg.muted'}
+                        fontSize="2xl"
+                        fontWeight="bold"
+                      >
+                        {format(date, 'd')}
+                      </Text>
+                      {dayEvents.length > 0 && (
+                        <Badge variant="subtle" size="xs" colorPalette="blue">
+                          {dayEvents.length} {dayEvents.length === 1 ? 'task' : 'tasks'}
+                        </Badge>
+                      )}
+                    </VStack>
                   </Card.Header>
-                  <Card.Body>
+                  <Card.Body pt="3">
                     <VStack gap="2" alignItems="stretch">
                       {dayEvents.map((event) => (
-                        <EventItem
+                        <Box
                           key={event.id}
-                          event={event}
-                          onComplete={() => void completeTask(event.id)}
-                          compact
-                        />
+                          borderRadius="md"
+                          p="2"
+                          bg={event.completed ? 'bg.muted' : 'bg.surface'}
+                          borderLeftWidth="3px"
+                          borderLeftColor={
+                            event.priority === 'urgent'
+                              ? 'red.default'
+                              : event.priority === 'high'
+                                ? 'orange.default'
+                                : event.priority === 'medium'
+                                  ? 'yellow.default'
+                                  : 'gray.default'
+                          }
+                          opacity={event.completed ? 0.6 : 1}
+                          transition="all 0.2s"
+                          cursor="pointer"
+                          _hover={{
+                            bg: event.completed ? 'bg.muted' : 'bg.emphasized',
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'sm'
+                          }}
+                          onClick={() => void completeTask(event.id)}
+                        >
+                          <VStack gap="1" alignItems="start">
+                            <HStack gap="2" width="100%">
+                              {event.type === 'task' && (
+                                <Checkbox
+                                  checked={event.completed}
+                                  onChange={() => void completeTask(event.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  size="sm"
+                                />
+                              )}
+                              <Text
+                                flex="1"
+                                fontSize="xs"
+                                fontWeight="medium"
+                                textDecoration={event.completed ? 'line-through' : 'none'}
+                                noOfLines={2}
+                              >
+                                {event.title}
+                              </Text>
+                            </HStack>
+                            {event.dueDate && (
+                              <Text fontSize="2xs" color="fg.muted">
+                                {format(new Date(event.dueDate), 'h:mm a')}
+                              </Text>
+                            )}
+                          </VStack>
+                        </Box>
                       ))}
                       {dayEvents.length === 0 && (
-                        <Text color="fg.subtle" fontSize="sm" textAlign="center">
+                        <Text
+                          color="fg.subtle"
+                          fontSize="xs"
+                          textAlign="center"
+                          py="4"
+                        >
                           No events
                         </Text>
                       )}
