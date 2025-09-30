@@ -156,3 +156,21 @@ export const pomodoroSessions = pgTable('pomodoro_sessions', {
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
+
+// Calendar integrations table for OAuth tokens
+export const calendarIntegrations = pgTable('calendar_integrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  provider: varchar('provider', { length: 50 }).notNull(), // 'google', 'microsoft'
+  accessToken: text('access_token').notNull(),
+  refreshToken: text('refresh_token'),
+  tokenExpiry: timestamp('token_expiry'),
+  email: varchar('email', { length: 255 }),
+  calendarId: varchar('calendar_id', { length: 255 }),
+  syncEnabled: boolean('sync_enabled').default(true).notNull(),
+  lastSyncAt: timestamp('last_sync_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});

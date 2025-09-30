@@ -975,4 +975,54 @@ export const apiRoutes = new Elysia()
         const baseUrl = process.env.API_URL || `http://localhost:3000`;
         return { url: `${baseUrl}/calendar/ical/${token}` };
       })
+      .get(
+        '/calendar/events',
+        async ({ query, db, user }) => {
+          const { start, end, space } = query;
+
+          // Parse dates
+          const startDate = start ? new Date(start) : new Date();
+          const endDate = end ? new Date(end) : new Date();
+
+          // Build conditions
+          const conditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
+
+          if (start) {
+            conditions.push(gte(tasks.dueDate, startDate));
+          }
+          if (end) {
+            conditions.push(lte(tasks.dueDate, endDate));
+          }
+          if (space && space !== 'all') {
+            conditions.push(eq(boards.space, space as 'work' | 'personal'));
+          }
+
+          // Fetch tasks with due dates in the range
+          const events = await db
+            .select({
+              id: tasks.id,
+              title: tasks.title,
+              description: tasks.description,
+              dueDate: tasks.dueDate,
+              priority: tasks.priority,
+              completed: tasks.completed,
+              type: sql<string>`'task'`,
+              space: boards.space
+            })
+            .from(tasks)
+            .leftJoin(columns, eq(tasks.columnId, columns.id))
+            .leftJoin(boards, eq(columns.boardId, boards.id))
+            .where(and(...conditions))
+            .orderBy(tasks.dueDate);
+
+          return events;
+        },
+        {
+          query: t.Object({
+            start: t.Optional(t.String()),
+            end: t.Optional(t.String()),
+            space: t.Optional(t.String())
+          })
+        }
+      )
   );
