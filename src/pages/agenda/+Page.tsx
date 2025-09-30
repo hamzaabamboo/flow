@@ -339,7 +339,7 @@ export default function AgendaPage() {
           <Card.Body>
             <HStack gap="8" justifyContent="center">
               <VStack gap="1">
-                <Text colorPalette="blue" color="colorPalette.fg" fontSize="2xl" fontWeight="bold">
+                <Text color="blue.default" fontSize="2xl" fontWeight="bold">
                   {events?.filter((e) => e.type === 'task' && !e.completed).length || 0}
                 </Text>
                 <Text color="fg.muted" fontSize="sm">
@@ -347,7 +347,7 @@ export default function AgendaPage() {
                 </Text>
               </VStack>
               <VStack gap="1">
-                <Text colorPalette="green" color="colorPalette.fg" fontSize="2xl" fontWeight="bold">
+                <Text color="green.default" fontSize="2xl" fontWeight="bold">
                   {habits?.filter((h) => h.completedToday).length || 0}/{habits?.length || 0}
                 </Text>
                 <Text color="fg.muted" fontSize="sm">
@@ -355,12 +355,7 @@ export default function AgendaPage() {
                 </Text>
               </VStack>
               <VStack gap="1">
-                <Text
-                  colorPalette="purple"
-                  color="colorPalette.fg"
-                  fontSize="2xl"
-                  fontWeight="bold"
-                >
+                <Text color="purple.default" fontSize="2xl" fontWeight="bold">
                   {events?.filter((e) => e.type === 'reminder').length || 0}
                 </Text>
                 <Text color="fg.muted" fontSize="sm">
