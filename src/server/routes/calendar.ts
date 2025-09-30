@@ -168,7 +168,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         ical.push(`DTSTAMP:${formatICalDate(now)}`);
         ical.push(`DTSTART:${formatICalDate(reminderDate)}`);
         ical.push(`DTEND:${formatICalDate(endDate)}`);
-        ical.push(`SUMMARY:${escapeICalText(`⏰ ${reminder.message}`)}`);
+        ical.push(`SUMMARY:${escapeICalText(`[Reminder] ${reminder.message}`)}`);
         ical.push('STATUS:CONFIRMED');
         ical.push('CATEGORIES:reminders');
 
@@ -216,7 +216,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         ical.push(`DTSTAMP:${formatICalDate(now)}`);
         ical.push(`DTSTART:${formatICalDate(startDate)}`);
         ical.push(`DTEND:${formatICalDate(endDate)}`);
-        ical.push(`SUMMARY:${escapeICalText(`✅ Habit: ${habit.name}`)}`);
+        ical.push(`SUMMARY:${escapeICalText(`[Habit] ${habit.name}`)}`);
 
         if (habit.description) {
           ical.push(`DESCRIPTION:${escapeICalText(habit.description)}`);
@@ -285,7 +285,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       ];
 
       if (space !== 'all') {
-        whereConditions.push(eq(boards.space, space as any));
+        whereConditions.push(eq(boards.space, space));
       }
 
       const taskEvents = await db

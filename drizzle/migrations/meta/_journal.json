@@ -29,6 +29,20 @@
       "when": 1758706311618,
       "tag": "0003_rare_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1759196990297,
+      "tag": "0004_demonic_jubilee",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1759198397640,
+      "tag": "0005_futuristic_mentallo",
+      "breakpoints": true
     }
   ]
 }

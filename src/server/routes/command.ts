@@ -25,21 +25,25 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
         ]);
 
         const toolCalls = result.toolCalls || [];
-        let parsedCommandResult: any;
-        let parseDateTimeResult: any;
+        let parsedCommandResult: { action: string; data: Record<string, unknown> } | undefined;
+        let parseDateTimeResult: string | undefined;
 
         for (const toolCall of toolCalls) {
           if (toolCall.toolName === 'parse-task-command') {
             if (commandProcessor.tools.parseTaskCommand) {
-              parsedCommandResult = await (commandProcessor.tools.parseTaskCommand as any).execute(
-                toolCall.args
-              );
+              parsedCommandResult = (
+                commandProcessor.tools.parseTaskCommand as {
+                  execute: (args: unknown) => { action: string; data: Record<string, unknown> };
+                }
+              ).execute(toolCall.args);
             }
           } else if (toolCall.toolName === 'parse-datetime') {
             if (commandProcessor.tools.parseDateTime) {
-              parseDateTimeResult = await (commandProcessor.tools.parseDateTime as any).execute(
-                toolCall.args
-              );
+              parseDateTimeResult = (
+                commandProcessor.tools.parseDateTime as {
+                  execute: (args: unknown) => string;
+                }
+              ).execute(toolCall.args);
             }
           }
         }
@@ -63,10 +67,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           };
         }
 
-        const { action, data } = parsedCommandResult as {
-          action: string;
-          data: Record<string, unknown>;
-        };
+        const { action, data } = parsedCommandResult;
 
         switch (action) {
           case 'create_task':
@@ -90,7 +91,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           case 'create_reminder':
             // Parse time from command
             const reminderTime = parseDateTimeResult
-              ? new Date(parseDateTimeResult as string)
+              ? new Date(parseDateTimeResult)
               : new Date(Date.now() + 30 * 60 * 1000); // Default to 30 minutes
 
             const [reminder] = await db

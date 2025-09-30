@@ -8,6 +8,7 @@ import { connect } from 'elysia-connect-middleware';
 
 import { db } from './db';
 import { webhookRoutes } from './routes/webhook';
+import { calendarRoutes } from './routes/calendar';
 import { simpleAuth } from './auth/simple-auth';
 import { apiRoutes } from './apiRoutes';
 import { reminderCron } from './cron';
@@ -50,6 +51,8 @@ app
   .use(simpleAuth)
   // Public webhook endpoints
   .use(webhookRoutes)
+  // Public calendar routes
+  .use(calendarRoutes)
   // Cron jobs
   .use(reminderCron)
   // WebSocket for real-time updates

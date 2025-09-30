@@ -9,7 +9,8 @@ import {
   Home,
   Command,
   Timer,
-  LogOut
+  LogOut,
+  Activity
 } from 'lucide-react';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { label: 'Overview', href: '/overview', icon: Activity },
   { label: 'Boards', href: '/', icon: LayoutGrid },
   { label: 'Agenda', href: '/agenda', icon: Calendar },
   { label: 'Inbox', href: '/inbox', icon: Inbox, badge: 3 },

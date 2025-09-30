@@ -1,0 +1,1 @@
+Always read and update CLAUDE.md

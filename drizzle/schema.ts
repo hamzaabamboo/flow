@@ -42,6 +42,7 @@ export const columns = pgTable('columns', {
     .notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   position: integer('position').notNull().default(0),
+  wipLimit: integer('wip_limit'), // Work In Progress limit
   taskOrder: jsonb('task_order').notNull().default([]),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
@@ -62,6 +63,22 @@ export const tasks = pgTable('tasks', {
   priority: varchar('priority', { length: 20 }), // 'low', 'medium', 'high', 'urgent'
   noteId: varchar('note_id', { length: 255 }), // Link to Notes Server
   completed: boolean('completed').default(false),
+  labels: jsonb('labels').$type<string[]>().default([]), // Array of label strings
+  recurringPattern: varchar('recurring_pattern', { length: 100 }), // 'daily', 'weekly', 'monthly', 'custom:cron'
+  parentTaskId: uuid('parent_task_id').references(() => tasks.id, { onDelete: 'cascade' }), // For recurring task instances
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+// Subtasks table
+export const subtasks = pgTable('subtasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  taskId: uuid('task_id')
+    .references(() => tasks.id, { onDelete: 'cascade' })
+    .notNull(),
+  title: varchar('title', { length: 500 }).notNull(),
+  completed: boolean('completed').default(false),
+  order: integer('order').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });

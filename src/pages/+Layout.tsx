@@ -9,6 +9,7 @@ import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
 import { CommandBar } from '../components/CommandBar/CommandBar';
 import { PomodoroTimer } from '../components/Pomodoro/PomodoroTimer';
 import { useWebSocket } from '../hooks/useWebSocket';
+import ErrorBoundary from '../components/utils/ErrorBoundary';
 import { Text } from '../components/ui/text';
 import { Button } from '../components/ui/button';
 import { IconButton } from '../components/ui/icon-button';
@@ -284,6 +285,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
       {/* Mobile Sidebar Overlay */}
       {mobileSidebarOpen && (
         <Box
+          onClick={() => setMobileSidebarOpen(false)}
           display={{ base: 'block', lg: 'none' }}
           zIndex="30"
           position="fixed"
@@ -292,18 +294,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
           right="0"
           bottom="0"
           bg="bg.canvas/80"
-          onClick={() => setMobileSidebarOpen(false)}
         >
           <Box
+            onClick={(e) => e.stopPropagation()}
             position="fixed"
             top="0"
             left="0"
+            borderColor="border.default"
+            borderRightWidth="1px"
             w="280px"
             h="100vh"
             bg="bg.default"
-            borderRightWidth="1px"
-            borderColor="border.default"
-            onClick={(e) => e.stopPropagation()}
           >
             <Sidebar />
           </Box>
@@ -366,7 +367,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   }
                 }
               `}</style>
-              <AppContent>{children}</AppContent>
+              <ErrorBoundary>
+                <AppContent>{children}</AppContent>
+              </ErrorBoundary>
             </Box>
           </SpaceProvider>
         </AuthProvider>

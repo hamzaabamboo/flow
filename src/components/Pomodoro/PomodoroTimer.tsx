@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { X, Minimize2, Maximize2, Timer } from 'lucide-react';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Box, HStack, VStack } from 'styled-system/jsx';
+import { IconButton } from '../ui/icon-button';
+import { Box, HStack } from 'styled-system/jsx';
 
 interface PomodoroSession {
   taskId?: string;
@@ -28,8 +30,23 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   const [timeLeft, setTimeLeft] = useState(TIMERS.work);
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isHidden, setIsHidden] = useState(() => {
+    // Load hidden state from localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pomodoroHidden') === 'true';
+    }
+    return false;
+  });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Save hidden state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pomodoroHidden', isHidden.toString());
+    }
+  }, [isHidden]);
 
   // Save completed session
   const saveSession = useMutation({
@@ -140,6 +157,81 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
 
   const progress = ((session.duration - timeLeft) / session.duration) * 100;
 
+  // If completely hidden, show a small floating button to restore
+  if (isHidden) {
+    return (
+      <Box zIndex="50" position="fixed" right="8" bottom="8">
+        <IconButton
+          onClick={() => setIsHidden(false)}
+          variant="solid"
+          size="lg"
+          aria-label="Show Pomodoro Timer"
+          colorPalette={getSessionColorPalette()}
+          borderRadius="full"
+          shadow="lg"
+        >
+          <Timer />
+        </IconButton>
+      </Box>
+    );
+  }
+
+  // Minimized view - just show timer and basic controls
+  if (isMinimized) {
+    return (
+      <Box
+        zIndex="50"
+        position="fixed"
+        right="8"
+        bottom="8"
+        borderColor="border.subtle"
+        borderRadius="xl"
+        borderWidth="2px"
+        p="4"
+        bg="bg.default"
+        shadow="xl"
+      >
+        <HStack gap="3" alignItems="center">
+          <Text color="fg.default" fontFamily="mono" fontSize="2xl" fontWeight="bold">
+            {formatTime(timeLeft)}
+          </Text>
+
+          <Badge size="sm" colorPalette={getSessionColorPalette()}>
+            {session.type.replace('-', ' ')}
+          </Badge>
+
+          <Button
+            onClick={toggleTimer}
+            variant={isRunning ? 'ghost' : 'solid'}
+            size="sm"
+            colorPalette={!isRunning ? getSessionColorPalette() : undefined}
+          >
+            {isRunning ? 'Pause' : 'Start'}
+          </Button>
+
+          <IconButton
+            onClick={() => setIsMinimized(false)}
+            variant="ghost"
+            size="sm"
+            aria-label="Expand Timer"
+          >
+            <Maximize2 width="16" height="16" />
+          </IconButton>
+
+          <IconButton
+            onClick={() => setIsHidden(true)}
+            variant="ghost"
+            size="sm"
+            aria-label="Hide Timer"
+          >
+            <X width="16" height="16" />
+          </IconButton>
+        </HStack>
+      </Box>
+    );
+  }
+
+  // Full view
   return (
     <Box
       zIndex="50"
@@ -154,8 +246,8 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       bg="bg.default"
       shadow="xl"
     >
-      {/* Session Type */}
-      <VStack mb="4">
+      {/* Header with minimize/close buttons */}
+      <HStack justifyContent="space-between" alignItems="center" mb="4">
         <Badge
           variant="solid"
           colorPalette={
@@ -167,12 +259,33 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         >
           {session.type.replace('-', ' ')}
         </Badge>
-        {session.taskTitle && (
-          <Text mt="1" color="fg.muted" fontSize="xs">
-            {session.taskTitle}
-          </Text>
-        )}
-      </VStack>
+
+        <HStack gap="1">
+          <IconButton
+            onClick={() => setIsMinimized(true)}
+            variant="ghost"
+            size="sm"
+            aria-label="Minimize Timer"
+          >
+            <Minimize2 width="16" height="16" />
+          </IconButton>
+          <IconButton
+            onClick={() => setIsHidden(true)}
+            variant="ghost"
+            size="sm"
+            aria-label="Hide Timer"
+          >
+            <X width="16" height="16" />
+          </IconButton>
+        </HStack>
+      </HStack>
+
+      {/* Task Title */}
+      {session.taskTitle && (
+        <Text mb="4" color="fg.muted" fontSize="xs" textAlign="center">
+          {session.taskTitle}
+        </Text>
+      )}
 
       {/* Timer Display */}
       <Text

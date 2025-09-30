@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sun, Moon } from 'lucide-react';
 import { useColorMode } from '../../contexts/ColorModeContext';
 import { IconButton } from '../ui/icon-button';
 
@@ -12,7 +13,7 @@ export function ColorModeToggle() {
       aria-label={`Switch to ${colorMode === 'dark' ? 'light' : 'dark'} mode`}
       title={`Switch to ${colorMode === 'dark' ? 'light' : 'dark'} mode`}
     >
-      {colorMode === 'dark' ? '☀️' : '🌙'}
+      {colorMode === 'dark' ? <Sun width="20" height="20" /> : <Moon width="20" height="20" />}
     </IconButton>
   );
 }

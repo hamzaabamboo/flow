@@ -19,7 +19,7 @@ const parseTaskCommand = createTool({
   inputSchema: z.object({
     command: z.string()
   }),
-  execute: async (context: any) => {
+  execute: (context: { input: { command: string } }) => {
     const { command } = context.input;
     const lowerCommand = command.toLowerCase();
 
@@ -131,7 +131,7 @@ const parseDateTime = createTool({
   inputSchema: z.object({
     text: z.string()
   }),
-  execute: async (context: any) => {
+  execute: (context: { input: { text: string } }) => {
     const { text } = context.input;
     const now = new Date();
     const lowerText = text.toLowerCase();

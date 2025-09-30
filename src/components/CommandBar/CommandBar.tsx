@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import React, { useState, useRef } from 'react';
+import { Mic, Circle } from 'lucide-react';
 import { useSpace } from '../../contexts/SpaceContext';
 import { Input } from '../ui/input';
 import { IconButton } from '../ui/icon-button';
@@ -129,7 +130,11 @@ export function CommandBar() {
         aria-label="Voice input"
         colorPalette={isListening ? 'red' : undefined}
       >
-        {isListening ? '🔴' : '🎤'}
+        {isListening ? (
+          <Circle width="16" height="16" fill="currentColor" />
+        ) : (
+          <Mic width="16" height="16" />
+        )}
       </IconButton>
 
       {isProcessing && (

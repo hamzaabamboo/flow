@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MessageCircle, Bot, Mail, FileText, PartyPopper } from 'lucide-react';
 import { useSpace } from '../../contexts/SpaceContext';
 import { Button } from '../../components/ui/button';
 import * as Card from '../../components/ui/styled/card';
@@ -78,13 +79,13 @@ export default function InboxPage() {
   const getSourceIcon = (source: string) => {
     switch (source) {
       case 'command':
-        return '💬';
+        return <MessageCircle width="16" height="16" />;
       case 'hambot':
-        return '🤖';
+        return <Bot width="16" height="16" />;
       case 'email':
-        return '📧';
+        return <Mail width="16" height="16" />;
       default:
-        return '📝';
+        return <FileText width="16" height="16" />;
     }
   };
 
@@ -120,7 +121,6 @@ export default function InboxPage() {
             </Button>
 
             <Button
-              variant="solid"
               onClick={() => {
                 if (confirm('Delete selected items?')) {
                   deleteItems.mutate(Array.from(selectedItems));
@@ -136,18 +136,26 @@ export default function InboxPage() {
       </HStack>
 
       {!items || items.length === 0 ? (
-        <Card.Root textAlign="center" bg="bg.subtle">
-          <Card.Body py="12">
-            <Text mb="2" color="fg.muted" fontSize="lg">
-              Your inbox is empty! 🎉
-            </Text>
-            <Text color="fg.subtle">
-              New items will appear here when you use the command bar or receive messages.
+        <Card.Root width="full" textAlign="center">
+          <Card.Header>
+            <Card.Title>
+              <HStack gap="2" justifyContent="center">
+                <Text>Your inbox is empty!</Text>
+                <PartyPopper width="20" height="20" />
+              </HStack>
+            </Card.Title>
+            <Card.Description>
+              New items will appear here when you use the command bar or receive messages
+            </Card.Description>
+          </Card.Header>
+          <Card.Body py="8">
+            <Text color="fg.muted" fontSize="sm">
+              No pending items in your {currentSpace} inbox
             </Text>
           </Card.Body>
         </Card.Root>
       ) : (
-        <VStack gap="2">
+        <VStack gap="3">
           {items.map((item) => (
             <Card.Root
               key={item.id}
@@ -155,36 +163,37 @@ export default function InboxPage() {
               cursor="pointer"
               borderColor={selectedItems.has(item.id) ? 'colorPalette.default' : 'border.default'}
               borderWidth="2px"
+              width="full"
               bg={selectedItems.has(item.id) ? 'colorPalette.subtle' : 'bg.default'}
               transition="all 0.2s"
               _hover={{
                 borderColor: 'colorPalette.emphasized'
               }}
             >
-              <Card.Body>
-                <HStack gap="4" alignItems="center">
+              <Card.Header>
+                <HStack gap="3" alignItems="center" w="full">
                   <Checkbox
                     checked={selectedItems.has(item.id)}
                     onChange={() => toggleItemSelection(item.id)}
                     onClick={(e: React.MouseEvent) => e.stopPropagation()}
                   />
-
                   <Text fontSize="xl">{getSourceIcon(item.source)}</Text>
-
                   <Box flex="1">
-                    <Text fontWeight="medium">{item.title}</Text>
-                    {item.description && (
-                      <Text mt="1" color="fg.muted" fontSize="sm">
-                        {item.description}
-                      </Text>
-                    )}
+                    <Card.Title>{item.title}</Card.Title>
+                    <Card.Description>
+                      From {item.source} • {new Date(item.createdAt).toLocaleDateString()}
+                    </Card.Description>
                   </Box>
-
-                  <Text color="fg.subtle" fontSize="xs">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </Text>
                 </HStack>
-              </Card.Body>
+              </Card.Header>
+
+              {item.description && (
+                <Card.Body>
+                  <Text color="fg.muted" fontSize="sm">
+                    {item.description}
+                  </Text>
+                </Card.Body>
+              )}
             </Card.Root>
           ))}
         </VStack>

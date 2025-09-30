@@ -55,6 +55,22 @@ class WebSocketManager {
     });
   }
 
+  // Broadcast column updates
+  broadcastColumnUpdate(
+    boardId: string,
+    columnId: string,
+    action: 'created' | 'updated' | 'deleted' | 'reordered'
+  ) {
+    this.broadcast({
+      type: 'column-update',
+      data: {
+        boardId,
+        columnId,
+        action
+      }
+    });
+  }
+
   // Broadcast inbox updates
   broadcastInboxUpdate(userId: string, space: string) {
     this.broadcast({
@@ -86,6 +102,33 @@ class WebSocketManager {
         userId,
         event,
         timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  // Broadcast subtask updates
+  broadcastSubtaskUpdate(
+    taskId: string,
+    subtaskId: string,
+    action: 'created' | 'updated' | 'deleted' | 'reordered'
+  ) {
+    this.broadcast({
+      type: 'subtask-update',
+      data: {
+        taskId,
+        subtaskId,
+        action
+      }
+    });
+  }
+
+  // Broadcast reminder updates
+  broadcastReminderUpdate(taskId: string, action: 'created' | 'updated' | 'deleted' | 'triggered') {
+    this.broadcast({
+      type: 'reminder-update',
+      data: {
+        taskId,
+        action
       }
     });
   }

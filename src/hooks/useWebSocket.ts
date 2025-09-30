@@ -81,28 +81,70 @@ export function useWebSocket() {
     };
   }, []);
 
-  const handleMessage = (message: { type: string; data?: { message?: string } }) => {
+  const handleMessage = (message: { type: string; data?: unknown }) => {
     // Handle different message types
     switch (message.type) {
       case 'task-update':
         queryClient.invalidateQueries({ queryKey: ['board'] });
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
         break;
-      case 'board-update':
+      case 'column-update': {
+        // Invalidate board queries when columns change
+        const data = message.data as { boardId?: string };
+        if (data?.boardId) {
+          queryClient.invalidateQueries({ queryKey: ['board', data.boardId] });
+        }
+        queryClient.invalidateQueries({ queryKey: ['board'] });
+        break;
+      }
+      case 'board-update': {
+        const data = message.data as { boardId?: string };
         queryClient.invalidateQueries({ queryKey: ['boards'] });
+        if (data?.boardId) {
+          queryClient.invalidateQueries({ queryKey: ['board', data.boardId] });
+        }
         break;
-      case 'reminder':
+      }
+      case 'subtask-update': {
+        // Invalidate task queries when subtasks change
+        const data = message.data as { taskId?: string };
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['board'] });
+        if (data?.taskId) {
+          queryClient.invalidateQueries({ queryKey: ['subtasks', data.taskId] });
+        }
+        break;
+      }
+      case 'inbox-update': {
+        // Invalidate inbox queries
+        const data = message.data as { space?: string };
+        queryClient.invalidateQueries({ queryKey: ['inbox'] });
+        if (data?.space) {
+          queryClient.invalidateQueries({ queryKey: ['inbox', data.space] });
+        }
+        break;
+      }
+      case 'pomodoro-event': {
+        // Invalidate pomodoro queries
+        queryClient.invalidateQueries({ queryKey: ['pomodoro'] });
+        break;
+      }
+      case 'reminder-update': {
+        // Invalidate reminders
+        queryClient.invalidateQueries({ queryKey: ['reminders'] });
+        break;
+      }
+      case 'reminder': {
         // Show notification
-        if (
-          'Notification' in window &&
-          Notification.permission === 'granted' &&
-          message.data?.message
-        ) {
+        const data = message.data as { message?: string };
+        if ('Notification' in window && Notification.permission === 'granted' && data?.message) {
           new Notification('HamFlow Reminder', {
-            body: message.data.message,
+            body: data.message,
             icon: '/favicon.ico'
           });
         }
         break;
+      }
       case 'server-shutdown':
         // Server is shutting down, prevent reconnection attempts
         console.log('Server is shutting down, stopping reconnection attempts');
@@ -163,7 +205,7 @@ export function useWebSocket() {
         // Force close without waiting
         try {
           ws.current.close(1000, 'Window closing');
-        } catch (e) {
+        } catch {
           // Ignore errors during close
         }
         ws.current = null;

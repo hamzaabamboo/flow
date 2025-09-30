@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Calendar, Check } from 'lucide-react';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
 import { Box, HStack, VStack } from 'styled-system/jsx';
@@ -102,13 +103,19 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
           <HStack gap="2" flexWrap="wrap">
             {task.dueDate && (
               <Badge variant="outline" colorPalette="yellow" fontSize="xs">
-                📅 {formatDueDate(task.dueDate)}
+                <HStack gap="1">
+                  <Calendar width="12" height="12" />
+                  {formatDueDate(task.dueDate)}
+                </HStack>
               </Badge>
             )}
 
             {task.completed && (
               <Badge variant="outline" colorPalette="green" fontSize="xs">
-                ✓ Completed
+                <HStack gap="1">
+                  <Check width="12" height="12" />
+                  Completed
+                </HStack>
               </Badge>
             )}
           </HStack>

@@ -86,7 +86,7 @@ export class HamBotIntegration {
     // In a real implementation, you would map userId to HamBot recipient
     const recipient = `user_${userId}`; // This would be mapped to actual contact info
 
-    return this.sendMessage(recipient, `⏰ Reminder: ${reminderMessage}`);
+    return this.sendMessage(recipient, `[REMINDER] ${reminderMessage}`);
   }
 
   // Send task notification
@@ -100,13 +100,13 @@ export class HamBotIntegration {
     let message = '';
     switch (action) {
       case 'created':
-        message = `📝 New task created: ${taskTitle}`;
+        message = `[TASK] New task created: ${taskTitle}`;
         break;
       case 'completed':
-        message = `✅ Task completed: ${taskTitle}`;
+        message = `[COMPLETED] Task completed: ${taskTitle}`;
         break;
       case 'due':
-        message = `⚠️ Task due soon: ${taskTitle}`;
+        message = `[DUE SOON] Task due soon: ${taskTitle}`;
         break;
     }
 

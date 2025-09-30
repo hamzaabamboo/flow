@@ -15,11 +15,11 @@ export default defineConfig({
     createPreset({
       accentColor: blue,
       grayColor: neutral,
-      radius: 'md'
+      radius: 'lg'
     })
   ],
 
-  include: ['./src/**/*.{js,jsx,ts,tsx}'],
+  include: ['./src/**/*.{js,jsx,ts,tsx,astro}'],
   exclude: [],
 
   theme: {

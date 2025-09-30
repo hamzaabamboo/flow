@@ -58,7 +58,7 @@ describe('TaskCard', () => {
     const _styles = window.getComputedStyle(titleElement);
 
     // Check for line-through style
-    expect(screen.getByText('✓ Completed')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
   it('should format due date correctly', () => {
@@ -131,7 +131,7 @@ describe('TaskCard', () => {
     render(<TaskCard task={minimalTask} onDragStart={mockOnDragStart} />);
 
     expect(screen.getByText('Minimal Task')).toBeTruthy();
-    expect(screen.queryByText('✓ Completed')).toBeFalsy();
+    expect(screen.queryByText('Completed')).toBeFalsy();
   });
 
   it('should toggle expansion state', () => {

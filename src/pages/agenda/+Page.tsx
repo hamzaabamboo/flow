@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
+import { FileText, Bell, Target, Calendar } from 'lucide-react';
 import { Container } from '../../../styled-system/jsx';
 import { VStack, HStack } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
@@ -197,7 +198,10 @@ export default function AgendaPage() {
                   alert('Calendar URL copied! Add it to your calendar app.');
                 }}
               >
-                📅 Subscribe
+                <HStack gap="2">
+                  <Calendar width="16" height="16" />
+                  Subscribe
+                </HStack>
               </Button>
             )}
           </HStack>
@@ -229,7 +233,7 @@ export default function AgendaPage() {
               return (
                 <Card.Root key={dateKey} minH="400px" bg={isToday ? 'bg.muted' : 'bg.default'}>
                   <Card.Header pb="2">
-                    <Text color={isToday ? 'colorPalette.fg' : 'fg.default'} fontWeight="semibold">
+                    <Text color="fg.default" fontWeight="semibold">
                       {format(date, 'EEE d')}
                     </Text>
                   </Card.Header>
@@ -239,7 +243,7 @@ export default function AgendaPage() {
                         <EventItem
                           key={event.id}
                           event={event}
-                          onComplete={() => completeTask(event.id)}
+                          onComplete={() => void completeTask(event.id)}
                           compact
                         />
                       ))}
@@ -265,7 +269,7 @@ export default function AgendaPage() {
                     <EventItem
                       key={event.id}
                       event={event}
-                      onComplete={() => completeTask(event.id)}
+                      onComplete={() => void completeTask(event.id)}
                     />
                   ))}
                   {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
@@ -290,7 +294,7 @@ export default function AgendaPage() {
                   {habits?.map((habit) => (
                     <HStack
                       key={habit.id}
-                      onClick={() => toggleHabit(habit.id)}
+                      onClick={() => void toggleHabit(habit.id)}
                       cursor="pointer"
                       borderRadius="md"
                       p="3"
@@ -384,13 +388,13 @@ function EventItem({
   const getEventIcon = () => {
     switch (event.type) {
       case 'task':
-        return '📝';
+        return <FileText width="16" height="16" />;
       case 'reminder':
-        return '⏰';
+        return <Bell width="16" height="16" />;
       case 'habit':
-        return '✅';
+        return <Target width="16" height="16" />;
       default:
-        return '📅';
+        return <Calendar width="16" height="16" />;
     }
   };
 
