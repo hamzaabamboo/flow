@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { cookie } from '@elysiajs/cookie';
 import { jwt } from '@elysiajs/jwt';
-import { eq, and, gte, or, sql, ilike, desc, asc } from 'drizzle-orm';
+import { eq, and, gte, lte, or, sql, ilike, desc, asc, isNotNull } from 'drizzle-orm';
 import {
   boards,
   columns,
@@ -984,7 +984,7 @@ export const apiRoutes = new Elysia()
           const startDate = start ? new Date(start) : new Date();
           const endDate = end ? new Date(end) : new Date();
 
-          // Build conditions
+          // Build base conditions - user and has due date
           const conditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
 
           if (start) {
@@ -993,12 +993,9 @@ export const apiRoutes = new Elysia()
           if (end) {
             conditions.push(lte(tasks.dueDate, endDate));
           }
-          if (space && space !== 'all') {
-            conditions.push(eq(boards.space, space as 'work' | 'personal'));
-          }
 
-          // Fetch tasks with due dates in the range
-          const events = await db
+          // Fetch all tasks with due dates, then filter by space in-memory
+          const allEvents = await db
             .select({
               id: tasks.id,
               title: tasks.title,
@@ -1015,7 +1012,12 @@ export const apiRoutes = new Elysia()
             .where(and(...conditions))
             .orderBy(tasks.dueDate);
 
-          return events;
+          // Filter by space if specified
+          if (space && space !== 'all') {
+            return allEvents.filter((event) => event.space === space);
+          }
+
+          return allEvents;
         },
         {
           query: t.Object({
