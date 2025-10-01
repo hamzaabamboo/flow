@@ -127,11 +127,5 @@ export default defineConfig({
           cssVar: true
         }
       : false,
-  hooks: {
-    // 'cssgen:done': ({ artifact, content }) => {
-    //   if (artifact === 'styles.css') {
-    //     return removeUnusedCssVars(removeUnusedKeyframes(content));
-    //   }
-    // }
-  }
+  hooks: {}
 });

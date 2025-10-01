@@ -1,0 +1,40 @@
+# Dependencies (don't copy from host, will install in Docker)
+node_modules
+.pnpm-store
+
+# Build outputs (will be built inside Docker)
+dist
+.vite
+styled-system
+
+# Development files
+.git
+.github
+.vscode
+*.log
+*.md
+docs
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+
+# Development tools
+nodemon.json
+.eslintrc*
+.prettierrc*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+coverage
+.sample_code_do_not_copy
+scripts/test-*.ts

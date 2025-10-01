@@ -1,6 +1,3 @@
 module.exports = {
-  plugins: [
-    require('@pandacss/dev/postcss')()
-    // require('postcss-prune-var')()
-  ]
+  plugins: [require('@pandacss/dev/postcss')(), require('postcss-prune-var')()]
 };
