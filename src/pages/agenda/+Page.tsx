@@ -1,9 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import type { Task } from '../../shared/types';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
-import { FileText, Bell, Target, Calendar, Edit2 } from 'lucide-react';
-import { Container, Box, VStack, HStack } from '../../../styled-system/jsx';
+import { Bell, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Box, VStack, HStack, Grid } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -19,7 +18,7 @@ import type { CalendarEvent, ExtendedTask, Habit } from '../../shared/types/cale
 export default function AgendaPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useQueryState<'day' | 'week'>('view', 'day');
+  const [viewMode, setViewMode] = useQueryState<'day' | 'week'>('view', 'week');
   const [selectedDate, setSelectedDate] = useDateQueryState('date');
   const [editingTask, setEditingTask] = useState<ExtendedTask | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -50,7 +49,36 @@ export default function AgendaPage() {
     }
   });
 
-  // Toggle habit completion
+  // Complete task mutation
+  const completeTaskMutation = useMutation({
+    mutationFn: async ({
+      id,
+      completed,
+      instanceDate
+    }: {
+      id: string;
+      completed: boolean;
+      instanceDate?: string | Date;
+    }) => {
+      const body: any = { completed };
+      if (instanceDate) {
+        body.instanceDate =
+          instanceDate instanceof Date ? instanceDate.toISOString().split('T')[0] : instanceDate;
+      }
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) throw new Error('Failed to update task');
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchEvents();
+    }
+  });
+
+  // Toggle habit mutation
   const toggleHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
       const response = await fetch(`/api/habits/${habitId}/log`, {
@@ -64,78 +92,10 @@ export default function AgendaPage() {
     }
   });
 
-  // Track in-progress completions to prevent duplicates
-  const completingTasks = useRef<Set<string>>(new Set());
-
-  // Mark task as complete
-  const completeTask = async (taskId: string, instanceDate?: string | Date) => {
-    // Create unique key for this completion
-    const completionKey = `${taskId}-${instanceDate ? String(instanceDate) : 'no-date'}`;
-
-    // Prevent duplicate calls
-    if (completingTasks.current.has(completionKey)) {
-      return;
-    }
-
-    completingTasks.current.add(completionKey);
-
-    try {
-      // Find the specific task instance - for recurring tasks, match by both ID and instanceDate
-      const task = events?.find((e) => {
-        if (e.id !== taskId) return false;
-
-        // For recurring tasks, also match the instanceDate
-        if (instanceDate && e.instanceDate) {
-          const eventDateStr =
-            typeof e.instanceDate === 'string'
-              ? e.instanceDate
-              : new Date(e.instanceDate).toISOString().split('T')[0];
-          const targetDateStr =
-            instanceDate instanceof Date
-              ? instanceDate.toISOString().split('T')[0]
-              : typeof instanceDate === 'string' && instanceDate.includes('T')
-                ? instanceDate.split('T')[0]
-                : instanceDate;
-          return eventDateStr === targetDateStr;
-        }
-
-        // For non-recurring tasks, just match by ID
-        return true;
-      });
-
-      // Toggle task completion - for recurring tasks, pass the instanceDate as ISO string
-      const instanceDateStr = instanceDate
-        ? instanceDate instanceof Date
-          ? instanceDate.toISOString()
-          : instanceDate
-        : undefined;
-
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          completed: !task?.completed,
-          ...(task?.recurringPattern && instanceDateStr ? { instanceDate: instanceDateStr } : {})
-        })
-      });
-
-      if (response.ok) {
-        await refetchEvents();
-      }
-    } catch (error) {
-      console.error('Failed to toggle task:', error);
-    } finally {
-      // Remove from set after a short delay to allow for refetch
-      setTimeout(() => {
-        completingTasks.current.delete(completionKey);
-      }, 1000);
-    }
-  };
-
   // Update task mutation
   const updateTaskMutation = useMutation({
-    mutationFn: async (taskData: Partial<Task>) => {
-      const response = await fetch(`/api/tasks/${editingTask?.id}`, {
+    mutationFn: async (taskData: any) => {
+      const response = await fetch(`/api/tasks/${taskData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskData)
@@ -144,53 +104,82 @@ export default function AgendaPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar', 'events'] });
-      setIsTaskDialogOpen(false);
       setEditingTask(null);
+      setIsTaskDialogOpen(false);
+      refetchEvents();
     }
   });
 
-  const handleTaskClick = (event: CalendarEvent) => {
-    if (event.type === 'task') {
-      // Convert CalendarEvent to ExtendedTask format
-      const extendedTask: ExtendedTask = {
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        dueDate: typeof event.dueDate === 'string' ? event.dueDate : event.dueDate?.toISOString(),
-        priority: event.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
-        completed: event.completed || false,
-        columnId: event.columnId || '', // Will be populated by TaskDialog
-        columnName: '',
-        boardName: '',
-        boardId: '',
-        boardSpace: currentSpace,
-        createdAt: '',
-        updatedAt: '',
-        labels: event.labels,
-        subtasks: event.subtasks,
-        recurringPattern: event.recurringPattern,
-        recurringEndDate: event.recurringEndDate
-      };
-      setEditingTask(extendedTask);
-      setIsTaskDialogOpen(true);
+  const completeTask = (taskId: string, dueDate?: string | Date) => {
+    const task = events?.find((e) => {
+      if (e.id !== taskId) return false;
+      if (dueDate && e.instanceDate) {
+        const eventDateStr =
+          typeof e.instanceDate === 'string'
+            ? e.instanceDate
+            : new Date(e.instanceDate).toISOString().split('T')[0];
+        const targetDateStr =
+          dueDate instanceof Date
+            ? dueDate.toISOString().split('T')[0]
+            : typeof dueDate === 'string' && dueDate.includes('T')
+              ? dueDate.split('T')[0]
+              : dueDate;
+        return eventDateStr === targetDateStr;
+      }
+      return true;
+    });
+
+    if (task) {
+      completeTaskMutation.mutate({
+        id: taskId,
+        completed: !task.completed,
+        instanceDate: dueDate
+      });
     }
   };
 
-  const handleTaskSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-
-    const taskData: Record<string, unknown> = {
-      title: data.title,
-      description: data.description || undefined,
-      priority: data.priority,
-      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
-      columnId: data.columnId
+  const handleTaskClick = (event: CalendarEvent) => {
+    const extendedTask: ExtendedTask = {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      dueDate: event.dueDate ? new Date(event.dueDate).toISOString() : undefined,
+      priority: (event.priority as ExtendedTask['priority']) || undefined,
+      completed: event.completed || false,
+      columnId: event.columnId || '',
+      columnName: '',
+      boardName: '',
+      boardId: '',
+      boardSpace: event.space || 'personal',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      labels: event.labels,
+      subtasks: event.subtasks,
+      recurringPattern: event.recurringPattern,
+      recurringEndDate: event.recurringEndDate
     };
 
-    // Parse JSON fields that TaskDialog adds as hidden inputs
+    setEditingTask(extendedTask);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleUpdateTask = (data: any) => {
+    if (!editingTask) return;
+
+    const taskData: any = {
+      id: editingTask.id,
+      title: data.title,
+      description: data.description
+    };
+
+    if (data.dueDate) {
+      taskData.dueDate = new Date(data.dueDate).toISOString();
+    }
+
+    if (data.priority && data.priority !== 'none') {
+      taskData.priority = data.priority;
+    }
+
     if (data.labels) {
       try {
         taskData.labels = JSON.parse(data.labels);
@@ -222,16 +211,6 @@ export default function AgendaPage() {
     updateTaskMutation.mutate(taskData);
   };
 
-  // Get calendar subscription URL
-  const { data: calendarUrl } = useQuery({
-    queryKey: ['calendar', 'feed-url'],
-    queryFn: async () => {
-      const response = await fetch('/api/calendar/feed-url');
-      if (!response.ok) throw new Error('Failed to get calendar URL');
-      return response.json();
-    }
-  });
-
   // Group events by date for week view
   const groupEventsByDate = (events: CalendarEvent[]) => {
     const grouped: Record<string, CalendarEvent[]> = {};
@@ -262,26 +241,34 @@ export default function AgendaPage() {
   };
 
   const groupedEvents = groupEventsByDate(events || []);
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selectedDate), i));
 
   return (
-    <Container maxW="6xl" py="8">
-      <VStack gap="6">
-        {/* Header */}
-        <HStack justifyContent="space-between" alignItems="center" width="100%">
-          <Heading size="3xl">Agenda</Heading>
+    <Box w="full" py="4" px="4">
+      <VStack gap="4">
+        {/* Compact Header */}
+        <HStack justifyContent="space-between" alignItems="center" width="100%" h="12">
+          <HStack gap="4" alignItems="center">
+            <Heading size="2xl">Agenda</Heading>
+            <Text color="fg.muted" fontSize="lg">
+              {viewMode === 'day'
+                ? format(selectedDate, 'EEEE, MMM d, yyyy')
+                : `Week of ${format(startOfWeek(selectedDate), 'MMM d, yyyy')}`}
+            </Text>
+          </HStack>
 
-          <HStack gap="4">
+          <HStack gap="3">
             {/* View Mode Toggle */}
-            <HStack gap="2">
+            <HStack gap="1">
               <Button
-                variant={viewMode === 'day' ? 'solid' : 'outline'}
+                variant={viewMode === 'day' ? 'solid' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('day')}
               >
                 Day
               </Button>
               <Button
-                variant={viewMode === 'week' ? 'solid' : 'outline'}
+                variant={viewMode === 'week' ? 'solid' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('week')}
               >
@@ -290,8 +277,8 @@ export default function AgendaPage() {
             </HStack>
 
             {/* Date Navigation */}
-            <HStack gap="2">
-              <Button
+            <HStack gap="1">
+              <IconButton
                 variant="ghost"
                 size="sm"
                 onClick={() =>
@@ -299,13 +286,14 @@ export default function AgendaPage() {
                     viewMode === 'day' ? addDays(selectedDate, -1) : addDays(selectedDate, -7)
                   )
                 }
+                aria-label="Previous"
               >
-                ←
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
+                <ChevronLeft width="16" height="16" />
+              </IconButton>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(new Date())}>
                 Today
               </Button>
-              <Button
+              <IconButton
                 variant="ghost"
                 size="sm"
                 onClick={() =>
@@ -313,393 +301,351 @@ export default function AgendaPage() {
                     viewMode === 'day' ? addDays(selectedDate, 1) : addDays(selectedDate, 7)
                   )
                 }
+                aria-label="Next"
               >
-                →
-              </Button>
+                <ChevronRight width="16" height="16" />
+              </IconButton>
             </HStack>
-
-            {/* Calendar Subscription */}
-            {calendarUrl && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(calendarUrl.url);
-                  alert('Calendar URL copied! Add it to your calendar app.');
-                }}
-              >
-                <HStack gap="2">
-                  <Calendar width="16" height="16" />
-                  Subscribe
-                </HStack>
-              </Button>
-            )}
           </HStack>
         </HStack>
 
-        {/* Current Date Display */}
-        <Text color="fg.muted" fontSize="xl">
-          {viewMode === 'day'
-            ? format(selectedDate, 'EEEE, MMMM d, yyyy')
-            : `Week of ${format(startOfWeek(selectedDate), 'MMMM d, yyyy')}`}
-        </Text>
+        {/* Main Content */}
+        {viewMode === 'week' ? (
+          // Week View - Grid Layout
+          <VStack gap="3" alignItems="stretch" w="full">
+            {/* Grid Header */}
+            <Grid gap="2" gridTemplateColumns="repeat(7, 1fr)" w="full">
+              {weekDates.map((date) => {
+                const isToday = isSameDay(date, new Date());
+                const dateKey = format(date, 'yyyy-MM-dd');
+                const dayEvents = groupedEvents[dateKey] || [];
+                const isPast = date < new Date() && !isSameDay(date, new Date());
 
-        {/* Main Content Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gap: '1rem',
-            gridTemplateColumns: viewMode === 'week' ? 'repeat(7, 1fr)' : '2fr 1fr',
-            width: '100%'
-          }}
-        >
-          {/* Events Section */}
-          {viewMode === 'week' ? (
-            // Week View - 7 columns
-            Object.entries(groupedEvents).map(([dateKey, dayEvents]) => {
-              const date = new Date(dateKey);
-              const isToday = isSameDay(date, new Date());
-              const isPast = date < new Date() && !isToday;
-
-              return (
-                <Card.Root
-                  key={dateKey}
-                  borderColor={isToday ? 'blue.default' : 'border.default'}
-                  borderWidth="2px"
-                  minH="300px"
-                  bg={isPast ? 'bg.subtle' : 'bg.default'}
-                  opacity={isPast ? 0.75 : 1}
-                >
-                  <Card.Header borderBottomWidth="1px" pb="3">
-                    <VStack gap="1" alignItems="start">
-                      <Text
-                        color={isToday ? 'blue.default' : 'fg.default'}
-                        fontSize="sm"
-                        fontWeight="bold"
-                      >
-                        {format(date, 'EEE')}
-                      </Text>
-                      <Text
-                        color={isToday ? 'blue.default' : 'fg.muted'}
-                        fontSize="2xl"
-                        fontWeight="bold"
-                      >
-                        {format(date, 'd')}
-                      </Text>
-                      {dayEvents.length > 0 && (
-                        <Badge variant="subtle" colorPalette="blue">
-                          {dayEvents.length} {dayEvents.length === 1 ? 'task' : 'tasks'}
-                        </Badge>
-                      )}
-                    </VStack>
-                  </Card.Header>
-                  <Card.Body pt="3">
-                    <VStack gap="2" alignItems="stretch">
-                      {dayEvents.map((event) => (
-                        <Box
-                          key={event.id}
-                          onClick={(e) => {
-                            if (!(e.target as HTMLElement).closest('input[type="checkbox"]')) {
-                              handleTaskClick(event);
-                            }
-                          }}
-                          cursor="pointer"
-                          borderLeftWidth="3px"
-                          borderLeftColor={
-                            event.priority === 'urgent'
-                              ? 'red.default'
-                              : event.priority === 'high'
-                                ? 'orange.default'
-                                : event.priority === 'medium'
-                                  ? 'yellow.default'
-                                  : 'gray.default'
-                          }
-                          borderRadius="md"
-                          p="2"
-                          bg={event.completed ? 'bg.muted' : 'bg.surface'}
-                          opacity={event.completed ? 0.6 : 1}
-                          transition="all 0.2s"
-                          _hover={{
-                            bg: event.completed ? 'bg.muted' : 'bg.emphasized',
-                            transform: 'translateY(-1px)',
-                            boxShadow: 'sm'
-                          }}
+                return (
+                  <Box
+                    key={date.toISOString()}
+                    borderColor={isToday ? 'blue.default' : 'border.default'}
+                    borderRadius="lg"
+                    borderWidth="1px"
+                    bg={isToday ? 'blue.subtle' : 'bg.default'}
+                    opacity={isPast ? 0.7 : 1}
+                    overflow="hidden"
+                  >
+                    {/* Day Header */}
+                    <Box
+                      borderBottomWidth="1px"
+                      borderBottomColor="border.default"
+                      p="2"
+                      bg={isToday ? 'blue.subtle' : 'bg.subtle'}
+                    >
+                      <VStack gap="0.5" alignItems="center">
+                        <Text
+                          color={isToday ? 'blue.default' : 'fg.muted'}
+                          fontSize="xs"
+                          fontWeight="semibold"
+                          textTransform="uppercase"
                         >
-                          <VStack gap="1" alignItems="start">
-                            <HStack gap="2" width="100%">
-                              {event.type === 'task' && (
-                                <Checkbox
-                                  checked={event.completed}
-                                  onCheckedChange={() =>
-                                    void completeTask(event.id, event.instanceDate || event.dueDate)
-                                  }
-                                  onClick={(e) => e.stopPropagation()}
-                                  size="sm"
-                                />
-                              )}
-                              <Text
-                                flex="1"
-                                textDecoration={event.completed ? 'line-through' : 'none'}
-                                fontSize="xs"
-                                fontWeight="medium"
-                                lineClamp={2}
-                              >
-                                {event.title}
-                              </Text>
+                          {format(date, 'EEE')}
+                        </Text>
+                        <Text
+                          color={isToday ? 'blue.default' : 'fg.default'}
+                          fontSize="xl"
+                          fontWeight="bold"
+                        >
+                          {format(date, 'd')}
+                        </Text>
+                      </VStack>
+                    </Box>
+
+                    {/* Day Content */}
+                    <Box minH="xs" maxH="md" p="2" overflowY="auto">
+                      <VStack gap="2" alignItems="stretch">
+                        {dayEvents.map((event) => (
+                          <Box
+                            key={event.id}
+                            onClick={(e) => {
+                              if (!(e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                handleTaskClick(event);
+                              }
+                            }}
+                            cursor="pointer"
+                            borderLeftWidth="3px"
+                            borderLeftColor={
+                              event.priority === 'urgent'
+                                ? 'red.default'
+                                : event.priority === 'high'
+                                  ? 'orange.default'
+                                  : event.priority === 'medium'
+                                    ? 'yellow.default'
+                                    : 'blue.default'
+                            }
+                            borderRadius="md"
+                            p="2"
+                            bg="bg.subtle"
+                            transition="background 0.2s"
+                            _hover={{ bg: 'bg.muted' }}
+                          >
+                            <HStack gap="2" alignItems="start">
+                              <Checkbox
+                                size="sm"
+                                checked={event.completed}
+                                onCheckedChange={() =>
+                                  completeTask(event.id, event.instanceDate || event.dueDate)
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                mt="0.5"
+                              />
+                              <VStack flex="1" gap="1" alignItems="start">
+                                <Text
+                                  color={event.completed ? 'fg.subtle' : 'fg.default'}
+                                  textDecoration={event.completed ? 'line-through' : 'none'}
+                                  fontSize="sm"
+                                  fontWeight="medium"
+                                  lineClamp="2"
+                                >
+                                  {event.title}
+                                </Text>
+                                {event.dueDate && (
+                                  <Text color="fg.muted" fontSize="xs">
+                                    {format(new Date(event.dueDate), 'h:mm a')}
+                                  </Text>
+                                )}
+                                {event.labels && event.labels.length > 0 && (
+                                  <HStack gap="1" flexWrap="wrap">
+                                    {event.labels.slice(0, 2).map((label) => (
+                                      <Badge key={label} variant="subtle" size="sm">
+                                        {label}
+                                      </Badge>
+                                    ))}
+                                    {event.labels.length > 2 && (
+                                      <Text color="fg.muted" fontSize="xs">
+                                        +{event.labels.length - 2}
+                                      </Text>
+                                    )}
+                                  </HStack>
+                                )}
+                              </VStack>
                             </HStack>
-                            {event.dueDate && (
-                              <Text color="fg.muted" fontSize="2xs">
-                                {format(new Date(event.dueDate), 'h:mm a')}
-                              </Text>
-                            )}
-                          </VStack>
-                        </Box>
-                      ))}
-                      {dayEvents.length === 0 && (
-                        <Text py="4" color="fg.subtle" fontSize="xs" textAlign="center">
-                          No events
+                          </Box>
+                        ))}
+                        {dayEvents.length === 0 && (
+                          <Text py="4" color="fg.subtle" fontSize="sm" textAlign="center">
+                            No tasks
+                          </Text>
+                        )}
+                      </VStack>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Grid>
+          </VStack>
+        ) : (
+          // Day View - Grid Layout
+          <Grid gap="4" gridTemplateColumns="3fr 1fr">
+            {/* Tasks for the day */}
+            <Box borderRadius="lg" borderWidth="1px" p="4">
+              <VStack gap="2" alignItems="stretch">
+                <Text mb="2" fontSize="lg" fontWeight="semibold">
+                  Tasks
+                </Text>
+                {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]?.map((event) => (
+                  <HStack
+                    key={event.id}
+                    onClick={(e) => {
+                      if (!(e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                        handleTaskClick(event);
+                      }
+                    }}
+                    cursor="pointer"
+                    gap="2"
+                    borderLeftWidth="3px"
+                    borderLeftColor={
+                      event.priority === 'urgent'
+                        ? 'red.default'
+                        : event.priority === 'high'
+                          ? 'orange.default'
+                          : event.priority === 'medium'
+                            ? 'yellow.default'
+                            : 'gray.default'
+                    }
+                    borderRadius="md"
+                    p="2"
+                    bg="bg.subtle"
+                    _hover={{ bg: 'bg.muted' }}
+                  >
+                    <Checkbox
+                      checked={event.completed}
+                      onCheckedChange={() => completeTask(event.id, event.dueDate)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <VStack flex="1" gap="0.5" alignItems="start">
+                      <Text
+                        color={event.completed ? 'fg.subtle' : 'fg.default'}
+                        textDecoration={event.completed ? 'line-through' : 'none'}
+                      >
+                        {event.title}
+                      </Text>
+                      {event.description && (
+                        <Text color="fg.muted" fontSize="sm">
+                          {event.description}
                         </Text>
                       )}
+                      <HStack gap="2">
+                        {event.dueDate && (
+                          <Badge variant="outline" size="sm">
+                            {format(new Date(event.dueDate), 'h:mm a')}
+                          </Badge>
+                        )}
+                        {event.labels?.map((label) => (
+                          <Badge key={label} variant="subtle" size="sm">
+                            {label}
+                          </Badge>
+                        ))}
+                      </HStack>
                     </VStack>
-                  </Card.Body>
-                </Card.Root>
-              );
-            })
-          ) : (
-            // Day View - Tasks column
-            <Card.Root>
-              <Card.Header>
-                <Card.Title>Today's Schedule</Card.Title>
-              </Card.Header>
-              <Card.Body>
-                <VStack gap="3" alignItems="stretch">
-                  {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]?.map((event) => (
-                    <EventItem
-                      key={event.id}
-                      event={event}
-                      onComplete={() => void completeTask(event.id, event.dueDate)}
-                      onClick={() => handleTaskClick(event)}
-                    />
-                  ))}
-                  {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
-                    groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
-                    <Text py="8" color="fg.subtle" textAlign="center">
-                      No events scheduled for today
-                    </Text>
-                  )}
-                </VStack>
-              </Card.Body>
-            </Card.Root>
-          )}
+                  </HStack>
+                ))}
+                {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
+                  groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
+                  <Text py="8" color="fg.subtle" textAlign="center">
+                    No tasks scheduled
+                  </Text>
+                )}
+              </VStack>
+            </Box>
 
-          {/* Habits Section (only in day view) */}
-          {viewMode === 'day' && (
+            {/* Habits Section */}
             <Card.Root>
               <Card.Header>
                 <Card.Title>Daily Habits</Card.Title>
               </Card.Header>
               <Card.Body>
-                <VStack gap="3" alignItems="stretch">
+                <VStack gap="2" alignItems="stretch">
                   {habits?.map((habit) => (
                     <HStack
                       key={habit.id}
                       borderRadius="md"
-                      p="3"
+                      p="2"
                       bg={habit.completedToday ? 'green.subtle' : 'bg.subtle'}
                       transition="all 0.2s"
                     >
                       <Checkbox
                         checked={habit.completedToday}
                         onCheckedChange={() => toggleHabitMutation.mutate(habit.id)}
+                        size="sm"
                       />
-                      <VStack flex="1" gap="1" alignItems="start">
+                      <VStack flex="1" gap="0.5" alignItems="start">
                         <Text
                           textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                          fontSize="sm"
                           fontWeight="medium"
                         >
                           {habit.name}
                         </Text>
-                        {habit.description && (
-                          <Text color="fg.muted" fontSize="sm">
-                            {habit.description}
-                          </Text>
+                        {habit.currentStreak && habit.currentStreak > 0 && (
+                          <Badge variant="subtle" size="sm">
+                            🔥 {habit.currentStreak} days
+                          </Badge>
                         )}
-                        <HStack gap="2" flexWrap="wrap">
-                          {habit.reminderTime && (
-                            <Badge variant="outline" size="sm" colorPalette="blue">
-                              🕐 {habit.reminderTime}
-                            </Badge>
-                          )}
-                          {habit.currentStreak && habit.currentStreak > 0 && (
-                            <Badge variant="subtle" size="sm">
-                              🔥 {habit.currentStreak} day streak
-                            </Badge>
-                          )}
-                        </HStack>
                       </VStack>
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => (window.location.href = '/habits')}
-                        aria-label="Edit habit"
-                      >
-                        <Edit2 width="16" height="16" />
-                      </IconButton>
                     </HStack>
                   ))}
                   {(!habits || habits.length === 0) && (
-                    <Text py="4" color="fg.subtle" textAlign="center">
+                    <Text py="4" color="fg.subtle" fontSize="sm" textAlign="center">
                       No habits yet
                     </Text>
                   )}
                 </VStack>
               </Card.Body>
             </Card.Root>
-          )}
-        </div>
+          </Grid>
+        )}
 
-        {/* Quick Stats */}
-        <Card.Root>
-          <Card.Body py="6">
-            <HStack gap="8" justifyContent="center">
-              <VStack gap="1" alignItems="center">
-                <Text color="blue.default" fontSize="2xl" fontWeight="bold">
-                  {events?.filter((e) => e.type === 'task' && !e.completed).length || 0}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  Tasks Due
-                </Text>
-              </VStack>
-              <VStack gap="1" alignItems="center">
-                <Text color="green.default" fontSize="2xl" fontWeight="bold">
-                  {habits?.filter((h) => h.completedToday).length || 0}/{habits?.length || 0}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  Habits Done
-                </Text>
-              </VStack>
-              <VStack gap="1" alignItems="center">
-                <Text color="purple.default" fontSize="2xl" fontWeight="bold">
-                  {events?.filter((e) => e.type === 'reminder').length || 0}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  Reminders
-                </Text>
-              </VStack>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+        {/* Task Dialog */}
+        {editingTask && (
+          <TaskDialog
+            open={isTaskDialogOpen}
+            onClose={() => {
+              setIsTaskDialogOpen(false);
+              setEditingTask(null);
+            }}
+            mode="edit"
+            task={editingTask as any}
+            onSubmit={handleUpdateTask}
+          />
+        )}
       </VStack>
-
-      {/* Task Edit Dialog */}
-      <TaskDialog
-        open={isTaskDialogOpen}
-        onOpenChange={setIsTaskDialogOpen}
-        task={editingTask as Task | null}
-        onSubmit={handleTaskSubmit}
-        mode="edit"
-      />
-    </Container>
+    </Box>
   );
 }
 
-// Event Item Component
+// Helper component for task items
 function EventItem({
   event,
   onComplete,
-  onClick,
-  compact = false
+  onClick
 }: {
   event: CalendarEvent;
   onComplete: () => void;
-  onClick?: () => void;
-  compact?: boolean;
+  onClick: () => void;
 }) {
-  const getEventIcon = () => {
-    switch (event.type) {
-      case 'task':
-        return <FileText width="16" height="16" />;
-      case 'reminder':
-        return <Bell width="16" height="16" />;
-      case 'habit':
-        return <Target width="16" height="16" />;
-      default:
-        return <Calendar width="16" height="16" />;
-    }
-  };
-
-  const getPriorityColor = () => {
-    switch (event.priority) {
-      case 'urgent':
-        return 'red';
-      case 'high':
-        return 'orange';
-      case 'medium':
-        return 'yellow';
-      case 'low':
-        return 'gray';
-      default:
-        return 'blue';
-    }
-  };
-
   return (
     <HStack
-      onClick={onClick}
-      cursor={onClick ? 'pointer' : 'default'}
-      gap={compact ? '2' : '3'}
-      border="1px solid"
-      borderColor={event.completed ? 'border.subtle' : 'border.default'}
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('input[type="checkbox"]')) {
+          onClick();
+        }
+      }}
+      cursor="pointer"
+      gap="2"
+      borderLeftWidth="3px"
+      borderLeftColor={
+        event.priority === 'urgent'
+          ? 'red.default'
+          : event.priority === 'high'
+            ? 'orange.default'
+            : event.priority === 'medium'
+              ? 'yellow.default'
+              : 'gray.default'
+      }
       borderRadius="md"
-      p={compact ? '2' : '3'}
-      bg={event.completed ? 'bg.subtle' : 'bg.default'}
-      opacity={event.completed ? 0.7 : 1}
-      transition="all 0.2s"
-      _hover={{ borderColor: 'colorPalette.default' }}
+      p="3"
+      bg="bg.subtle"
+      _hover={{ bg: 'bg.muted' }}
     >
-      {event.type === 'task' && (
-        <Checkbox
-          checked={event.completed}
-          onCheckedChange={onComplete}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
-
-      <Text fontSize={compact ? 'lg' : 'xl'}>{getEventIcon()}</Text>
-
+      <Checkbox
+        checked={event.completed}
+        onCheckedChange={onComplete}
+        onClick={(e) => e.stopPropagation()}
+      />
       <VStack flex="1" gap="1" alignItems="start">
         <Text
+          color={event.completed ? 'fg.subtle' : 'fg.default'}
           textDecoration={event.completed ? 'line-through' : 'none'}
-          fontSize={compact ? 'sm' : 'md'}
-          fontWeight={compact ? 'normal' : 'medium'}
         >
           {event.title}
         </Text>
-
-        {!compact && event.description && (
+        {event.description && (
           <Text color="fg.muted" fontSize="sm">
             {event.description}
           </Text>
         )}
-
-        {!compact && event.dueDate && (
-          <Text color="fg.subtle" fontSize="xs">
-            {format(new Date(event.dueDate), 'h:mm a')}
-          </Text>
-        )}
+        <HStack gap="2">
+          {event.dueDate && (
+            <Badge variant="outline" size="xs">
+              {format(new Date(event.dueDate), 'h:mm a')}
+            </Badge>
+          )}
+          {event.labels?.map((label) => (
+            <Badge key={label} variant="subtle" size="xs">
+              {label}
+            </Badge>
+          ))}
+        </HStack>
       </VStack>
-
-      {event.priority && (
-        <Badge variant="subtle" size="sm" bg={`${getPriorityColor()}.100`}>
-          {event.priority}
-        </Badge>
-      )}
-
-      {event.space && !compact && (
-        <Badge variant="outline" size="sm">
-          {event.space}
-        </Badge>
-      )}
+      {event.type === 'reminder' && <Bell width="16" height="16" />}
+      {event.type === 'habit' && <Target width="16" height="16" />}
     </HStack>
   );
 }
