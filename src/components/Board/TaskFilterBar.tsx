@@ -101,7 +101,7 @@ export function TaskFilterBar({
                 left: '12px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'var(--colors-fg-muted)'
+                color: 'fg.muted'
               }}
             />
             <Input

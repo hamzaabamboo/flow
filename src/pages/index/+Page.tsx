@@ -45,22 +45,27 @@ export default function AgendaPage() {
       let start: Date, end: Date;
 
       if (viewMode === 'day') {
-        // Use UTC dates to avoid timezone issues
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        start = new Date(`${dateStr}T00:00:00.000Z`);
-        end = new Date(`${dateStr}T23:59:59.999Z`);
+        // Get local midnight and end of day
+        start = new Date(selectedDate);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(selectedDate);
+        end.setHours(23, 59, 59, 999);
       } else {
-        // Use UTC dates for week view too
+        // Week view - local timezone boundaries
         const weekStart = startOfWeek(selectedDate);
         const weekEnd = endOfWeek(selectedDate);
-        const startStr = format(weekStart, 'yyyy-MM-dd');
-        const endStr = format(weekEnd, 'yyyy-MM-dd');
-        start = new Date(`${startStr}T00:00:00.000Z`);
-        end = new Date(`${endStr}T23:59:59.999Z`);
+        start = new Date(weekStart);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(weekEnd);
+        end.setHours(23, 59, 59, 999);
       }
 
+      // Convert to UNIX timestamps (seconds)
+      const startUnix = Math.floor(start.getTime() / 1000);
+      const endUnix = Math.floor(end.getTime() / 1000);
+
       const response = await fetch(
-        `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}&space=${currentSpace}`
+        `/api/calendar/events?start=${startUnix}&end=${endUnix}&space=${currentSpace}`
       );
       if (!response.ok) throw new Error('Failed to fetch events');
       return response.json();
@@ -166,7 +171,6 @@ export default function AgendaPage() {
     }
   });
 
-
   const completeTask = (event: CalendarEvent) => {
     completeTaskMutation.mutate({
       id: event.id,
@@ -200,7 +204,7 @@ export default function AgendaPage() {
 
     if (data.dueDate) {
       // Convert datetime-local to UTC ISO string
-      const dateStr = data.dueDate as string;
+      const dateStr = data.dueDate;
       // If already UTC ISO string (from TaskDialog), keep it
       if (dateStr.includes('Z')) {
         taskData.dueDate = dateStr;
@@ -244,7 +248,7 @@ export default function AgendaPage() {
     }
 
     if (data.link) {
-      taskData.link = data.link as string;
+      taskData.link = data.link;
     }
 
     if (editingTask) {
@@ -352,8 +356,13 @@ export default function AgendaPage() {
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <VStack gap="4" alignItems="stretch" width="100%">
-          <HStack justifyContent="space-between" alignItems="center" flexWrap={{ base: 'wrap', md: 'nowrap' }} gap="3">
-            <VStack gap="1" alignItems="start" flex="1" minW={{ base: 'full', md: 'auto' }}>
+          <HStack
+            gap="3"
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap={{ base: 'wrap', md: 'nowrap' }}
+          >
+            <VStack flex="1" gap="1" alignItems="start" minW={{ base: 'full', md: 'auto' }}>
               <Heading size={{ base: 'xl', md: '2xl' }}>Agenda</Heading>
               <Text color="fg.muted" fontSize={{ base: 'xs', md: 'sm' }}>
                 {viewMode === 'day'
@@ -362,7 +371,7 @@ export default function AgendaPage() {
               </Text>
             </VStack>
 
-            <HStack gap="2" flexWrap="wrap" justifyContent={{ base: 'flex-start', md: 'flex-end' }}>
+            <HStack gap="2" justifyContent={{ base: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
               {/* Create Task Button */}
               <Button
                 variant="solid"
@@ -408,7 +417,11 @@ export default function AgendaPage() {
                 >
                   <ChevronLeft width="16" height="16" />
                 </IconButton>
-                <Button variant="ghost" size={{ base: 'xs', sm: 'sm' }} onClick={() => setSelectedDate(new Date())}>
+                <Button
+                  variant="ghost"
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() => setSelectedDate(new Date())}
+                >
                   Today
                 </Button>
                 <IconButton
@@ -440,7 +453,15 @@ export default function AgendaPage() {
             {/* Week View - Grid Layout */}
             <VStack gap="3" alignItems="stretch" w="full">
               {/* Grid Header */}
-              <Grid gap="2" gridTemplateColumns={{ base: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)', md: 'repeat(7, 1fr)' }} w="full">
+              <Grid
+                gap="2"
+                gridTemplateColumns={{
+                  base: 'repeat(2, 1fr)',
+                  sm: 'repeat(4, 1fr)',
+                  md: 'repeat(7, 1fr)'
+                }}
+                w="full"
+              >
                 {weekDates.map((date) => {
                   const isToday = isSameDay(date, new Date());
                   const dateKey = format(date, 'yyyy-MM-dd');
@@ -488,18 +509,27 @@ export default function AgendaPage() {
                         <VStack gap="1.5" alignItems="stretch">
                           {/* Combined Habits and Tasks - Sorted by Time */}
                           {(() => {
-                            const dayHabits = habits?.filter((habit) => {
-                              if (habit.frequency === 'daily') return true;
-                              if (habit.frequency === 'weekly' && habit.targetDays) {
-                                return habit.targetDays.includes(date.getDay());
-                              }
-                              return false;
-                            }) || [];
+                            const dayHabits =
+                              habits?.filter((habit) => {
+                                if (habit.frequency === 'daily') return true;
+                                if (habit.frequency === 'weekly' && habit.targetDays) {
+                                  return habit.targetDays.includes(date.getDay());
+                                }
+                                return false;
+                              }) || [];
 
                             // Combine habits and tasks with a type indicator
                             const combined = [
-                              ...dayHabits.map(h => ({ type: 'habit' as const, item: h, time: h.reminderTime })),
-                              ...dayEvents.map(e => ({ type: 'task' as const, item: e, time: e.dueDate }))
+                              ...dayHabits.map((h) => ({
+                                type: 'habit' as const,
+                                item: h,
+                                time: h.reminderTime
+                              })),
+                              ...dayEvents.map((e) => ({
+                                type: 'task' as const,
+                                item: e,
+                                time: e.dueDate
+                              }))
                             ];
 
                             // Sort by time
@@ -541,7 +571,9 @@ export default function AgendaPage() {
                                       <Checkbox checked={habit.completedToday} size="sm" readOnly />
                                       <VStack flex="1" gap="0.5" alignItems="start">
                                         <Text
-                                          textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                                          textDecoration={
+                                            habit.completedToday ? 'line-through' : 'none'
+                                          }
                                           fontSize="xs"
                                           fontWeight="medium"
                                           lineHeight="1.2"
@@ -550,7 +582,10 @@ export default function AgendaPage() {
                                         </Text>
                                         {habit.reminderTime && (
                                           <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                            {format(new Date(`2000-01-01T${habit.reminderTime}`), 'h:mm a')}
+                                            {format(
+                                              new Date(`2000-01-01T${habit.reminderTime}`),
+                                              'h:mm a'
+                                            )}
                                           </Text>
                                         )}
                                       </VStack>
@@ -564,19 +599,30 @@ export default function AgendaPage() {
                                 );
                               } else {
                                 const event = item.item;
-                                const colorPalette = event.priority === 'urgent' ? 'red' : event.priority === 'high' ? 'orange' : event.priority === 'medium' ? 'yellow' : 'gray';
+                                const colorPalette =
+                                  event.priority === 'urgent'
+                                    ? 'red'
+                                    : event.priority === 'high'
+                                      ? 'orange'
+                                      : event.priority === 'medium'
+                                        ? 'yellow'
+                                        : 'gray';
                                 return (
                                   <Box
                                     key={`${event.id}-${event.instanceDate}`}
                                     onClick={() => handleTaskClick(event)}
+                                    colorPalette={colorPalette}
                                     cursor="pointer"
                                     borderLeftWidth="3px"
-                                    borderLeftColor={`${colorPalette}.default`}
+                                    borderLeftColor="colorPalette.default"
                                     borderRadius="sm"
                                     p="1.5"
                                     bg="bg.muted"
                                     transition="all 0.2s"
-                                    _hover={{ bg: 'bg.subtle', borderLeftColor: `${colorPalette}.emphasized` }}
+                                    _hover={{
+                                      bg: 'bg.subtle',
+                                      borderLeftColor: 'colorPalette.emphasized'
+                                    }}
                                   >
                                     <HStack gap="1.5" alignItems="start">
                                       <Checkbox
@@ -766,10 +812,10 @@ export default function AgendaPage() {
                             size="sm"
                           />
                           <Text
+                            flex="1"
                             textDecoration={habit.completedToday ? 'line-through' : 'none'}
                             fontSize="xs"
                             fontWeight="medium"
-                            flex="1"
                           >
                             {habit.name}
                           </Text>

@@ -59,9 +59,9 @@ export default function HomePage() {
   if (!isAuthenticated) {
     return (
       <VStack gap="4" justifyContent="center" alignItems="center" minHeight="60vh">
-        <h2 style={{ fontSize: 'var(--font-sizes-xl)', fontWeight: '600' }}>
+        <Heading fontSize="xl" fontWeight="bold">
           Please log in to continue
-        </h2>
+        </Heading>
         <Button onClick={() => login()} variant="solid">
           Log in with OAuth
         </Button>

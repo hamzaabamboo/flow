@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, createListCollection } from '../ui/select';
+import { RadioButtonGroup } from '../ui/radio-button-group';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Checkbox } from '../ui/checkbox';
@@ -23,15 +24,6 @@ interface TaskDialogProps {
   columns?: Column[];
   defaultColumnId?: string;
 }
-
-const priorityOptions = createListCollection({
-  items: [
-    { label: 'Low', value: 'low' },
-    { label: 'Medium', value: 'medium' },
-    { label: 'High', value: 'high' },
-    { label: 'Urgent', value: 'urgent' }
-  ]
-});
 
 const recurringOptions = createListCollection({
   items: [
@@ -66,6 +58,7 @@ export function TaskDialog({
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
 
   // Fetch boards if no columns provided (agenda page scenario)
+  // Now the API returns boards with columns in a single request - no N+1!
   const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
@@ -73,25 +66,24 @@ export function TaskDialog({
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch boards');
-      const boardsData = await response.json();
-      // Fetch columns for each board
-      const boardsWithColumns = await Promise.all(
-        boardsData.map(async (board: { id: string; name: string }) => {
-          const colResponse = await fetch(`/api/boards/${board.id}`, {
-            credentials: 'include'
-          });
-          if (!colResponse.ok) return { ...board, columns: [] };
-          const boardData = await colResponse.json();
-          return { ...board, columns: boardData.columns || [] };
-        })
-      );
-      return boardsWithColumns;
+      return response.json();
     },
     enabled: !columns && open // Only fetch if no columns provided and dialog is open
   });
 
   const availableColumns =
     columns || (selectedBoardId ? boards.find((b) => b.id === selectedBoardId)?.columns || [] : []);
+
+  // Initialize board/column selection when dialog opens
+  useEffect(() => {
+    if (open && !columns && boards.length > 0 && !selectedBoardId) {
+      const firstBoard = boards[0];
+      setSelectedBoardId(firstBoard.id);
+      if (firstBoard.columns && firstBoard.columns.length > 0) {
+        setSelectedColumnId(firstBoard.columns[0].id);
+      }
+    }
+  }, [open, columns, boards, selectedBoardId]);
 
   // Reset state when dialog opens/closes or task changes
   useEffect(() => {
@@ -110,15 +102,6 @@ export function TaskDialog({
       setRecurringEndDate(task?.recurringEndDate || '');
       setNewSubtask('');
       setNewLabel('');
-
-      // Set default board and column if not provided
-      if (!columns && boards.length > 0 && !selectedBoardId) {
-        const firstBoard = boards[0];
-        setSelectedBoardId(firstBoard.id);
-        if (firstBoard.columns && firstBoard.columns.length > 0) {
-          setSelectedColumnId(firstBoard.columns[0].id);
-        }
-      }
 
       // Show advanced if any advanced features are used
       setShowAdvanced(
@@ -142,7 +125,7 @@ export function TaskDialog({
       setSelectedBoardId('');
       setSelectedColumnId('');
     }
-  }, [open, task, boards, columns, selectedBoardId]);
+  }, [open, task]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -270,11 +253,11 @@ export function TaskDialog({
         <Dialog.Positioner>
           <Dialog.Content
             borderColor="border.default"
-            maxW="800px"
             w="90vw"
+            maxW="800px"
             maxH="90vh"
-            overflowY="auto"
             bg="bg.default"
+            overflowY="auto"
           >
             <VStack gap="6" p="6">
               <VStack gap="1">
@@ -286,7 +269,12 @@ export function TaskDialog({
                 </Dialog.Description>
               </VStack>
 
-              <form id="task-form" key={open ? (task?.id || 'new') : 'closed'} onSubmit={handleSubmit} style={{ width: '100%' }}>
+              <form
+                id="task-form"
+                key={open ? task?.id || 'new' : 'closed'}
+                onSubmit={handleSubmit}
+                style={{ width: '100%' }}
+              >
                 <VStack gap="4">
                   {/* Title */}
                   <Box w="full">
@@ -463,37 +451,34 @@ export function TaskDialog({
 
                     {/* Priority */}
                     <Box>
-                      <Text mb="1" fontSize="sm" fontWeight="medium">
+                      <Text mb="2" fontSize="sm" fontWeight="medium">
                         Priority
                       </Text>
-                      <input type="hidden" name="priority" value={task?.priority || 'medium'} />
-                      <Select.Root
-                        collection={priorityOptions}
-                        defaultValue={[task?.priority || 'medium']}
-                        onValueChange={(details) => {
-                          const hiddenInput = document.querySelector(
-                            'input[name="priority"]'
-                          ) as HTMLInputElement;
-                          if (hiddenInput) {
-                            hiddenInput.value = details.value[0];
-                          }
-                        }}
+                      <RadioButtonGroup.Root
+                        name="priority"
+                        defaultValue={task?.priority || 'medium'}
                       >
-                        <Select.Control>
-                          <Select.Trigger w="full">
-                            <Select.ValueText />
-                          </Select.Trigger>
-                        </Select.Control>
-                        <Select.Positioner>
-                          <Select.Content>
-                            {priorityOptions.items.map((item) => (
-                              <Select.Item key={item.value} item={item}>
-                                <Select.ItemText>{item.label}</Select.ItemText>
-                              </Select.Item>
-                            ))}
-                          </Select.Content>
-                        </Select.Positioner>
-                      </Select.Root>
+                        <RadioButtonGroup.Item value="low" colorPalette="green">
+                          <RadioButtonGroup.ItemText>Low</RadioButtonGroup.ItemText>
+                          <RadioButtonGroup.ItemControl />
+                          <RadioButtonGroup.ItemHiddenInput />
+                        </RadioButtonGroup.Item>
+                        <RadioButtonGroup.Item value="medium" colorPalette="yellow">
+                          <RadioButtonGroup.ItemText>Medium</RadioButtonGroup.ItemText>
+                          <RadioButtonGroup.ItemControl />
+                          <RadioButtonGroup.ItemHiddenInput />
+                        </RadioButtonGroup.Item>
+                        <RadioButtonGroup.Item value="high" colorPalette="orange">
+                          <RadioButtonGroup.ItemText>High</RadioButtonGroup.ItemText>
+                          <RadioButtonGroup.ItemControl />
+                          <RadioButtonGroup.ItemHiddenInput />
+                        </RadioButtonGroup.Item>
+                        <RadioButtonGroup.Item value="urgent" colorPalette="red">
+                          <RadioButtonGroup.ItemText>Urgent</RadioButtonGroup.ItemText>
+                          <RadioButtonGroup.ItemControl />
+                          <RadioButtonGroup.ItemHiddenInput />
+                        </RadioButtonGroup.Item>
+                      </RadioButtonGroup.Root>
                     </Box>
 
                     {/* Due Date */}

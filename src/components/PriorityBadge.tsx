@@ -1,6 +1,6 @@
-import { Badge } from './badge';
-import { HStack } from '../../../styled-system/jsx';
-import { priorityConfig, type Priority } from '../../utils/priority';
+import { HStack } from '../../styled-system/jsx';
+import { priorityConfig, type Priority } from '../utils/priority';
+import { Badge } from './ui/badge';
 
 interface PriorityBadgeProps {
   priority: string;
@@ -17,7 +17,7 @@ export function PriorityBadge({ priority, size = 'sm', showIcon = true }: Priori
   const Icon = config.icon;
 
   return (
-    <Badge size={size} colorPalette={config.color} variant="solid">
+    <Badge size={size} variant="solid" colorPalette={config.color}>
       <HStack gap="1">
         {showIcon && <Icon width="14" height="14" />}
         <span>{config.label}</span>

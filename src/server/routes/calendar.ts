@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { and, eq, gte, lte, isNotNull, isNull, inArray, between } from 'drizzle-orm';
+import { and, eq, gte, lte, isNotNull, inArray, between } from 'drizzle-orm';
 import { db } from '../db';
 import {
   tasks,
@@ -90,7 +90,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           space: boards.space
         })
         .from(tasks)
-        .leftJoin(boards, eq(tasks.columnId, boards.id))
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
         .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
 
       // Fetch reminders
@@ -327,8 +328,9 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
     async ({ query, db, user }) => {
       const { start, end, space = 'all' } = query;
 
-      const startDate = new Date(start);
-      const endDate = new Date(end);
+      // Convert UNIX timestamps (seconds) to Date objects
+      const startDate = new Date(parseInt(start) * 1000);
+      const endDate = new Date(parseInt(end) * 1000);
 
       // Build the query with joins
       const queryBuilder = db
@@ -361,7 +363,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         .leftJoin(boards, eq(columns.boardId, boards.id));
 
       // Define conditions
-      const whereConditions = [eq(tasks.userId, user.id), isNull(tasks.parentTaskId)];
+      const whereConditions = [eq(tasks.userId, user.id)];
       if (space !== 'all') {
         whereConditions.push(eq(boards.space, space));
       }

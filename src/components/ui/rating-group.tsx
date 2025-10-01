@@ -1,6 +1,7 @@
 'use client';
 import { forwardRef } from 'react';
 import * as StyledRatingGroup from './styled/rating-group';
+import { token } from 'styled-system/tokens';
 
 export type RatingGroupProps = StyledRatingGroup.RootProps;
 
@@ -49,8 +50,8 @@ function StarIcon(props: IconProps) {
       <title>Star Icon</title>
       <defs>
         <linearGradient id="half">
-          <stop offset="50%" stopColor="var(--colors-color-palette-default)" />
-          <stop offset="50%" stopColor="var(--colors-bg-emphasized)" />
+          <stop offset="50%" stopColor={token.var('colors.colorPalette.default')} />
+          <stop offset="50%" stopColor={token.var('colors.bg.emphasized')} />
         </linearGradient>
       </defs>
       <polygon

@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { boards, columns } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 
@@ -8,12 +8,46 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .get(
     '/',
     async ({ query, db, user }) => {
+      // Fetch boards with columns in a single query using JOIN
       const userBoards = await db
-        .select()
+        .select({
+          id: boards.id,
+          userId: boards.userId,
+          name: boards.name,
+          space: boards.space,
+          columnOrder: boards.columnOrder,
+          createdAt: boards.createdAt,
+          updatedAt: boards.updatedAt
+        })
         .from(boards)
         .where(
           and(eq(boards.userId, user.id), eq(boards.space, query.space as 'work' | 'personal'))
         );
+
+      // Fetch all columns for these boards in one query
+      if (userBoards.length > 0) {
+        const boardIds = userBoards.map((b) => b.id);
+        const allColumns = await db
+          .select()
+          .from(columns)
+          .where(inArray(columns.boardId, boardIds));
+
+        // Group columns by board
+        const columnsMap = new Map<string, any[]>();
+        allColumns.forEach((col) => {
+          if (!columnsMap.has(col.boardId)) {
+            columnsMap.set(col.boardId, []);
+          }
+          columnsMap.get(col.boardId)!.push(col);
+        });
+
+        // Return boards with their columns
+        return userBoards.map((board) => ({
+          ...board,
+          columns: columnsMap.get(board.id) || []
+        }));
+      }
+
       return userBoards;
     },
     {

@@ -21,10 +21,10 @@ export function LinkifiedText({ children, ...textProps }: LinkifiedTextProps) {
               href={part}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               color="colorPalette.default"
               textDecoration="underline"
               _hover={{ color: 'colorPalette.emphasized' }}
-              onClick={(e) => e.stopPropagation()}
             >
               {part}
             </Link>

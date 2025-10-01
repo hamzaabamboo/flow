@@ -42,6 +42,11 @@ export interface ExtendedTask {
   subtasks?: Subtask[];
   recurringPattern?: string;
   recurringEndDate?: string;
+  type?: 'task' | 'reminder' | 'habit';
+  space?: string;
+  parentTaskId?: string;
+  instanceDate?: string;
+  link?: string;
 }
 
 export interface Habit {

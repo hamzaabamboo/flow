@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Settings, AlertTriangle, GripVertical, Grip, ExternalLink } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Settings,
+  AlertTriangle,
+  GripVertical,
+  Grip,
+  ExternalLink
+} from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
-import { PriorityBadge } from '../ui/priority-badge';
+import { PriorityBadge } from '../PriorityBadge';
 import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
 import { Input } from '../ui/input';
@@ -109,14 +118,14 @@ export function KanbanColumn({
         style={columnStyle}
         display="flex"
         flexDirection="column"
+        borderColor={isColumnDragging ? 'colorPalette.default' : 'transparent'}
         borderRadius="lg"
+        borderWidth="2px"
         minW="320px"
         maxW="320px"
         maxH="calc(100vh - 200px)"
         p="4"
         bg="bg.muted"
-        borderWidth="2px"
-        borderColor={isColumnDragging ? 'colorPalette.default' : 'transparent'}
         boxShadow={isColumnDragging ? 'lg' : 'none'}
       >
         <HStack flexShrink={0} justifyContent="space-between" mb="4">
@@ -127,8 +136,8 @@ export function KanbanColumn({
               {...columnListeners}
               cursor="grab"
               color="fg.muted"
-              _hover={{ color: 'fg.default' }}
               transition="color 0.2s"
+              _hover={{ color: 'fg.default' }}
             >
               <Grip width="16" height="16" />
             </Box>
@@ -175,7 +184,7 @@ export function KanbanColumn({
 
         <Box flex="1" overflowX="hidden" overflowY="auto">
           <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            <VStack gap="2" pb="2" minH="200px">
+            <VStack gap="2" minH="200px" pb="2">
               {tasks.map((task) => (
                 <TaskCard
                   key={task.id}
@@ -286,7 +295,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     >
       <HStack gap="2" alignItems="start" mb="2">
         <Box {...listeners} cursor="grab" flexShrink={0} mt="0.5">
-          <GripVertical width="16" height="16" color="var(--colors-fg-muted)" />
+          <GripVertical width="16" height="16" color="fg.muted" />
         </Box>
         <VStack flex="1" gap="2" alignItems="stretch">
           <HStack gap="2" alignItems="center" flexWrap="wrap">
@@ -298,9 +307,9 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
                 asChild
                 variant="ghost"
                 size="xs"
-                colorPalette="gray"
                 aria-label="Open link"
                 onClick={(e) => e.stopPropagation()}
+                colorPalette="gray"
               >
                 <a href={task.link} target="_blank" rel="noopener noreferrer">
                   <ExternalLink width="14" height="14" />

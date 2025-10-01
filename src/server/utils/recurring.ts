@@ -20,13 +20,12 @@ export function expandRecurringTasks(
     };
 
     if (!task.recurringPattern) {
-      // Compare using date strings to avoid timezone issues
-      const taskDateStr = taskDueDate.toISOString().split('T')[0];
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-
-      if (taskDateStr >= startDateStr && taskDateStr <= endDateStr) {
-        const isCompleted = task.completed || (completionMap.get(task.id)?.has(taskDateStr) ?? false);
+      // Simple UNIX timestamp comparison - no timezone bullshit
+      if (taskDueDate >= startDate && taskDueDate <= endDate) {
+        // Use UTC date string for instanceDate (for completion tracking)
+        const taskDateStr = taskDueDate.toISOString().split('T')[0];
+        const isCompleted =
+          task.completed || (completionMap.get(task.id)?.has(taskDateStr) ?? false);
 
         events.push({
           ...formattedTask,

@@ -6,9 +6,32 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
-## Latest Updates (2025-10-01)
+## Latest Updates (2025-10-02)
 
 ### ✅ Completed This Session
+
+- **Tasks Page Improvements** - Enhanced filters and UI components
+  - Refactored task priority picker to use RadioButtonGroup with color coding (green/yellow/orange/red)
+  - Moved PriorityBadge component from `/ui` to `/components` (business logic separation)
+  - Made task filters responsive with flexbox wrapping
+  - Search bar uses `flex="1"` to fill available space
+  - Filter group (Priority/Status/Board + view buttons) wraps together as a unit
+  - Fixed Select component text wrapping with proper `whiteSpace="nowrap"` on ValueText
+  - Adjusted filter widths: Priority 130px, Status 90px, Board 130px
+  - Added full date+time display in TaskItem using `Intl.DateTimeFormat`
+
+- **Type System Improvements** - Better TypeScript coverage
+  - Extended `ExtendedTask` interface to include CalendarEvent fields (`type`, `space`, `parentTaskId`, `instanceDate`, `link`)
+  - Fixed type compatibility between ExtendedTask and CalendarEvent
+
+- **Bug Fixes** - Calendar and recurring tasks
+  - Fixed calendar endpoint to show child tasks (removed `parentTaskId` filter)
+  - Changed from ISO date strings to UNIX timestamps for date range queries
+  - Fixed N+1 query performance issue in boards endpoint using `inArray`
+  - Fixed incorrect JOIN in calendar.ts (tasks→columns→boards)
+  - Fixed infinite render loop in TaskDialog by properly managing useEffect dependencies
+
+## Previous Updates (2025-10-01)
 
 - **UI/UX Improvements** - Enhanced user interface and navigation
   - Made Agenda the home page (`/`) with Boards moved to `/boards`

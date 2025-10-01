@@ -319,7 +319,7 @@ export default function HabitsPage() {
                     {/* Frequency & Schedule */}
                     <HStack gap="3" flexWrap="wrap">
                       <HStack gap="1.5">
-                        <Calendar width="16" height="16" color="var(--colors-fg-muted)" />
+                        <Calendar width="16" height="16" color="fg.muted" />
                         <Badge
                           variant="subtle"
                           colorPalette={habit.frequency === 'daily' ? 'blue' : 'purple'}
@@ -358,7 +358,7 @@ export default function HabitsPage() {
                     >
                       <VStack flex="1" gap="0.5" alignItems="start">
                         <HStack gap="1">
-                          <TrendingUp width="14" height="14" color="var(--colors-green-default)" />
+                          <TrendingUp width="14" height="14" color="green.default" />
                           <Text color="fg.muted" fontSize="xs">
                             Streak
                           </Text>
@@ -370,7 +370,7 @@ export default function HabitsPage() {
 
                       <VStack flex="1" gap="0.5" alignItems="start">
                         <HStack gap="1">
-                          <Award width="14" height="14" color="var(--colors-blue-default)" />
+                          <Award width="14" height="14" color="blue.default" />
                           <Text color="fg.muted" fontSize="xs">
                             Total
                           </Text>
@@ -382,7 +382,7 @@ export default function HabitsPage() {
 
                       <VStack flex="1" gap="0.5" alignItems="start">
                         <HStack gap="1">
-                          <Target width="14" height="14" color="var(--colors-purple-default)" />
+                          <Target width="14" height="14" color="purple.default" />
                           <Text color="fg.muted" fontSize="xs">
                             Rate
                           </Text>

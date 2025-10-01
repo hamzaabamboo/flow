@@ -1,6 +1,6 @@
 import React from 'react';
 import { cva } from 'styled-system/css';
-import { Box } from 'styled-system/jsx';
+import { Box, styled } from 'styled-system/jsx';
 
 const spinnerRecipe = cva({
   base: {
@@ -64,15 +64,9 @@ export function Loading({ size = 'md', colorScheme = 'primary', fullScreen, text
     <>
       <Box className={spinnerRecipe({ size, colorScheme })} />
       {text && (
-        <span
-          style={{
-            marginTop: '8px',
-            color: colorScheme === 'white' ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)',
-            fontSize: '14px'
-          }}
-        >
+        <styled.span mt="2" color="fg.muted" fontSize="sm">
           {text}
-        </span>
+        </styled.span>
       )}
     </>
   );

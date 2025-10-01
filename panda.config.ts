@@ -94,6 +94,62 @@ export default defineConfig({
         spin: {
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(360deg)' }
+        },
+        slideDown: {
+          from: {
+            opacity: '0',
+            transform: 'translateY(-20px)'
+          },
+          to: {
+            opacity: '1',
+            transform: 'translateY(0)'
+          }
+        },
+        pulse: {
+          '0%, 100%': {
+            opacity: '0.8',
+            transform: 'scale(1)'
+          },
+          '50%': {
+            opacity: '1',
+            transform: 'scale(1.05)'
+          }
+        },
+        float: {
+          '0%, 100%': {
+            transform: 'translateY(0px)'
+          },
+          '50%': {
+            transform: 'translateY(-10px)'
+          }
+        },
+        fadeInUp: {
+          from: {
+            opacity: '0',
+            transform: 'translateY(20px)'
+          },
+          to: {
+            opacity: '1',
+            transform: 'translateY(0)'
+          }
+        },
+        scaleIn: {
+          from: {
+            opacity: '0',
+            transform: 'scale(0.95)'
+          },
+          to: {
+            opacity: '1',
+            transform: 'scale(1)'
+          }
+        },
+        shimmer: {
+          '0%': {
+            backgroundPosition: '-1000px 0'
+          },
+          '100%': {
+            backgroundPosition: '1000px 0'
+          }
         }
       }
     }
@@ -115,6 +171,33 @@ export default defineConfig({
     extend: {
       dark: ['&.dark, .dark &'],
       light: ['&.light, .light &']
+    }
+  },
+
+  globalCss: {
+    html: {
+      scrollSnapType: 'y proximity',
+      height: '100%'
+    },
+    body: {
+      margin: 0,
+      fontFamily: 'body',
+      WebkitFontSmoothing: 'antialiased',
+      MozOsxFontSmoothing: 'grayscale',
+      bg: 'bg.canvas',
+      color: 'fg.default',
+      height: '100%',
+      overflow: 'hidden'
+    },
+    '*': {
+      boxSizing: 'border-box',
+      transitionProperty: 'background-color, border-color, color, fill, stroke',
+      transitionDuration: '200ms',
+      transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
+    },
+    '*:focus-visible': {
+      outline: '2px solid {colors.accent.default}',
+      outlineOffset: '2px'
     }
   },
 

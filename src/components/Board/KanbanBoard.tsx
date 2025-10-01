@@ -321,7 +321,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
       recurringPattern: recurringPattern || undefined,
       recurringEndDate: recurringEndDate || undefined,
       createReminder: createReminder || undefined,
-      link: formData.get('link') as string || undefined
+      link: (formData.get('link') as string) || undefined
     };
 
     if (editingTask) {
@@ -408,80 +408,80 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
               strategy={horizontalListSortingStrategy}
             >
               <HStack gap="4" alignItems="stretch" minH="full" flexWrap="nowrap">
-              {sortedColumns.map((column) => (
-                <KanbanColumn
-                  key={column.id}
-                  column={column}
-                  tasks={getTasksByColumn(column.id)}
-                  onAddTask={() => openAddTaskDialog(column.id)}
-                  onEditTask={openEditTaskDialog}
-                  onDeleteTask={(task) => deleteTaskMutation.mutate(task.id)}
-                  getPriorityColor={getPriorityColor}
-                  onRenameColumn={handleRenameColumn}
-                  onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
-                  onUpdateWipLimit={handleUpdateWipLimit}
-                />
-              ))}
+                {sortedColumns.map((column) => (
+                  <KanbanColumn
+                    key={column.id}
+                    column={column}
+                    tasks={getTasksByColumn(column.id)}
+                    onAddTask={() => openAddTaskDialog(column.id)}
+                    onEditTask={openEditTaskDialog}
+                    onDeleteTask={(task) => deleteTaskMutation.mutate(task.id)}
+                    getPriorityColor={getPriorityColor}
+                    onRenameColumn={handleRenameColumn}
+                    onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
+                    onUpdateWipLimit={handleUpdateWipLimit}
+                  />
+                ))}
 
-              {/* Add Column Button */}
-              <Box
-                onClick={() => setIsAddColumnDialogOpen(true)}
-                cursor="pointer"
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                borderColor="border.default"
-                borderRadius="lg"
-                borderWidth="2px"
-                minW="300px"
-                p="4"
-                bg="bg.muted"
-                transition="all 0.2s"
-                borderStyle="dashed"
-                _hover={{ borderColor: 'colorPalette.default' }}
-              >
-                <VStack gap="2">
-                  <Plus width="24" height="24" />
-                  <Text fontSize="sm" fontWeight="medium">
-                    Add Column
-                  </Text>
-                </VStack>
-              </Box>
+                {/* Add Column Button */}
+                <Box
+                  onClick={() => setIsAddColumnDialogOpen(true)}
+                  cursor="pointer"
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  borderColor="border.default"
+                  borderRadius="lg"
+                  borderWidth="2px"
+                  minW="300px"
+                  p="4"
+                  bg="bg.muted"
+                  transition="all 0.2s"
+                  borderStyle="dashed"
+                  _hover={{ borderColor: 'colorPalette.default' }}
+                >
+                  <VStack gap="2">
+                    <Plus width="24" height="24" />
+                    <Text fontSize="sm" fontWeight="medium">
+                      Add Column
+                    </Text>
+                  </VStack>
+                </Box>
               </HStack>
             </SortableContext>
 
             <DragOverlay>
-            {activeTask ? (
-              <Box
-                borderColor="colorPalette.default"
-                borderRadius="md"
-                borderWidth="2px"
-                w="280px"
-                p="3"
-                bg="bg.default"
-                opacity={0.9}
-                boxShadow="lg"
-              >
-                <Text fontSize="sm" fontWeight="medium">
-                  {activeTask.title}
-                </Text>
-              </Box>
-            ) : activeId && sortedColumns.find((c) => c.id === activeId) ? (
-              <Box
-                borderColor="colorPalette.default"
-                borderRadius="lg"
-                borderWidth="2px"
-                w="320px"
-                p="4"
-                bg="bg.muted"
-                opacity={0.9}
-                boxShadow="xl"
-              >
-                <Text fontSize="sm" fontWeight="semibold">
-                  {sortedColumns.find((c) => c.id === activeId)?.name}
-                </Text>
-              </Box>
-            ) : null}
+              {activeTask ? (
+                <Box
+                  borderColor="colorPalette.default"
+                  borderRadius="md"
+                  borderWidth="2px"
+                  w="280px"
+                  p="3"
+                  bg="bg.default"
+                  opacity={0.9}
+                  boxShadow="lg"
+                >
+                  <Text fontSize="sm" fontWeight="medium">
+                    {activeTask.title}
+                  </Text>
+                </Box>
+              ) : activeId && sortedColumns.find((c) => c.id === activeId) ? (
+                <Box
+                  borderColor="colorPalette.default"
+                  borderRadius="lg"
+                  borderWidth="2px"
+                  w="320px"
+                  p="4"
+                  bg="bg.muted"
+                  opacity={0.9}
+                  boxShadow="xl"
+                >
+                  <Text fontSize="sm" fontWeight="semibold">
+                    {sortedColumns.find((c) => c.id === activeId)?.name}
+                  </Text>
+                </Box>
+              ) : null}
             </DragOverlay>
           </DndContext>
         </Box>

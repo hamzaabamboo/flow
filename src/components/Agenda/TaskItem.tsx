@@ -1,15 +1,14 @@
-import { format } from 'date-fns';
 import { ExternalLink, Edit2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { Text } from '../ui/text';
 import { IconButton } from '../ui/icon-button';
-import { PriorityBadge } from '../ui/priority-badge';
+import { PriorityBadge } from '../PriorityBadge';
 import { LinkifiedText } from '../ui/linkified-text';
 import type { CalendarEvent } from '../../shared/types/calendar';
-import { Box, HStack, VStack } from 'styled-system/jsx';
 import { getPriorityColor } from '../../utils/priority';
-import type { ReactNode } from 'react';
+import { Box, HStack, VStack } from 'styled-system/jsx';
 
 export function TaskItem({
   event,
@@ -31,19 +30,19 @@ export function TaskItem({
       onClick={onToggleComplete}
       colorPalette={colorPalette}
       cursor="pointer"
-      borderWidth="1px"
       borderColor="border.default"
       borderLeftWidth="4px"
       borderLeftColor="colorPalette.default"
       borderRadius="md"
-      p="3"
+      borderWidth="1px"
       w="full"
+      p="3"
       bg="bg.default"
       transition="all 0.2s"
       _hover={{ bg: 'bg.subtle', boxShadow: 'sm' }}
     >
-      <HStack gap="2" alignItems="center" justify="space-between">
-        <HStack gap="2" alignItems="center" flex="1">
+      <HStack gap="2" justify="space-between" alignItems="center">
+        <HStack flex="1" gap="2" alignItems="center">
           <Checkbox
             size="sm"
             checked={event.completed}
@@ -66,9 +65,9 @@ export function TaskItem({
                   asChild
                   variant="ghost"
                   size="xs"
-                  colorPalette="gray"
                   aria-label="Open link"
                   onClick={(e) => e.stopPropagation()}
+                  colorPalette="gray"
                 >
                   <a href={event.link} target="_blank" rel="noopener noreferrer">
                     <ExternalLink width="14" height="14" />
@@ -80,7 +79,13 @@ export function TaskItem({
             </HStack>
             {event.dueDate && (
               <Text color="fg.muted" fontSize="xs">
-                {format(new Date(event.dueDate), 'h:mm a')}
+                {new Intl.DateTimeFormat(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit'
+                }).format(new Date(event.dueDate))}
               </Text>
             )}
             <HStack gap="2" flexWrap="wrap">
@@ -113,11 +118,7 @@ export function TaskItem({
           >
             <Edit2 width="16" height="16" />
           </IconButton>
-          {actions && (
-            <Box onClick={(e) => e.stopPropagation()}>
-              {actions}
-            </Box>
-          )}
+          {actions && <Box onClick={(e) => e.stopPropagation()}>{actions}</Box>}
         </HStack>
       </HStack>
     </Box>

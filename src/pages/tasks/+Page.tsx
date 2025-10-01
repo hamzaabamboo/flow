@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
-import { Edit2, Trash2, LayoutGrid } from 'lucide-react';
+import { Trash2, LayoutGrid } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import TaskDialog from '../../components/Board/TaskDialog';
@@ -17,6 +17,7 @@ import { Input } from '~/components/ui/input';
 import type { ExtendedTask } from '~/shared/types/calendar';
 import type { CalendarEvent } from '~/shared/types/calendar';
 import { Spinner } from '~/components/ui/spinner';
+import { PriorityBadge } from '~/components/PriorityBadge';
 
 export default function TasksPage() {
   const { currentSpace } = useSpace();
@@ -259,119 +260,128 @@ export default function TasksPage() {
         </Grid>
 
         {/* Filters and Controls */}
-        <Box borderRadius="lg" w="full" p="4" bg="bg.muted">
-          <VStack gap="4" w="full">
-            <HStack gap="4" justify="space-between" w="full">
-              <HStack flex="1" gap="2">
-                <Input
-                  placeholder="Search tasks..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  maxW="300px"
-                />
-                <Select.Root
-                  collection={createListCollection({
-                    items: [
-                      { label: 'All Priorities', value: 'all' },
-                      { label: 'Urgent', value: 'urgent' },
-                      { label: 'High', value: 'high' },
-                      { label: 'Medium', value: 'medium' },
-                      { label: 'Low', value: 'low' }
-                    ]
-                  })}
-                  value={[filterPriority]}
-                  onValueChange={(details) => setFilterPriority(details.value[0])}
-                >
-                  <Select.Control>
-                    <Select.Trigger w="150px">
-                      <Select.ValueText placeholder="Priority" />
-                    </Select.Trigger>
-                  </Select.Control>
-                  <Select.Positioner>
-                    <Select.Content>
-                      {createListCollection({
-                        items: [
-                          { label: 'All Priorities', value: 'all' },
-                          { label: 'Urgent', value: 'urgent' },
-                          { label: 'High', value: 'high' },
-                          { label: 'Medium', value: 'medium' },
-                          { label: 'Low', value: 'low' }
-                        ]
-                      }).items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          <Select.ItemText>{item.label}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Select.Root>
-                <Select.Root
-                  collection={createListCollection({
-                    items: [
-                      { label: 'All Tasks', value: 'all' },
-                      { label: 'Active', value: 'active' },
-                      { label: 'Completed', value: 'completed' }
-                    ]
-                  })}
-                  value={[filterStatus]}
-                  onValueChange={(details) => setFilterStatus(details.value[0])}
-                >
-                  <Select.Control>
-                    <Select.Trigger w="150px">
-                      <Select.ValueText placeholder="Status" />
-                    </Select.Trigger>
-                  </Select.Control>
-                  <Select.Positioner>
-                    <Select.Content>
-                      {createListCollection({
-                        items: [
-                          { label: 'All Tasks', value: 'all' },
-                          { label: 'Active', value: 'active' },
-                          { label: 'Completed', value: 'completed' }
-                        ]
-                      }).items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          <Select.ItemText>{item.label}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Select.Root>
-                <Select.Root
-                  collection={createListCollection({
-                    items: [
-                      { label: 'All Boards', value: 'all' },
-                      ...(boards?.map((board) => ({ label: board.name, value: board.id })) || [])
-                    ]
-                  })}
-                  value={[filterBoard]}
-                  onValueChange={(details) => setFilterBoard(details.value[0])}
-                >
-                  <Select.Control>
-                    <Select.Trigger w="200px">
-                      <Select.ValueText placeholder="Board" />
-                    </Select.Trigger>
-                  </Select.Control>
-                  <Select.Positioner>
-                    <Select.Content>
-                      {createListCollection({
-                        items: [
-                          { label: 'All Boards', value: 'all' },
-                          ...(boards?.map((board) => ({
-                            label: board.name,
-                            value: board.id
-                          })) || [])
-                        ]
-                      }).items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          <Select.ItemText>{item.label}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Select.Root>
-              </HStack>
-              <HStack gap="2">
+        <Box borderRadius="lg" w="full" p={{ base: '3', md: '4' }} bg="bg.muted">
+          <HStack gap="2" alignItems="center" flexWrap="wrap">
+            {/* Search - grows to fill space */}
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              flex="1"
+              minW="120px"
+            />
+
+            {/* Filters group that wraps together */}
+            <HStack gap="2" flexWrap="nowrap">
+              {/* Priority Filter */}
+              <Select.Root
+                collection={createListCollection({
+                  items: [
+                    { label: 'All Priorities', value: 'all' },
+                    { label: 'Urgent', value: 'urgent' },
+                    { label: 'High', value: 'high' },
+                    { label: 'Medium', value: 'medium' },
+                    { label: 'Low', value: 'low' }
+                  ]
+                })}
+                value={[filterPriority]}
+                onValueChange={(details) => setFilterPriority(details.value[0])}
+              >
+                <Select.Control>
+                  <Select.Trigger minW="130px">
+                    <Select.ValueText placeholder="Priority" whiteSpace="nowrap" />
+                  </Select.Trigger>
+                </Select.Control>
+                <Select.Positioner>
+                  <Select.Content>
+                    {createListCollection({
+                      items: [
+                        { label: 'All Priorities', value: 'all' },
+                        { label: 'Urgent', value: 'urgent' },
+                        { label: 'High', value: 'high' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'Low', value: 'low' }
+                      ]
+                    }).items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Select.Root>
+
+              {/* Status Filter */}
+              <Select.Root
+                collection={createListCollection({
+                  items: [
+                    { label: 'All', value: 'all' },
+                    { label: 'Active', value: 'active' },
+                    { label: 'Done', value: 'completed' }
+                  ]
+                })}
+                value={[filterStatus]}
+                onValueChange={(details) => setFilterStatus(details.value[0])}
+              >
+                <Select.Control>
+                  <Select.Trigger minW="90px">
+                    <Select.ValueText placeholder="Status" whiteSpace="nowrap" />
+                  </Select.Trigger>
+                </Select.Control>
+                <Select.Positioner>
+                  <Select.Content>
+                    {createListCollection({
+                      items: [
+                        { label: 'All', value: 'all' },
+                        { label: 'Active', value: 'active' },
+                        { label: 'Done', value: 'completed' }
+                      ]
+                    }).items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Select.Root>
+
+              {/* Board Filter */}
+              <Select.Root
+                collection={createListCollection({
+                  items: [
+                    { label: 'All Boards', value: 'all' },
+                    ...(boards?.map((board) => ({ label: board.name, value: board.id })) || [])
+                  ]
+                })}
+                value={[filterBoard]}
+                onValueChange={(details) => setFilterBoard(details.value[0])}
+              >
+                <Select.Control>
+                  <Select.Trigger minW="130px">
+                    <Select.ValueText placeholder="Board" whiteSpace="nowrap" />
+                  </Select.Trigger>
+                </Select.Control>
+                <Select.Positioner>
+                  <Select.Content>
+                    {createListCollection({
+                      items: [
+                        { label: 'All Boards', value: 'all' },
+                        ...(boards?.map((board) => ({
+                          label: board.name,
+                          value: board.id
+                        })) || [])
+                      ]
+                    }).items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Select.Root>
+
+              {/* View Mode Buttons */}
+              <HStack gap="1">
                 <Button
                   variant={viewMode === 'list' ? 'solid' : 'outline'}
                   onClick={() => setViewMode('list')}
@@ -388,7 +398,7 @@ export default function TasksPage() {
                 </Button>
               </HStack>
             </HStack>
-          </VStack>
+          </HStack>
         </Box>
 
         {/* Task Views */}
@@ -441,8 +451,8 @@ export default function TasksPage() {
                             deleteTaskMutation.mutate(task.id);
                           }
                         }}
-                        colorPalette="red"
                         aria-label="Delete task"
+                        colorPalette="red"
                       >
                         <Trash2 />
                       </IconButton>
