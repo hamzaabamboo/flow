@@ -52,21 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Logout failed');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
       queryClient.setQueryData(['auth', 'user'], null);
-      queryClient.clear(); // Clear all cached data
-      window.location.href = '/';
+      queryClient.clear();
+
+      // Server will redirect to OIDC logout
+      window.location.href = '/api/auth/logout';
     }
   });
 

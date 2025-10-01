@@ -3,9 +3,11 @@ import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
 import { cookie } from '@elysiajs/cookie';
+import { jwt } from '@elysiajs/jwt';
 import { wrap } from '@bogeychan/elysia-logger';
 import { renderPage, createDevMiddleware } from 'vike/server';
 import { connect } from 'elysia-connect-middleware';
+import { eq } from 'drizzle-orm';
 
 import { db } from './db';
 import { logger } from './logger';
@@ -21,9 +23,10 @@ import { habitsRoutes } from './routes/habits';
 import { commandRoutes } from './routes/command';
 import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
-import { simpleAuth } from './auth/simple-auth';
+import { oidcAuth } from './auth/oidc';
 import { reminderCron } from './cron';
 import { wsManager } from './websocket';
+import { users } from 'drizzle/schema';
 
 const app = new Elysia({
   serve: {
@@ -59,9 +62,15 @@ app
     })
   )
   .use(cookie())
+  .use(
+    jwt({
+      name: 'jwt',
+      secret: process.env.JWT_SECRET || 'your-secret-key'
+    })
+  )
   .state('db', db)
-  // Simple auth routes (public)
-  .use(simpleAuth)
+  // OAuth/OIDC auth routes (public)
+  .use(oidcAuth)
   // Public webhook endpoints
   .use(webhookRoutes)
   // Cron jobs
@@ -115,13 +124,43 @@ app
 
       ws.unsubscribe('hamflow');
     },
-    error(ctx: any) {
+    error(ctx) {
       logger.error(ctx, 'WebSocket error');
     }
   })
   // Catch-all route for SSR (must be last)
-  .get('/*', async ({ request }) => {
-    const pageContextInit = { urlOriginal: request.url };
+  .get('/*', async ({ request, cookie, jwt }) => {
+    // Check for authentication and add user to pageContext
+    let user = null;
+    const token = cookie.auth.value;
+
+    if (token) {
+      try {
+        const payload = await jwt.verify(token as string);
+        if (payload) {
+          const [dbUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, payload.userId as string));
+
+          if (dbUser) {
+            user = {
+              id: dbUser.id,
+              email: dbUser.email,
+              name: dbUser.name
+            };
+          }
+        }
+      } catch {
+        // Invalid token, continue as unauthenticated
+      }
+    }
+
+    const pageContextInit = {
+      urlOriginal: request.url,
+      user,
+      headers: Object.fromEntries(request.headers.entries())
+    };
     const pageContext = await renderPage(pageContextInit);
     const { httpResponse } = pageContext;
 

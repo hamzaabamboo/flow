@@ -57,9 +57,10 @@ export const oidcAuth = new Elysia()
         code_challenge_method: 'S256'
       });
 
-      const authUrl = `${OIDC_CONFIG.issuer}/authorize?${params}`;
+      const authUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/auth?${params}`;
 
-      set.redirect = authUrl;
+      set.status = 302;
+      set.headers['Location'] = authUrl;
       return;
     },
     {
@@ -92,7 +93,7 @@ export const oidcAuth = new Elysia()
 
       try {
         // Exchange code for tokens
-        const tokenResponse = await fetch(`${OIDC_CONFIG.issuer}/token`, {
+        const tokenResponse = await fetch(`${OIDC_CONFIG.issuer}/protocol/openid-connect/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -114,11 +115,14 @@ export const oidcAuth = new Elysia()
         const tokens = await tokenResponse.json();
 
         // Get user info
-        const userInfoResponse = await fetch(`${OIDC_CONFIG.issuer}/userinfo`, {
-          headers: {
-            Authorization: `Bearer ${tokens.access_token}`
+        const userInfoResponse = await fetch(
+          `${OIDC_CONFIG.issuer}/protocol/openid-connect/userinfo`,
+          {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`
+            }
           }
-        });
+        );
 
         if (!userInfoResponse.ok) {
           throw new Error('Failed to fetch user info');
@@ -164,7 +168,8 @@ export const oidcAuth = new Elysia()
         });
 
         // Redirect to return URL
-        set.redirect = returnUrl;
+        set.status = 302;
+        set.headers['Location'] = returnUrl;
         return;
       } catch (error) {
         console.error('OAuth error:', error);
@@ -182,16 +187,19 @@ export const oidcAuth = new Elysia()
   )
   // Logout
   .post('/api/auth/logout', ({ cookie, set }) => {
+    const token = cookie.auth.value;
     cookie.auth.remove();
 
-    // If OIDC supports logout
-    if (OIDC_CONFIG.issuer) {
-      const logoutUrl = `${OIDC_CONFIG.issuer}/logout?post_logout_redirect_uri=${encodeURIComponent(process.env.APP_URL || 'http://localhost:3000')}`;
-      set.redirect = logoutUrl;
-      return;
-    }
+    // Build OIDC logout URL
+    const logoutUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/logout?${new URLSearchParams({
+      post_logout_redirect_uri: process.env.FRONTEND_URL || 'http://localhost:3000',
+      id_token_hint: token as string
+    })}`;
 
-    return { success: true };
+    // Redirect to OIDC logout
+    set.status = 302;
+    set.headers['Location'] = logoutUrl;
+    return;
   })
   // Get current user
   .get('/api/auth/me', async ({ cookie, jwt, db, set }) => {

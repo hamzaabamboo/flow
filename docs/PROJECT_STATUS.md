@@ -10,30 +10,27 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ### ✅ Completed This Session
 
-- **Type System Refactored** - All interfaces moved to centralized `src/shared/types/` directory
-  - Modular type files: `board.ts`, `task.ts`, `user.ts`, `calendar.ts`, etc.
-  - Props interfaces remain in components, data models in shared types
-  - Fixed all TypeScript errors - build passes with zero errors
+- **OIDC Authentication Implemented** - Full OAuth/OIDC integration with Keycloak
+  - Configured OIDC endpoints for authorization, token exchange, userinfo
+  - Implemented PKCE flow for secure authentication
+  - Server-side JWT verification and user management
+  - Proper OIDC logout with session termination on auth server
+  - Vike route guards for protected pages
 
-- **Structured Logging Added** - Integrated pino logger with colored output
-  - Created `src/server/logger.ts` with pino configuration
-  - Added `@bogeychan/elysia-logger` middleware
-  - Replaced all console.log/error with proper logger calls
+- **Route Guards Added** - Server-side authentication checks using Vike guards
+  - Root guard (`src/pages/+guard.ts`) protects all routes except login
+  - Login guard (`src/pages/login/+guard.ts`) redirects authenticated users
+  - User data passed from renderPage to pageContext for guards
+  - Type-safe PageContext extension via `src/vike.d.ts`
 
-- **Fixed recurring task checkbox bug** - Proper instanceDate matching in agenda week view
-
-- **Agenda Week View Redesigned** - Changed from table layout to CSS Grid
-  - Full-width layout (removed Container, using Box w="full")
-  - Grid layout with 7 equal columns: `gridTemplateColumns="repeat(7, 1fr)"`
-  - Card-based design for each day with headers and scrollable content
-  - Visual distinction for today (blue border/background) and past dates (opacity 0.7)
-
-- **Build verified**: TypeScript compilation passes cleanly with `bunx tsc --noEmit`
+- **Timezone-Consistent Date Handling** - Fixed habit tracking across timezones
+  - Client uses local timezone formatting: `format(date, 'yyyy-MM-dd')`
+  - Server parses as UTC midnight: `new Date('${date}T00:00:00.000Z')`
+  - Consistent calendar date handling without timestamp issues
 
 ### 🚧 In Progress
 
-- Task size adjustments in agenda week view (user feedback: "tasks itself is still small")
-- Debugging habit completion UI update issues on Agenda page, specifically for non-current dates.
+- None
 
 ## Feature Implementation Status
 
@@ -41,12 +38,13 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Authentication System | ✅ | Simple cookie-based, ready for OAuth |
+| Authentication System | ✅ | OIDC with Keycloak, JWT cookies |
+| Route Guards | ✅ | Vike server-side guards |
 | Kanban Boards | ✅ | Full CRUD with drag-drop |
 | Task Management | ✅ | Labels, priorities, subtasks |
 | Recurring Tasks | ✅ | Daily/Weekly/Monthly patterns |
 | Task Completions | ✅ | Per-instance tracking for recurring |
-| Habit Tracking | ✅ | Streaks, completion status |
+| Habit Tracking | ✅ | Streaks, timezone-aware completion |
 | Calendar Integration | ✅ | iCal feeds with RRULE support |
 | Agenda Views | ✅ | Day/Week toggle with navigation |
 | WebSocket Sync | ✅ | Real-time updates across entities |
@@ -79,17 +77,16 @@ All core tables implemented:
 ## Known Issues
 
 ### 🔴 Blocking
-- Habit completion UI on Agenda page not updating consistently due to suspected react-query `queryKey` shallow comparison issue with `Date` objects, leading to stale data fetches for incorrect dates.
+- None
 
 ### 🟡 Non-blocking
-- Task cards in agenda week view need size adjustment
 - Some TypeScript warnings in test files
 - Badge component size prop only accepts "sm"/"md"/"lg" (not "xs")
 
 ### 🟢 Minor
-- Environment variables need production configuration
 - Some ESLint warnings for dynamic styles
 - EventItem component defined but unused
+- cSpell warnings for "vike" in guard files
 
 ## Build & Test Status
 
@@ -102,17 +99,18 @@ All core tables implemented:
 
 ## Recent Commits
 
+- `feat: implement OIDC authentication with Keycloak and Vike route guards`
+- `fix: timezone-consistent date handling for habits`
 - `fix: recurring task completion tracking and migration cleanup`
 - `fix: missing routes`
-- `feat: significantly improve Agenda week view UX`
-- `fix: add missing imports for calendar events API`
 
 ## Deployment Notes
 
 - Database: PostgreSQL with Drizzle ORM
 - Runtime: Bun (not Node.js)
 - Server: Port 3000 (not 5173)
-- Auth: Cookie-based with JWT tokens
+- Auth: OIDC with Keycloak, JWT in httpOnly cookies
+- Route Protection: Vike server-side guards
 - Migrations: Squashed into single initial migration
 
 ---
