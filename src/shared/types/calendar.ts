@@ -1,3 +1,5 @@
+import type { Subtask } from './task';
+
 // Calendar and Task related types shared between frontend and backend
 
 export interface CalendarEvent {
@@ -14,7 +16,7 @@ export interface CalendarEvent {
   parentTaskId?: string;
   columnId?: string;
   labels?: string[];
-  subtasks?: { title: string; completed: boolean }[];
+  subtasks?: Subtask[];
   instanceDate?: string; // For tracking specific instances of recurring tasks
 }
 
@@ -33,7 +35,7 @@ export interface ExtendedTask {
   createdAt: string;
   updatedAt: string;
   labels?: string[];
-  subtasks?: { title: string; completed: boolean }[];
+  subtasks?: Subtask[];
   recurringPattern?: string;
   recurringEndDate?: string;
 }

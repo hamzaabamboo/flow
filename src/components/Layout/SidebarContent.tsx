@@ -32,11 +32,10 @@ interface SidebarNavItem {
 
 const navItems: SidebarNavItem[] = [
   { label: 'Agenda', href: '/agenda', icon: Calendar, badgeKey: 'agenda' },
-  { label: 'Tasks', href: '/overview', icon: CheckSquare, badgeKey: 'tasks' },
+  { label: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Boards', href: '/', icon: LayoutGrid },
   { label: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'inbox' },
-  { label: 'Habits', href: '/habits', icon: Target },
-  { label: 'Analytics', href: '/analytics', icon: BarChart3 }
+  { label: 'Habits', href: '/habits', icon: Target }
 ];
 
 interface SidebarContentProps {

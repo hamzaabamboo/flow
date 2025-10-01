@@ -189,6 +189,10 @@ logger.error('Message', error);
 - Always use `useMutation` for writes
 - Include all relevant data in queryKey
 - Use onSuccess for cache invalidation
+- **`queryKey` and `Date` Objects Issue**:
+  - **Problem**: When using `Date` objects directly in `queryKey` (e.g., `['habits', selectedDate, currentSpace]`), `react-query`'s shallow comparison might not trigger a refetch even if the `selectedDate` object instance changes but represents the same date value. This can lead to stale data being displayed in the UI.
+  - **Observed Behavior**: After a successful `POST` to update a habit's completion status for a specific date, the subsequent `GET` request for habits sometimes fetches data for an *incorrect or stale date*, even though `invalidateQueries` was called with the correct date from the mutation variables.
+  - **Potential Solution/Investigation**: Consider formatting `Date` objects into a stable string representation (e.g., `format(selectedDate, 'yyyy-MM-dd')`) when used in `queryKey` to ensure `react-query` correctly identifies changes and triggers refetches.
 
 ### Event Propagation
 

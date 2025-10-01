@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Task } from '../../shared/types';
 import { navigate } from 'vike/client/router';
 import { Edit2, Trash2 } from 'lucide-react';
+import type { Task } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import TaskDialog from '../../components/Board/TaskDialog';
 import { Countdown } from '../../components/ui/countdown';
@@ -17,7 +17,7 @@ import { createListCollection, Select } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import type { ExtendedTask } from '~/shared/types/calendar';
 
-export default function OverviewPage() {
+export default function TasksPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
 
@@ -171,7 +171,7 @@ export default function OverviewPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>
       {/* Header */}
       <VStack gap="6" justifyContent="flex-start" w="full">
         <Box w="full">

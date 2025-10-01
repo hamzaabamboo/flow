@@ -33,6 +33,7 @@ Moving towards Phase 4 - Advanced Features & Integrations
 ### 🚧 In Progress
 
 - Task size adjustments in agenda week view (user feedback: "tasks itself is still small")
+- Debugging habit completion UI update issues on Agenda page, specifically for non-current dates.
 
 ## Feature Implementation Status
 
@@ -78,7 +79,7 @@ All core tables implemented:
 ## Known Issues
 
 ### 🔴 Blocking
-- None currently
+- Habit completion UI on Agenda page not updating consistently due to suspected react-query `queryKey` shallow comparison issue with `Date` objects, leading to stale data fetches for incorrect dates.
 
 ### 🟡 Non-blocking
 - Task cards in agenda week view need size adjustment

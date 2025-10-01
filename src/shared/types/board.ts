@@ -19,6 +19,7 @@ export interface Task {
   recurringEndDate?: string;
   parentTaskId?: string;
   createReminder?: boolean;
+  column?: Column & { board?: Board };
 }
 
 export interface Column {

@@ -1,0 +1,16 @@
+{
+  "model": {
+    "name": "gemini-2.5-pro"
+  },
+  "context": {
+    "include": ["docs/**/.ts", "README.md"],
+    "exclude": ["node_modules/**", "dist/**"]
+  },
+  "tools": {
+    "allowed": ["read_file", "write_file", "run_shell_command"]
+  },
+  "mcp": {
+    "excluded": ["playwright"],
+    "allowed": ["chrome-devtools"]
+  }
+}

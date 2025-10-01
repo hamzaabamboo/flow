@@ -112,7 +112,10 @@ describe('TaskCard', () => {
 
     priorities.forEach((priority) => {
       const { unmount } = render(
-        <TaskCard task={{ ...mockTask, priority: priority as 'urgent' | 'high' | 'medium' | 'low' }} onDragStart={mockOnDragStart} />
+        <TaskCard
+          task={{ ...mockTask, priority: priority as 'urgent' | 'high' | 'medium' | 'low' }}
+          onDragStart={mockOnDragStart}
+        />
       );
 
       const taskCard = screen.getByText('Test Task').closest('[draggable]');

@@ -134,8 +134,8 @@ export default function BoardsListPage() {
       <Box p="6">
         {boards && boards.length > 0 ? (
           <Grid
-            gridTemplateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
             gap="6"
+            gridTemplateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
           >
             {boards.map((board) => (
               <Card.Root

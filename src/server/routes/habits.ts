@@ -1,38 +1,31 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, gte } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { habits, habitLogs } from '../../../drizzle/schema';
 
 export const habitsRoutes = new Elysia({ prefix: '/habits' })
   .use(withAuth())
   .get('/', async ({ query, db, user }) => {
-    // Get space filter from query
     const space = query.space || 'work';
 
-    // If date is provided, only show active habits (Agenda view)
-    // If no date, show all habits including disabled (Habits management page)
     const conditions = [eq(habits.userId, user.id), eq(habits.space, space)];
     if (query.date) {
       conditions.push(eq(habits.active, true));
     }
 
-    // Fetch habits for the user filtered by space
     const allHabits = await db
       .select()
       .from(habits)
       .where(and(...conditions))
       .orderBy(habits.name);
 
-    // If date is provided, filter by day of week for weekly habits (Agenda view)
-    // If no date, return all habits (Habits management page)
     let userHabits = allHabits;
 
     if (query.date) {
-      const queryDate = new Date(String(query.date));
-      queryDate.setHours(0, 0, 0, 0);
-      const dayOfWeek = queryDate.getDay(); // 0 = Sun, 1 = Mon, etc.
+      const [year, month, day] = String(query.date).split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      const dayOfWeek = localDate.getDay();
 
-      // Filter habits based on frequency and target days
       userHabits = allHabits.filter((habit) => {
         if (habit.frequency === 'daily') return true;
         if (habit.frequency === 'weekly' && habit.targetDays) {
@@ -42,17 +35,16 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
       });
     }
 
-    // Check completion status for each habit
-    // Use query date if provided, otherwise use today for completion check
-    const checkDate = query.date ? new Date(String(query.date)) : new Date();
-    checkDate.setHours(0, 0, 0, 0);
+    const checkDate = query.date
+      ? new Date(`${query.date}T00:00:00.000Z`)
+      : new Date(`${new Date().toISOString().split('T')[0]}T00:00:00.000Z`);
 
     const habitsWithStatus = await Promise.all(
       userHabits.map(async (habit) => {
         const [log] = await db
           .select()
           .from(habitLogs)
-          .where(and(eq(habitLogs.habitId, habit.id), gte(habitLogs.date, checkDate)))
+          .where(and(eq(habitLogs.habitId, habit.id), eq(habitLogs.date, checkDate)))
           .limit(1);
 
         return {
@@ -139,42 +131,46 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
   })
   .post(
     '/:id/log',
-    async ({ params, db, user }) => {
-      // Check if already logged today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    async ({ params, body, db }) => {
+      const logDate = new Date(`${body.date}T00:00:00.000Z`);
 
       const [existingLog] = await db
         .select()
         .from(habitLogs)
-        .where(and(eq(habitLogs.habitId, params.id), gte(habitLogs.date, today)));
+        .where(and(eq(habitLogs.habitId, params.id), eq(habitLogs.date, logDate)));
 
       if (existingLog) {
-        // Toggle completion
         const [updated] = await db
           .update(habitLogs)
           .set({
-            completed: !existingLog.completed,
-            completedAt: !existingLog.completed ? new Date() : existingLog.completedAt
+            completed: body.completed,
+            completedAt: new Date()
           })
           .where(eq(habitLogs.id, existingLog.id))
           .returning();
         return updated;
       }
 
-      // Create new log
-      const [newLog] = await db
-        .insert(habitLogs)
-        .values({
-          habitId: params.id,
-          date: today,
-          completedAt: new Date(),
-          completed: true
-        })
-        .returning();
-      return newLog;
+      if (body.completed) {
+        const [newLog] = await db
+          .insert(habitLogs)
+          .values({
+            habitId: params.id,
+            date: logDate,
+            completedAt: new Date(),
+            completed: true
+          })
+          .returning();
+        return newLog;
+      }
+
+      return { success: true, message: 'No log to complete' };
     },
     {
-      params: t.Object({ id: t.String() })
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        date: t.String(),
+        completed: t.Boolean()
+      })
     }
   );

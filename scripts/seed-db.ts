@@ -6,7 +6,8 @@
 
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { users, boards, columns, tasks, inboxItems, reminders, habits } from '../src/drizzle/schema';
+import { randomUUID } from 'crypto';
+import { users, boards, columns, tasks, inboxItems, reminders, habits } from '../drizzle/schema';
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/hamflow';
 const client = postgres(connectionString);
@@ -19,7 +20,6 @@ async function seed() {
     // Create test user
     console.log('Creating test user...');
     const [testUser] = await db.insert(users).values({
-      id: 'test-user-1',
       email: 'demo@hamflow.app',
       name: 'Demo User',
       createdAt: new Date()
@@ -29,49 +29,62 @@ async function seed() {
 
     // Create boards for both spaces
     console.log('\nCreating boards...');
+
+    const workBoardColumns = [
+      { id: randomUUID(), name: 'To Do', position: 0 },
+      { id: randomUUID(), name: 'In Progress', position: 1 },
+      { id: randomUUID(), name: 'Done', position: 2 }
+    ];
+
+    const personalBoardColumns = [
+      { id: randomUUID(), name: 'Backlog', position: 0 },
+      { id: randomUUID(), name: 'This Week', position: 1 },
+      { id: randomUUID(), name: 'Complete', position: 2 }
+    ];
+
     const [workBoard] = await db.insert(boards).values({
       name: 'Q1 Projects',
       space: 'work',
       userId: testUser.id,
-      columnOrder: ['todo', 'in-progress', 'done']
+      columnOrder: workBoardColumns.map(c => c.id)
     }).returning();
 
     const [personalBoard] = await db.insert(boards).values({
       name: 'Home Tasks',
       space: 'personal',
       userId: testUser.id,
-      columnOrder: ['backlog', 'this-week', 'complete']
+      columnOrder: personalBoardColumns.map(c => c.id)
     }).returning();
 
     console.log('✓ Boards created:', workBoard.name, personalBoard.name);
 
-    // Create columns for work board
+    // Create columns for boards
     console.log('\nCreating columns...');
-    const [todoCol] = await db.insert(columns).values({
-      id: 'todo',
-      name: 'To Do',
+    const todoCol = (await db.insert(columns).values({
+      ...workBoardColumns[0],
       boardId: workBoard.id,
-      position: 0,
       taskOrder: []
-    }).returning();
+    }).returning())[0];
 
-    const [inProgressCol] = await db.insert(columns).values({
-      id: 'in-progress',
-      name: 'In Progress',
+    const inProgressCol = (await db.insert(columns).values({
+      ...workBoardColumns[1],
       boardId: workBoard.id,
-      position: 1,
       taskOrder: []
-    }).returning();
+    }).returning())[0];
 
-    const [doneCol] = await db.insert(columns).values({
-      id: 'done',
-      name: 'Done',
+    const doneCol = (await db.insert(columns).values({
+      ...workBoardColumns[2],
       boardId: workBoard.id,
-      position: 2,
       taskOrder: []
-    }).returning();
+    }).returning())[0];
 
-    console.log('✓ Columns created for work board');
+    await db.insert(columns).values(personalBoardColumns.map(c => ({
+      ...c,
+      boardId: personalBoard.id,
+      taskOrder: []
+    })));
+
+    console.log('✓ Columns created for both boards');
 
     // Create sample tasks
     console.log('\nCreating tasks...');
@@ -162,23 +175,20 @@ async function seed() {
       {
         name: 'Morning Exercise',
         frequency: 'daily',
-        targetCount: 1,
         userId: testUser.id,
-        streak: 5
+        space: 'personal'
       },
       {
         name: 'Read for 30 minutes',
         frequency: 'daily',
-        targetCount: 1,
         userId: testUser.id,
-        streak: 3
+        space: 'personal'
       },
       {
         name: 'Weekly Review',
         frequency: 'weekly',
-        targetCount: 1,
         userId: testUser.id,
-        streak: 2
+        space: 'personal'
       }
     ]);
 

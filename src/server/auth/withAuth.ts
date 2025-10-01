@@ -4,6 +4,7 @@ import { jwt } from '@elysiajs/jwt';
 import { eq } from 'drizzle-orm';
 import { users } from '../../../drizzle/schema';
 import { db } from '../db';
+import { logger } from '../logger';
 
 interface AuthUser {
   id: string;
@@ -15,6 +16,7 @@ interface AuthUser {
 export const withAuth = () =>
   new Elysia()
     .decorate('db', db)
+    .decorate('logger', logger)
     .use(cookie())
     .use(
       jwt({

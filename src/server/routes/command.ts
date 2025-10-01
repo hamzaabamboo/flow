@@ -26,11 +26,15 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
         for (const toolCall of toolCalls) {
           if (toolCall.toolName === 'parse-task-command') {
             if (commandProcessor.tools.parseTaskCommand?.execute) {
-              parsedCommandResult = await commandProcessor.tools.parseTaskCommand.execute(toolCall.args) as { action: string; data: Record<string, unknown> };
+              parsedCommandResult = (await commandProcessor.tools.parseTaskCommand.execute(
+                toolCall.args
+              )) as { action: string; data: Record<string, unknown> };
             }
           } else if (toolCall.toolName === 'parse-datetime') {
             if (commandProcessor.tools.parseDateTime?.execute) {
-              parseDateTimeResult = await commandProcessor.tools.parseDateTime.execute(toolCall.args) as string;
+              parseDateTimeResult = (await commandProcessor.tools.parseDateTime.execute(
+                toolCall.args
+              )) as string;
             }
           }
         }
