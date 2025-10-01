@@ -1,5 +1,6 @@
-import { createTool } from '@mastra/core';
+import { Agent, createTool } from '@mastra/core';
 import { z } from 'zod';
+import { google } from '@ai-sdk/google';
 
 // Helper function to get the next occurrence of a specific day of the week
 function getNextDayOfWeek(dayOfWeek: number, fromDate: Date): Date {
@@ -192,4 +193,25 @@ const parseDateTime = createTool({
     now.setHours(now.getHours() + 2);
     return now.toISOString();
   }
+});
+
+export const commandProcessor = new Agent({
+  id: 'command-processor',
+  name: 'HamFlow Command Processor',
+  description: 'Processes natural language commands for task management',
+  model: google('gemini-1.5-flash'),
+  tools: {
+    parseTaskCommand,
+    parseDateTime
+  },
+  instructions: `You are an AI assistant for HamFlow, a productivity hub.
+    Parse user commands to understand their intent and extract relevant information.
+    Common commands include:
+    - Creating tasks with titles and due dates
+    - Setting reminders
+    - Moving tasks between boards
+    - Creating notes
+    - Checking schedules
+
+    Always be helpful and extract as much relevant information as possible from the command.`
 });
