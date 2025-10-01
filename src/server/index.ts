@@ -60,8 +60,6 @@ app
   .use(simpleAuth)
   // Public webhook endpoints
   .use(webhookRoutes)
-  // Public calendar routes
-  .use(calendarRoutes)
   // Cron jobs
   .use(reminderCron)
   // Protected API Routes
@@ -77,6 +75,7 @@ app
       .use(commandRoutes)
       .use(searchRoutes)
       .use(settingsRoutes)
+      .use(calendarRoutes)
   )
   // WebSocket for real-time updates
   .ws('/ws', {

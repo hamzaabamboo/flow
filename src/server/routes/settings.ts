@@ -1,14 +1,9 @@
 import { Elysia, t } from 'elysia';
-import { db } from '../db';
-
-interface User {
-  id: string;
-  email: string;
-}
+import { withAuth } from '../auth/withAuth';
 
 // User preferences/settings
 export const settingsRoutes = new Elysia({ prefix: '/settings' })
-  .decorate('db', db)
+  .use(withAuth())
 
   // Get user settings
   .get('/', ({ db: _db, user: _user }) => {
