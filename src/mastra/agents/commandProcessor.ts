@@ -19,8 +19,8 @@ const parseTaskCommand = createTool({
   inputSchema: z.object({
     command: z.string()
   }),
-  execute: (context: { input: { command: string } }) => {
-    const { command } = context.input;
+  execute: async (context: any) => {
+    const command = context?.input?.command || context?.command || '';
     const lowerCommand = command.toLowerCase();
 
     // Task creation patterns
@@ -131,8 +131,8 @@ const parseDateTime = createTool({
   inputSchema: z.object({
     text: z.string()
   }),
-  execute: (context: { input: { text: string } }) => {
-    const { text } = context.input;
+  execute: async (context: any) => {
+    const text = context?.input?.text || context?.text || '';
     const now = new Date();
     const lowerText = text.toLowerCase();
 

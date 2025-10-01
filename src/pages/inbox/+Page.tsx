@@ -7,15 +7,8 @@ import * as Card from '../../components/ui/styled/card';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
+import type { InboxItem } from '../../shared/types/misc';
 import { VStack, HStack, Box, Container } from 'styled-system/jsx';
-
-interface InboxItem {
-  id: string;
-  title: string;
-  description?: string;
-  source: string;
-  createdAt: string;
-}
 
 export default function InboxPage() {
   const { currentSpace } = useSpace();

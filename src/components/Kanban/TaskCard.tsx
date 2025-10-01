@@ -1,17 +1,9 @@
 import React, { useState } from 'react';
 import { Calendar, Check } from 'lucide-react';
+import type { Task } from '../../shared/types';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
 import { Box, HStack, VStack } from 'styled-system/jsx';
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-  completed: boolean;
-}
 
 interface TaskCardProps {
   task: Task;

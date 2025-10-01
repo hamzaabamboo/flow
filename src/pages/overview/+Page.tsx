@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Task } from '../../shared/types';
 import { navigate } from 'vike/client/router';
 import { Edit2, Trash2 } from 'lucide-react';
 import { useSpace } from '../../contexts/SpaceContext';
@@ -14,22 +15,7 @@ import { Badge } from '../../components/ui/badge';
 import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
 import { createListCollection, Select } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
-
-interface ExtendedTask {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
-  columnId: string;
-  columnName: string;
-  boardName: string;
-  boardId: string;
-  boardSpace: 'work' | 'personal';
-  createdAt: string;
-  updatedAt: string;
-}
+import type { ExtendedTask } from '~/shared/types/calendar';
 
 export default function OverviewPage() {
   const { currentSpace } = useSpace();
@@ -548,7 +534,7 @@ export default function OverviewPage() {
       <TaskDialog
         open={isTaskDialogOpen}
         onOpenChange={setIsTaskDialogOpen}
-        task={editingTask}
+        task={editingTask as Task | null}
         onSubmit={handleTaskSubmit}
         mode="edit"
       />

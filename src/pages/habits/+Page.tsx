@@ -22,20 +22,7 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { IconButton } from '../../components/ui/icon-button';
 import { useSpace } from '../../contexts/SpaceContext';
-
-interface Habit {
-  id: string;
-  name: string;
-  description: string | null;
-  frequency: 'daily' | 'weekly';
-  targetDays: number[] | null;
-  reminderTime: string | null;
-  space: 'work' | 'personal';
-  color: string | null;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Habit } from '../../shared/types/calendar';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sun' },
@@ -171,7 +158,7 @@ export default function HabitsPage() {
     setFormData({
       name: habit.name,
       description: habit.description || '',
-      frequency: habit.frequency,
+      frequency: habit.frequency === 'custom' ? 'weekly' : habit.frequency,
       targetDays: habit.targetDays || [],
       reminderTime: habit.reminderTime || '',
       color: habit.color || '#3b82f6'

@@ -7,17 +7,8 @@ import { Select, createListCollection } from '../ui/select';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import * as Popover from '../ui/styled/popover';
+import type { FilterOptions } from '../../shared/types';
 import { Box, HStack, VStack } from 'styled-system/jsx';
-
-interface FilterOptions {
-  search?: string;
-  priority?: string;
-  label?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  dueBefore?: string;
-  dueAfter?: string;
-}
 
 interface TaskFilterBarProps {
   filters: FilterOptions;

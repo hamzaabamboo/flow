@@ -16,7 +16,13 @@ function Page() {
   const errorReason = pageContext.abortReason || pageContext.errorWhileRendering;
 
   // Get appropriate error message and title
-  const getErrorContent = () => {
+  const getErrorContent = (): {
+    title: string;
+    subtitle: string;
+    message: string;
+    icon: React.ReactNode;
+    color: string;
+  } => {
     if (is404) {
       return {
         title: '404',
@@ -52,7 +58,9 @@ function Page() {
       title: '500',
       subtitle: 'Something Went Wrong',
       message:
-        errorReason?.toString() || 'Our servers are having a moment. Please try again later.',
+        typeof errorReason === 'string'
+          ? errorReason
+          : 'Our servers are having a moment. Please try again later.',
       icon: <ServerCrash width="64" height="64" />,
       color: 'red'
     };
@@ -83,7 +91,6 @@ function Page() {
   return (
     <Center minH="100vh" p="6" bg="bg.subtle">
       <VStack gap="8" maxW="md" textAlign="center">
-        {/* Error Icon */}
         <Box
           colorPalette={color}
           color="colorPalette.default"
@@ -93,7 +100,6 @@ function Page() {
           {icon}
         </Box>
 
-        {/* Error Title */}
         <VStack gap="2">
           <Text
             color="fg.default"
@@ -112,7 +118,6 @@ function Page() {
           {message}
         </Text>
 
-        {/* Action Buttons */}
         <HStack gap="4" justifyContent="center" flexWrap="wrap">
           {!is404 && (
             <Button onClick={handleRefresh} variant="outline" size="lg" gap="2">
@@ -132,8 +137,7 @@ function Page() {
           </Button>
         </HStack>
 
-        {/* Debug Information (only in development) */}
-        {process.env.NODE_ENV === 'development' && errorReason && (
+        {process.env.NODE_ENV === 'development' && !!errorReason && (
           <Box
             borderColor="border.default"
             borderRadius="md"

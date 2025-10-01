@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Tag, RefreshCw, Calendar, CheckSquare, Bell } from 'lucide-react';
 import { Portal } from '@ark-ui/react/portal';
+import type { Task, Column, SimpleSubtask } from '../../shared/types';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -10,31 +11,6 @@ import { Text } from '../ui/text';
 import { Checkbox } from '../ui/checkbox';
 import * as Dialog from '../ui/styled/dialog';
 import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
-
-interface Subtask {
-  id?: string;
-  title: string;
-  completed: boolean;
-}
-
-interface Task {
-  id?: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  columnId?: string;
-  labels?: string[];
-  recurringPattern?: string;
-  recurringEndDate?: string;
-  subtasks?: Subtask[];
-  createReminder?: boolean;
-}
-
-interface Column {
-  id: string;
-  name: string;
-}
 
 interface TaskDialogProps {
   open: boolean;
@@ -76,7 +52,7 @@ export function TaskDialog({
 }: TaskDialogProps) {
   const isEdit = mode === 'edit';
   const [labels, setLabels] = useState<string[]>([]);
-  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [subtasks, setSubtasks] = useState<SimpleSubtask[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [createReminder, setCreateReminder] = useState(false);
@@ -88,7 +64,14 @@ export function TaskDialog({
   useEffect(() => {
     if (open) {
       setLabels(task?.labels || []);
-      setSubtasks(task?.subtasks || []);
+      // Convert full Subtask to SimpleSubtask for UI
+      setSubtasks(
+        task?.subtasks?.map((st) => ({
+          id: st.id,
+          title: st.title,
+          completed: st.completed
+        })) || []
+      );
       setCreateReminder(task?.createReminder || false);
       setRecurringPattern(task?.recurringPattern || '');
       setRecurringEndDate(task?.recurringEndDate || '');
@@ -483,7 +466,7 @@ export function TaskDialog({
                             size="sm"
                             value={newLabel}
                             onChange={(e) => setNewLabel(e.target.value)}
-                            onKeyPress={(e) => {
+                            onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -511,8 +494,7 @@ export function TaskDialog({
                               <Checkbox
                                 size="sm"
                                 checked={subtask.completed}
-                                onCheckedChange={(e) => {
-                                  e.stopPropagation?.();
+                                onCheckedChange={() => {
                                   toggleSubtask(index);
                                 }}
                               />
@@ -543,7 +525,7 @@ export function TaskDialog({
                               placeholder="Add subtask..."
                               value={newSubtask}
                               onChange={(e) => setNewSubtask(e.target.value)}
-                              onKeyPress={(e) => {
+                              onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
                                   e.stopPropagation();

@@ -1,18 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { X, Minimize2, Maximize2, Timer } from 'lucide-react';
+import type { PomodoroSession } from '../../shared/types';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { IconButton } from '../ui/icon-button';
 import { Box, HStack } from 'styled-system/jsx';
-
-interface PomodoroSession {
-  taskId?: string;
-  taskTitle?: string;
-  duration: number;
-  type: 'work' | 'short-break' | 'long-break';
-}
 
 const TIMERS = {
   work: 25 * 60, // 25 minutes

@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Task } from '../../shared/types';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
 import { TaskCard } from './TaskCard';
 import { VStack, HStack, Box } from 'styled-system/jsx';
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-  completed: boolean;
-}
 
 interface ColumnProps {
   column: {

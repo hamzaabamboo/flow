@@ -8,25 +8,10 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import * as Menu from '../ui/styled/menu';
 import * as Dialog from '../ui/styled/dialog';
+import type { Task, Column } from '../../shared/types';
 import { Box, VStack, HStack } from 'styled-system/jsx';
 
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
-  columnId: string;
-}
-
-export interface Column {
-  id: string;
-  name: string;
-  taskOrder?: string[];
-  wipLimit?: number | null;
-  position?: number;
-}
+export { type Task, type Column } from '../../shared/types';
 
 interface KanbanColumnProps {
   column: Column;

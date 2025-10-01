@@ -1,34 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Task, ColumnData, BoardData } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import { Heading } from '../ui/heading';
 import { Text } from '../ui/text';
 import { Column } from './Column';
 import { Box, HStack } from 'styled-system/jsx';
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-  completed: boolean;
-}
-
-interface ColumnData {
-  id: string;
-  name: string;
-  taskOrder: string[];
-  tasks: Task[];
-}
-
-interface BoardData {
-  id: string;
-  name: string;
-  space: string;
-  columnOrder: string[];
-  columns: ColumnData[];
-}
 
 export function Board({ boardId }: { boardId: string }) {
   const {} = useSpace();

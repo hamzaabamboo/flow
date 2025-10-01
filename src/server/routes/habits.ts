@@ -139,7 +139,7 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
   })
   .post(
     '/:id/log',
-    async ({ params, db, _user }) => {
+    async ({ params, db, user }) => {
       // Check if already logged today
       const today = new Date();
       today.setHours(0, 0, 0, 0);

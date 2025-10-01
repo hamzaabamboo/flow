@@ -8,12 +8,7 @@ import { Input } from '../../components/ui/input';
 import * as Card from '../../components/ui/styled/card';
 import { Text } from '../../components/ui/text';
 import { VStack, HStack, Box } from 'styled-system/jsx';
-
-interface BoardInfo {
-  id: string;
-  name: string;
-  space: string;
-}
+import type { BoardInfo } from '~/shared/types/board';
 
 export default function HomePage() {
   const { currentSpace } = useSpace();

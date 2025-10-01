@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
-import { taskRoutes } from '../tasks';
+import { tasksRoutes } from '../tasks';
 
 // Mock database
 const mockDb = {
@@ -32,7 +32,7 @@ describe('Task Routes', () => {
     app = new Elysia()
       .decorate('db', mockDb as unknown as Record<string, unknown>)
       .derive(() => ({ user: mockUser }))
-      .use(taskRoutes);
+      .use(tasksRoutes);
   });
 
   describe('GET /tasks/:columnId', () => {

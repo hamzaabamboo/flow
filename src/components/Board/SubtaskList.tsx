@@ -5,14 +5,8 @@ import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
+import type { Subtask } from '../../shared/types';
 import { HStack, VStack } from 'styled-system/jsx';
-
-interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-  order: number;
-}
 
 interface SubtaskListProps {
   taskId: string;

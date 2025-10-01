@@ -3,10 +3,12 @@ import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
 import { cookie } from '@elysiajs/cookie';
+import { wrap } from '@bogeychan/elysia-logger';
 import { renderPage, createDevMiddleware } from 'vike/server';
 import { connect } from 'elysia-connect-middleware';
 
 import { db } from './db';
+import { logger } from './logger';
 import { webhookRoutes } from './routes/webhook';
 import { calendarRoutes } from './routes/calendar';
 import { boardRoutes } from './routes/boards';
@@ -28,7 +30,9 @@ const app = new Elysia({
     port: 3000,
     idleTimeout: 60
   }
-});
+})
+  // Add logger middleware
+  .use(wrap(logger, { autoLogging: false }));
 
 const isProduction = process.env.NODE_ENV === 'production';
 const root = join(process.cwd());
@@ -80,7 +84,7 @@ app
   // WebSocket for real-time updates
   .ws('/ws', {
     open(ws) {
-      console.log('WebSocket client connected');
+      logger.info('WebSocket client connected');
       ws.subscribe('hamflow');
 
       // Send a ping every 30 seconds to keep connection alive
@@ -94,31 +98,25 @@ app
       }, 30000);
 
       // Store interval ID for cleanup
-      (ws as { data?: { pingInterval: NodeJS.Timeout } }).data = { pingInterval };
+      (ws as unknown as { data?: { pingInterval: NodeJS.Timeout } }).data = { pingInterval };
     },
     message(ws, message) {
       // Broadcast updates to all clients
       ws.publish('hamflow', message);
     },
     close(ws, code, reason) {
-      console.log(`WebSocket client disconnected (code: ${code}, reason: ${reason})`);
+      logger.info(`WebSocket client disconnected (code: ${code}, reason: ${reason})`);
 
       // Clean up ping interval
-      const wsData = (ws as { data?: { pingInterval: NodeJS.Timeout } }).data;
+      const wsData = (ws as unknown as { data?: { pingInterval: NodeJS.Timeout } }).data;
       if (wsData?.pingInterval) {
         clearInterval(wsData.pingInterval);
       }
 
       ws.unsubscribe('hamflow');
     },
-    error(ws: unknown, error: Error) {
-      console.error('WebSocket error:', error);
-
-      // Clean up ping interval on error
-      const wsData = (ws as { data?: { pingInterval: NodeJS.Timeout } }).data;
-      if (wsData?.pingInterval) {
-        clearInterval(wsData.pingInterval);
-      }
+    error(ctx: any) {
+      logger.error(ctx, 'WebSocket error');
     }
   })
   // Catch-all route for SSR (must be last)
@@ -142,7 +140,7 @@ app
       set.status = 404;
       return { error: 'Not found' };
     }
-    console.error(error);
+    logger.error(error, 'Server error');
     set.status = 500;
     return { error: 'Internal server error' };
   })
@@ -151,11 +149,11 @@ app
 // Initialize WebSocket manager with app instance
 wsManager.setApp(app);
 
-console.log(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
+logger.info(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
 
 // Graceful shutdown handlers
 const gracefulShutdown = () => {
-  console.log('Shutting down server gracefully...');
+  logger.info('Shutting down server gracefully...');
 
   // Close all WebSocket connections
   if (app.server) {
@@ -167,7 +165,7 @@ const gracefulShutdown = () => {
 
     // Force exit after 10 seconds
     const forceExitTimeout = setTimeout(() => {
-      console.error('Could not close connections in time, forcefully shutting down');
+      logger.error('Could not close connections in time, forcefully shutting down');
       process.exit(1);
     }, 10000);
 
@@ -175,7 +173,7 @@ const gracefulShutdown = () => {
     // Bun's server.stop() is synchronous and takes a boolean for closeActiveConnections
     app.server.stop(true);
     clearTimeout(forceExitTimeout);
-    console.log('Server closed');
+    logger.info('Server closed');
     process.exit(0);
   }
 };
@@ -187,11 +185,11 @@ process.on('SIGUSR2', gracefulShutdown); // For nodemon restarts
 
 // Handle uncaught errors
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logger.error(error, 'Uncaught Exception');
   gracefulShutdown();
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error({ promise, reason }, 'Unhandled Rejection');
   gracefulShutdown();
 });

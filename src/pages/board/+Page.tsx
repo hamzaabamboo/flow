@@ -10,15 +10,7 @@ import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import { Badge } from '../../components/ui/badge';
 import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
-
-interface BoardInfo {
-  id: string;
-  name: string;
-  space: string;
-  columnOrder: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Board as BoardInfo } from '~/shared/types/board';
 
 export default function BoardsListPage() {
   const { currentSpace } = useSpace();
@@ -142,7 +134,7 @@ export default function BoardsListPage() {
       <Box p="6">
         {boards && boards.length > 0 ? (
           <Grid
-            templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
+            gridTemplateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
             gap="6"
           >
             {boards.map((board) => (
@@ -164,7 +156,7 @@ export default function BoardsListPage() {
                       <Card.Title>{board.name}</Card.Title>
                       <Card.Description>
                         {board.columnOrder?.length || 3} columns • Updated{' '}
-                        {new Date(board.updatedAt).toLocaleDateString()}
+                        {board.updatedAt ? new Date(board.updatedAt).toLocaleDateString() : 'Never'}
                       </Card.Description>
                     </VStack>
                     <Badge size="sm" colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>
@@ -185,7 +177,7 @@ export default function BoardsListPage() {
                     <HStack gap="1">
                       <Calendar width="14" height="14" />
                       <Text color="fg.muted" fontSize="sm">
-                        {new Date(board.updatedAt).toLocaleDateString()}
+                        {board.updatedAt ? new Date(board.updatedAt).toLocaleDateString() : 'Never'}
                       </Text>
                     </HStack>
                   </HStack>

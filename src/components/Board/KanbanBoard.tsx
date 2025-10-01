@@ -5,20 +5,13 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Text } from '../ui/text';
 import * as Dialog from '../ui/styled/dialog';
+import type { BoardWithColumns, Task, Column } from '../../shared/types';
 import { TaskDialog } from './TaskDialog';
-import { KanbanColumn, type Task, type Column } from './KanbanColumn';
+import { KanbanColumn } from './KanbanColumn';
 import { Box, HStack, VStack } from 'styled-system/jsx';
 
-interface Board {
-  id: string;
-  name: string;
-  space: 'work' | 'personal';
-  columnOrder?: string[];
-  columns: Column[];
-}
-
 interface KanbanBoardProps {
-  board: Board;
+  board: BoardWithColumns;
   tasks: Task[];
   onTaskUpdate?: () => void;
 }

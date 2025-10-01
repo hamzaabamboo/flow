@@ -166,8 +166,8 @@ export const oidcAuth = new Elysia()
         // Redirect to return URL
         set.redirect = returnUrl;
         return;
-      } catch {
-        console.error('OAuth error:', _error);
+      } catch (error) {
+        console.error('OAuth error:', error);
         set.status = 500;
         return { error: 'Authentication failed' };
       }

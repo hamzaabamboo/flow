@@ -8,8 +8,9 @@ describe('TaskCard', () => {
     title: 'Test Task',
     description: 'Test description',
     dueDate: new Date().toISOString(),
-    priority: 'high',
-    completed: false
+    priority: 'high' as const,
+    completed: false,
+    columnId: 'col-1'
   };
 
   const mockOnDragStart = vi.fn();
@@ -111,7 +112,7 @@ describe('TaskCard', () => {
 
     priorities.forEach((priority) => {
       const { unmount } = render(
-        <TaskCard task={{ ...mockTask, priority }} onDragStart={mockOnDragStart} />
+        <TaskCard task={{ ...mockTask, priority: priority as 'urgent' | 'high' | 'medium' | 'low' }} onDragStart={mockOnDragStart} />
       );
 
       const taskCard = screen.getByText('Test Task').closest('[draggable]');
@@ -125,7 +126,8 @@ describe('TaskCard', () => {
     const minimalTask = {
       id: 'task-2',
       title: 'Minimal Task',
-      completed: false
+      completed: false,
+      columnId: 'col-1'
     };
 
     render(<TaskCard task={minimalTask} onDragStart={mockOnDragStart} />);

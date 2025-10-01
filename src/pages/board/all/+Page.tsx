@@ -10,30 +10,8 @@ import { Text } from '../../../components/ui/text';
 import { Heading } from '../../../components/ui/heading';
 import { Badge } from '../../../components/ui/badge';
 import { Countdown } from '../../../components/ui/countdown';
+import type { Task, BoardWithColumns as Board } from '../../../shared/types/board';
 import { Box, VStack, HStack } from 'styled-system/jsx';
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
-  columnId: string;
-}
-
-interface Column {
-  id: string;
-  name: string;
-  boardId: string;
-}
-
-interface Board {
-  id: string;
-  name: string;
-  space: 'work' | 'personal';
-  columns: Column[];
-}
 
 export default function AllTasksPage() {
   const { currentSpace } = useSpace();
@@ -178,7 +156,8 @@ export default function AllTasksPage() {
       board.columns.map((col) => ({
         id: col.id,
         name: col.name,
-        boardName: board.name
+        boardName: board.name,
+        boardId: board.id
       }))
     )
     .sort((a, b) => `${a.boardName} - ${a.name}`.localeCompare(`${b.boardName} - ${b.name}`));
@@ -444,7 +423,9 @@ export default function AllTasksPage() {
         mode="edit"
         columns={allColumns.map((col) => ({
           id: col.id,
-          name: `${col.boardName} - ${col.name}`
+          name: `${col.boardName} - ${col.name}`,
+          boardId: col.boardId,
+          taskOrder: []
         }))}
       />
     </Box>

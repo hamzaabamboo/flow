@@ -10,21 +10,8 @@ import { IconButton } from '../../../components/ui/icon-button';
 import { Text } from '../../../components/ui/text';
 import { Heading } from '../../../components/ui/heading';
 import { Badge } from '../../../components/ui/badge';
+import type { BoardWithColumns } from '../../../shared/types/board';
 import { Box, HStack } from 'styled-system/jsx';
-
-interface Column {
-  id: string;
-  name: string;
-  taskOrder?: string[];
-}
-
-interface Board {
-  id: string;
-  name: string;
-  space: 'work' | 'personal';
-  columnOrder?: string[];
-  columns: Column[];
-}
 
 export default function BoardPage() {
   const pageContext = usePageContext();
@@ -32,7 +19,7 @@ export default function BoardPage() {
   const { currentSpace } = useSpace();
 
   // Fetch board with columns
-  const { data: board, isLoading: boardLoading } = useQuery<Board>({
+  const { data: board, isLoading: boardLoading } = useQuery<BoardWithColumns>({
     queryKey: ['board', boardId],
     queryFn: async () => {
       const response = await fetch(`/api/boards/${boardId}`, {

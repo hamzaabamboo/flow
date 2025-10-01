@@ -27,7 +27,7 @@ describe('Authentication Flow Integration', () => {
     // Setup test server with all routes
     const { simpleAuth } = await import('../../server/auth/simple-auth');
     const { authMiddleware } = await import('../../server/auth/middleware');
-    const { taskRoutes } = await import('../../server/routes/tasks');
+    const { tasksRoutes } = await import('../../server/routes/tasks');
     const { boardRoutes } = await import('../../server/routes/boards');
     const { inboxRoutes } = await import('../../server/routes/inbox');
 
@@ -49,7 +49,7 @@ describe('Authentication Flow Integration', () => {
       .state('db', mockDb)
       .use(simpleAuth)
       .group('/api', (app) =>
-        app.use(authMiddleware).use(taskRoutes).use(boardRoutes).use(inboxRoutes)
+        app.use(authMiddleware).use(tasksRoutes).use(boardRoutes).use(inboxRoutes)
       )
       .listen(3333) as unknown as TestApp;
 

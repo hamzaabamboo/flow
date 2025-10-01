@@ -1,20 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-interface User {
-  id: string;
-  email: string;
-  name: string | null;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (returnUrl?: string) => void;
-  logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
-}
+import type { User, AuthContextType } from '../shared/types/user';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

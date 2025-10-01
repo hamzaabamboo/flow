@@ -13,6 +13,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import type { InboxItem, Task, Habit } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
@@ -22,14 +23,14 @@ import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Box, VStack, HStack, Divider } from 'styled-system/jsx';
 
-interface NavItem {
+interface SidebarNavItem {
   label: string;
   href: string;
   icon: React.ElementType;
   badgeKey?: 'inbox' | 'agenda' | 'tasks';
 }
 
-const navItems: NavItem[] = [
+const navItems: SidebarNavItem[] = [
   { label: 'Agenda', href: '/agenda', icon: Calendar, badgeKey: 'agenda' },
   { label: 'Tasks', href: '/overview', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Boards', href: '/', icon: LayoutGrid },
@@ -40,22 +41,6 @@ const navItems: NavItem[] = [
 
 interface SidebarContentProps {
   onNavigate?: () => void;
-}
-
-interface InboxItem {
-  id: string;
-  content: string;
-}
-
-interface Task {
-  id: string;
-  completed: boolean;
-  dueDate: string | null;
-}
-
-interface Habit {
-  id: string;
-  completedToday: boolean;
 }
 
 function isActiveRoute(href: string, currentPath: string): boolean {

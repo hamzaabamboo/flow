@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import type { Task } from '../../shared/types';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { FileText, Bell, Target, Calendar, Edit2 } from 'lucide-react';
 import { Container, Box, VStack, HStack } from '../../../styled-system/jsx';
@@ -13,63 +14,7 @@ import { IconButton } from '../../components/ui/icon-button';
 import { useSpace } from '../../contexts/SpaceContext';
 import { TaskDialog } from '../../components/Board/TaskDialog';
 import { useQueryState, useDateQueryState } from '../../hooks/useQueryState';
-
-interface Task {
-  id?: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  columnId?: string;
-}
-
-interface ExtendedTask {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
-  columnId: string;
-  columnName: string;
-  boardName: string;
-  boardId: string;
-  boardSpace: 'work' | 'personal';
-  createdAt: string;
-  updatedAt: string;
-  labels?: string[];
-  subtasks?: { title: string; completed: boolean }[];
-  recurringPattern?: string;
-  recurringEndDate?: string;
-}
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-  completed?: boolean;
-  type: 'task' | 'reminder' | 'habit';
-  space?: string;
-  recurringPattern?: string;
-  recurringEndDate?: string;
-  parentTaskId?: string;
-  columnId?: string;
-  labels?: string[];
-  subtasks?: { title: string; completed: boolean }[];
-}
-
-interface Habit {
-  id: string;
-  name: string;
-  description?: string;
-  frequency: 'daily' | 'weekly';
-  targetDays?: number[] | null;
-  reminderTime?: string | null;
-  completedToday: boolean;
-  currentStreak: number;
-}
+import type { CalendarEvent, ExtendedTask, Habit } from '../../shared/types/calendar';
 
 export default function AgendaPage() {
   const { currentSpace } = useSpace();
@@ -135,10 +80,28 @@ export default function AgendaPage() {
     completingTasks.current.add(completionKey);
 
     try {
-      // Find the task to get its current completed status
-      const task = Object.values(groupedEvents)
-        .flat()
-        .find((e) => e.id === taskId);
+      // Find the specific task instance - for recurring tasks, match by both ID and instanceDate
+      const task = events?.find((e) => {
+        if (e.id !== taskId) return false;
+
+        // For recurring tasks, also match the instanceDate
+        if (instanceDate && e.instanceDate) {
+          const eventDateStr =
+            typeof e.instanceDate === 'string'
+              ? e.instanceDate
+              : new Date(e.instanceDate).toISOString().split('T')[0];
+          const targetDateStr =
+            instanceDate instanceof Date
+              ? instanceDate.toISOString().split('T')[0]
+              : typeof instanceDate === 'string' && instanceDate.includes('T')
+                ? instanceDate.split('T')[0]
+                : instanceDate;
+          return eventDateStr === targetDateStr;
+        }
+
+        // For non-recurring tasks, just match by ID
+        return true;
+      });
 
       // Toggle task completion - for recurring tasks, pass the instanceDate as ISO string
       const instanceDateStr = instanceDate
@@ -194,7 +157,7 @@ export default function AgendaPage() {
         id: event.id,
         title: event.title,
         description: event.description,
-        dueDate: event.dueDate,
+        dueDate: typeof event.dueDate === 'string' ? event.dueDate : event.dueDate?.toISOString(),
         priority: event.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
         completed: event.completed || false,
         columnId: event.columnId || '', // Will be populated by TaskDialog
@@ -467,7 +430,9 @@ export default function AgendaPage() {
                               {event.type === 'task' && (
                                 <Checkbox
                                   checked={event.completed}
-                                  onCheckedChange={() => void completeTask(event.id, event.dueDate)}
+                                  onCheckedChange={() =>
+                                    void completeTask(event.id, event.instanceDate || event.dueDate)
+                                  }
                                   onClick={(e) => e.stopPropagation()}
                                   size="sm"
                                 />
@@ -565,7 +530,7 @@ export default function AgendaPage() {
                               🕐 {habit.reminderTime}
                             </Badge>
                           )}
-                          {habit.currentStreak > 0 && (
+                          {habit.currentStreak && habit.currentStreak > 0 && (
                             <Badge variant="subtle" size="sm">
                               🔥 {habit.currentStreak} day streak
                             </Badge>
@@ -630,7 +595,7 @@ export default function AgendaPage() {
       <TaskDialog
         open={isTaskDialogOpen}
         onOpenChange={setIsTaskDialogOpen}
-        task={editingTask}
+        task={editingTask as Task | null}
         onSubmit={handleTaskSubmit}
         mode="edit"
       />
