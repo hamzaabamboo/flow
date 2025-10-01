@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Logout mutation
   const logoutMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/require-await
     mutationFn: async () => {
       queryClient.setQueryData(['auth', 'user'], null);
       queryClient.clear();

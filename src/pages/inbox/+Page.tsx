@@ -8,7 +8,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import type { InboxItem } from '../../shared/types/misc';
-import { Spinner } from '../ui/spinner';
+import { Spinner } from '../../components/ui/spinner';
 import { VStack, HStack, Box, Center } from 'styled-system/jsx';
 
 export default function InboxPage() {

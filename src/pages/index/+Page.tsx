@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
@@ -17,7 +17,6 @@ import type { CalendarEvent, ExtendedTask, Habit } from '../../shared/types/cale
 import type { Task } from '../../shared/types/board';
 import { TaskItem } from '../../components/Agenda/TaskItem';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
-import type { TaskFormData } from '../../shared/types/forms';
 import { Spinner } from '../../components/ui/spinner';
 
 interface CompleteTaskPayload {
@@ -27,7 +26,6 @@ interface CompleteTaskPayload {
 }
 
 export default function AgendaPage() {
-  const queryClient = useQueryClient();
   const { currentSpace } = useSpace();
   const [viewMode, setViewMode] = useQueryState<'day' | 'week'>('view', 'day');
   const [selectedDate, setSelectedDate] = useDateQueryState('date');
@@ -167,19 +165,13 @@ export default function AgendaPage() {
     setIsTaskDialogOpen(true);
   };
 
-  const handleUpdateTask = (data: TaskFormData) => {
-    if (!editingTask) return;
-
-    updateTaskMutation.mutate(data);
-  };
-
   const handleDialogSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
 
-    const taskData: TaskFormData = editingTask
+    const taskData: Partial<Task> & { id?: string } = editingTask
       ? {
           id: editingTask.id,
           title: data.title,
@@ -292,6 +284,7 @@ export default function AgendaPage() {
     const completed = filteredEvents.filter((event) => event.completed).length;
     const overdue = filteredEvents.filter((event) => {
       if (event.completed) return false;
+      if (!event.dueDate) return false;
       const dueDate = new Date(event.dueDate);
       return dueDate < now;
     }).length;

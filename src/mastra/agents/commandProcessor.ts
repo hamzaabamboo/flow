@@ -1,6 +1,5 @@
-import { Agent, createTool } from '@mastra/core';
+import { createTool } from '@mastra/core';
 import { z } from 'zod';
-import { google } from '@ai-sdk/google';
 
 // Helper function to get the next occurrence of a specific day of the week
 function getNextDayOfWeek(dayOfWeek: number, fromDate: Date): Date {
@@ -19,8 +18,9 @@ const parseTaskCommand = createTool({
   inputSchema: z.object({
     command: z.string()
   }),
-  execute: async (context: any) => {
-    const command = context?.input?.command || context?.command || '';
+  // eslint-disable-next-line @typescript-eslint/require-await
+  execute: async ({ context }) => {
+    const command = context?.command;
     const lowerCommand = command.toLowerCase();
 
     // Task creation patterns
@@ -131,10 +131,11 @@ const parseDateTime = createTool({
   inputSchema: z.object({
     text: z.string()
   }),
-  execute: async (context: any) => {
-    const text = context?.input?.text || context?.text || '';
+  outputSchema: z.string(),
+  // eslint-disable-next-line @typescript-eslint/require-await
+  execute: async ({ context }) => {
     const now = new Date();
-    const lowerText = text.toLowerCase();
+    const lowerText = context.text.toLowerCase();
 
     // Time-based patterns
     if (lowerText.includes('tomorrow')) {
@@ -191,25 +192,4 @@ const parseDateTime = createTool({
     now.setHours(now.getHours() + 2);
     return now.toISOString();
   }
-});
-
-export const commandProcessor = new Agent({
-  id: 'command-processor',
-  name: 'HamFlow Command Processor',
-  description: 'Processes natural language commands for task management',
-  model: google('gemini-1.5-flash'),
-  tools: {
-    parseTaskCommand,
-    parseDateTime
-  },
-  instructions: `You are an AI assistant for HamFlow, a productivity hub.
-    Parse user commands to understand their intent and extract relevant information.
-    Common commands include:
-    - Creating tasks with titles and due dates
-    - Setting reminders
-    - Moving tasks between boards
-    - Creating notes
-    - Checking schedules
-
-    Always be helpful and extract as much relevant information as possible from the command.`
 });
