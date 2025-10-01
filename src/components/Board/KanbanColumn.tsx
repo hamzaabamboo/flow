@@ -20,7 +20,6 @@ import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Checkbox } from '../ui/checkbox';
 import * as Menu from '../ui/styled/menu';
 import * as Dialog from '../ui/styled/dialog';
 import type { Task, Column } from '../../shared/types';
@@ -264,11 +263,10 @@ interface TaskCardProps {
   task: Task;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
-  onToggleComplete: (task: Task) => void;
   getPriorityColor?: (priority?: string) => string;
 }
 
-function TaskCard({ task, onEdit, onDelete, onToggleComplete }: TaskCardProps) {
+function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id
   });
@@ -296,16 +294,8 @@ function TaskCard({ task, onEdit, onDelete, onToggleComplete }: TaskCardProps) {
       _hover={{ borderColor: 'colorPalette.default', boxShadow: 'sm' }}
     >
       <HStack gap="2" alignItems="start" mb="2">
-        <Checkbox
-          checked={task.completed}
-          onCheckedChange={() => onToggleComplete(task)}
-          onClick={(e) => e.stopPropagation()}
-          size="sm"
-          flexShrink={0}
-          mt="0.5"
-        />
-        <Box {...listeners} cursor="grab" flexShrink={0} mt="0.5">
-          <GripVertical width="16" height="16" color="fg.muted" />
+        <Box {...listeners} cursor="grab" flexShrink={0} mt="0.5" color="fg.muted">
+          <GripVertical width="16" height="16" />
         </Box>
         <VStack flex="1" gap="2" alignItems="stretch">
           <HStack gap="2" alignItems="center" flexWrap="wrap">
