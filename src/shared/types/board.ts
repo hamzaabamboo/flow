@@ -2,6 +2,15 @@
 
 import type { Subtask } from './task';
 
+export interface TaskMetadata {
+  link?: string;
+  attachments?: string[];
+  estimatedTime?: number;
+  actualTime?: number;
+  tags?: string[];
+  customFields?: Record<string, unknown>;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -19,7 +28,10 @@ export interface Task {
   recurringEndDate?: string;
   parentTaskId?: string;
   createReminder?: boolean;
+  metadata?: TaskMetadata;
   column?: Column & { board?: Board };
+  // Convenience accessors for common metadata fields
+  link?: string;
 }
 
 export interface Column {

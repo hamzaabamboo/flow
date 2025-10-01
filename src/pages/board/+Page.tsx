@@ -80,7 +80,7 @@ export default function BoardsListPage() {
     <Box>
       {/* Header */}
       <Box borderColor="border.default" borderBottomWidth="1px" mb="8" bg="bg.default">
-        <VStack gap="6" p="6">
+        <VStack gap="6" p={{ base: '4', md: '6' }}>
           <HStack justifyContent="space-between" alignItems="center" w="full">
             <HStack gap="4">
               <Heading size="3xl" color="fg.default">
@@ -131,7 +131,7 @@ export default function BoardsListPage() {
       </Box>
 
       {/* Boards Grid */}
-      <Box p="6">
+      <Box p={{ base: '2', md: '4' }}>
         {boards && boards.length > 0 ? (
           <Grid
             gap="6"

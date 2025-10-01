@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
-import { Plus, MoreHorizontal, Edit2, Trash2, Settings, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Edit2, Trash2, Settings, AlertTriangle, GripVertical, Grip, ExternalLink } from 'lucide-react';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
+import { PriorityBadge } from '../ui/priority-badge';
+import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -19,11 +24,6 @@ interface KanbanColumnProps {
   onAddTask: () => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragStartColumn?: (e: React.DragEvent, column: Column) => void;
-  onDropColumn?: (e: React.DragEvent) => void;
   getPriorityColor: (priority?: string) => string;
   onRenameColumn?: (columnId: string, name: string) => void;
   onDeleteColumn?: (columnId: string) => void;
@@ -36,11 +36,6 @@ export function KanbanColumn({
   onAddTask,
   onEditTask,
   onDeleteTask,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragStartColumn,
-  onDropColumn,
   getPriorityColor,
   onRenameColumn,
   onDeleteColumn,
@@ -49,6 +44,38 @@ export function KanbanColumn({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [columnName, setColumnName] = useState(column.name);
   const [wipLimit, setWipLimit] = useState(column.wipLimit?.toString() || '');
+
+  // Make the column itself sortable
+  const {
+    attributes: columnAttributes,
+    listeners: columnListeners,
+    setNodeRef: setColumnRef,
+    transform: columnTransform,
+    transition: columnTransition,
+    isDragging: isColumnDragging
+  } = useSortable({
+    id: column.id,
+    data: {
+      type: 'column',
+      column
+    }
+  });
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: column.id
+  });
+
+  const columnStyle = {
+    transform: CSS.Transform.toString(columnTransform),
+    transition: columnTransition,
+    opacity: isColumnDragging ? 0.5 : 1
+  };
+
+  // Combine refs
+  const setRefs = (element: HTMLDivElement | null) => {
+    setColumnRef(element);
+    setDroppableRef(element);
+  };
 
   const isOverWipLimit = column.wipLimit && tasks.length > column.wipLimit;
 
@@ -78,18 +105,33 @@ export function KanbanColumn({
   return (
     <>
       <Box
-        onDragOver={onDragOver}
-        onDrop={(e) => (onDropColumn ? onDropColumn(e) : onDrop(e))}
-        draggable={!!onDragStartColumn}
-        onDragStart={(e) => onDragStartColumn && onDragStartColumn(e, column)}
-        cursor={onDragStartColumn ? 'move' : 'default'}
+        ref={setRefs}
+        style={columnStyle}
+        display="flex"
+        flexDirection="column"
         borderRadius="lg"
-        minW="300px"
+        minW="320px"
+        maxW="320px"
+        maxH="calc(100vh - 200px)"
         p="4"
         bg="bg.muted"
+        borderWidth="2px"
+        borderColor={isColumnDragging ? 'colorPalette.default' : 'transparent'}
+        boxShadow={isColumnDragging ? 'lg' : 'none'}
       >
-        <HStack justifyContent="space-between" mb="4">
+        <HStack flexShrink={0} justifyContent="space-between" mb="4">
           <HStack gap="2">
+            {/* Drag handle for column */}
+            <Box
+              {...columnAttributes}
+              {...columnListeners}
+              cursor="grab"
+              color="fg.muted"
+              _hover={{ color: 'fg.default' }}
+              transition="color 0.2s"
+            >
+              <Grip width="16" height="16" />
+            </Box>
             <Text color="fg.default" fontSize="sm" fontWeight="semibold">
               {column.name} ({tasks.length}
               {column.wipLimit ? `/${column.wipLimit}` : ''})
@@ -131,18 +173,21 @@ export function KanbanColumn({
           </HStack>
         </HStack>
 
-        <VStack gap="2">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onDragStart={onDragStart}
-              onEdit={onEditTask}
-              onDelete={onDeleteTask}
-              getPriorityColor={getPriorityColor}
-            />
-          ))}
-        </VStack>
+        <Box flex="1" overflowX="hidden" overflowY="auto">
+          <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            <VStack gap="2" pb="2" minH="200px">
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onEdit={onEditTask}
+                  onDelete={onDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                />
+              ))}
+            </VStack>
+          </SortableContext>
+        </Box>
       </Box>
 
       <Dialog.Root
@@ -151,7 +196,7 @@ export function KanbanColumn({
       >
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="400px">
+          <Dialog.Content borderColor="border.default" maxW="400px" bg="bg.default">
             <VStack gap="4" p="6">
               <VStack gap="1">
                 <Dialog.Title>Edit Column</Dialog.Title>
@@ -207,68 +252,110 @@ export function KanbanColumn({
 
 interface TaskCardProps {
   task: Task;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
-  getPriorityColor: (priority?: string) => string;
+  getPriorityColor?: (priority?: string) => string;
 }
 
-function TaskCard({ task, onDragStart, onEdit, onDelete, getPriorityColor }: TaskCardProps) {
+function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  };
+
   return (
     <Box
-      draggable
-      onDragStart={(e) => onDragStart(e, task)}
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
       cursor="grab"
+      position="relative"
       borderColor="border.default"
       borderRadius="md"
       borderWidth="1px"
-      width="full"
+      w="full"
       p="3"
       bg="bg.default"
       transition="all 0.2s"
-      _hover={{ borderColor: 'colorPalette.default' }}
+      _hover={{ borderColor: 'colorPalette.default', boxShadow: 'sm' }}
     >
-      <HStack justifyContent="space-between" mb="2">
-        <Text flex="1" color="fg.default" fontSize="sm" fontWeight="medium">
-          {task.title}
-        </Text>
-        <HStack gap="0">
-          <IconButton variant="ghost" size="sm" aria-label="Edit task" onClick={() => onEdit(task)}>
-            <Edit2 width="16" height="16" />
-          </IconButton>
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <IconButton variant="ghost" size="sm" aria-label="More options">
-                <MoreHorizontal width="16" height="16" />
+      <HStack gap="2" alignItems="start" mb="2">
+        <Box {...listeners} cursor="grab" flexShrink={0} mt="0.5">
+          <GripVertical width="16" height="16" color="var(--colors-fg-muted)" />
+        </Box>
+        <VStack flex="1" gap="2" alignItems="stretch">
+          <HStack gap="2" alignItems="center" flexWrap="wrap">
+            <Text color="fg.default" fontSize="sm" fontWeight="medium" lineHeight="1.4">
+              {task.title}
+            </Text>
+            {task.link && (
+              <IconButton
+                asChild
+                variant="ghost"
+                size="xs"
+                colorPalette="gray"
+                aria-label="Open link"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <a href={task.link} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink width="14" height="14" />
+                </a>
               </IconButton>
-            </Menu.Trigger>
-            <Menu.Positioner>
-              <Menu.Content>
-                <Menu.Item value="delete" onClick={() => onDelete(task)}>
-                  <HStack gap="2" color="red.default">
-                    <Trash2 width="16" height="16" />
-                    <Menu.ItemText>Delete</Menu.ItemText>
-                  </HStack>
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Positioner>
-          </Menu.Root>
-        </HStack>
-      </HStack>
+            )}
+            {task.priority && <PriorityBadge priority={task.priority} size="sm" />}
+          </HStack>
 
-      {task.description && (
-        <Text mb="2" color="fg.muted" fontSize="xs">
-          {task.description}
-        </Text>
-      )}
+          {task.description && (
+            <LinkifiedText
+              color="fg.muted"
+              fontSize="xs"
+              lineHeight="1.3"
+              textOverflow="ellipsis"
+              overflow="hidden"
+              css={{
+                WebkitBoxOrient: 'vertical' as const,
+                display: '-webkit-box',
+                WebkitLineClamp: '2'
+              }}
+            >
+              {task.description}
+            </LinkifiedText>
+          )}
 
-      <HStack gap="2" flexWrap="wrap">
-        {task.priority && (
-          <Badge size="sm" colorPalette={getPriorityColor(task.priority)}>
-            {task.priority}
-          </Badge>
-        )}
-        {task.dueDate && <Countdown targetDate={task.dueDate} size="sm" />}
+          <HStack gap="2" flexWrap="wrap">
+            {task.dueDate && <Countdown targetDate={task.dueDate} size="sm" />}
+          </HStack>
+        </VStack>
+        <VStack gap="0" flexShrink={0}>
+          <IconButton
+            variant="ghost"
+            size="xs"
+            aria-label="Edit task"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+          >
+            <Edit2 width="14" height="14" />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            size="xs"
+            aria-label="Delete task"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(task);
+            }}
+            colorPalette="red"
+          >
+            <Trash2 width="14" height="14" />
+          </IconButton>
+        </VStack>
       </HStack>
     </Box>
   );

@@ -8,6 +8,13 @@
       "when": 1759281396708,
       "tag": "0000_squashed_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1759324755215,
+      "tag": "0001_chemical_deadpool",
+      "breakpoints": true
     }
   ]
 }

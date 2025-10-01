@@ -2,6 +2,157 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-02 - Timezone Handling Fix
+
+### The Problem: Timezone Inconsistency
+
+**User Feedback**:
+- "this cutting timezone ain't it lah, when i updated a task it goes back 7 hr for some fucking reason, PICK ONE AND STICK WITH IT"
+- "EVERYTHING IS NOT IN THEIR RIGHT COLUMN LAH"
+- "WHEN I OPEN THE TASK DIALOG ON 27 IT SHOWS UP AT 28 2:00"
+- "I WANT EVERYTHING ON THE SCREEN TO BE IN LOCAL TIMEZONE AND EVERYTHING BEHIND THE SCENES TO BE IN UTC"
+- "EVERYTHING PASSED TO THE SERVER MUST BE IN UNIX IN UTC"
+
+**Root Cause**: Three separate issues causing timezone chaos:
+1. Frontend was using `instanceDate` (UTC format) to group tasks by day
+2. TaskDialog was not consistently converting between UTC and local
+3. Mixed date format handling throughout the codebase
+
+### The Solution: UTC Backend, Local Frontend
+
+**Core Principle**: Server stores UTC, display shows local time, proper conversion both ways.
+
+#### 1. TaskDialog Display (TaskDialog.tsx:484-500)
+```typescript
+// Convert UTC from server to local for datetime-local input
+defaultValue={
+  task?.dueDate
+    ? (() => {
+        // Server sends UTC ISO string, convert to local for display
+        const date = new Date(task.dueDate);
+        if (isNaN(date.getTime())) return '';
+        // Use local timezone methods to format for datetime-local input
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      })()
+    : ''
+}
+```
+
+**Key**: `new Date()` constructor automatically converts UTC to local timezone. Extract components with local methods.
+
+#### 2. TaskDialog Submission (TaskDialog.tsx:147-221)
+```typescript
+// Convert datetime-local to UTC ISO string before submitting
+const dueDateInput = form.querySelector('input[name="dueDate"]') as HTMLInputElement;
+if (dueDateInput && dueDateInput.value) {
+  // datetime-local value is in local timezone (YYYY-MM-DDTHH:mm)
+  const localDate = new Date(dueDateInput.value);
+  const utcISOString = localDate.toISOString(); // Convert to UTC
+
+  // Replace with hidden input containing UTC
+  const utcInput = document.createElement('input');
+  utcInput.type = 'hidden';
+  utcInput.name = 'dueDate';
+  utcInput.value = utcISOString;
+  form.appendChild(utcInput);
+}
+```
+
+**Key**: `datetime-local` input interprets its value as local time. Use `.toISOString()` to convert to UTC.
+
+#### 3. Agenda Page Submission (+Page.tsx:201-212)
+```typescript
+if (data.dueDate) {
+  const dateStr = data.dueDate as string;
+  // If already UTC ISO string (from TaskDialog), keep it
+  if (dateStr.includes('Z')) {
+    taskData.dueDate = dateStr;
+  } else {
+    // datetime-local format: YYYY-MM-DDTHH:mm - convert to UTC
+    const localDate = new Date(dateStr);
+    taskData.dueDate = localDate.toISOString();
+  }
+}
+```
+
+#### 4. Event Grouping Fix (+Page.tsx:272-288)
+**The Critical Fix**: Stop using `instanceDate` for display grouping
+```typescript
+// Group events by LOCAL date, not UTC instanceDate
+events?.forEach((event) => {
+  // Always use dueDate converted to local timezone for grouping
+  // instanceDate is in UTC format and causes timezone issues
+  if (!event.dueDate) return;
+
+  // Parse the UTC date and extract local date for grouping
+  const eventDate = new Date(event.dueDate);
+  const year = eventDate.getFullYear();
+  const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+  const day = String(eventDate.getDate()).padStart(2, '0');
+  const dateKey = `${year}-${month}-${day}`;
+
+  if (grouped[dateKey]) {
+    grouped[dateKey].push(event);
+  }
+});
+```
+
+**Why This Matters**:
+- `instanceDate` is set server-side using `.toISOString().split('T')[0]` which extracts UTC date
+- A task at `2025-09-27T17:00:00.000Z` (UTC) is actually `2025-09-28T02:00` in JST (+9)
+- Old code: Grouped by `instanceDate: "2025-09-27"` → appeared on Saturday
+- New code: Grouped by local date `"2025-09-28"` → appears on Sunday (correct!)
+
+### The instanceDate Dilemma
+
+**What is instanceDate?**
+- Used for tracking specific instances of recurring tasks
+- Stored as UTC date string (YYYY-MM-DD) in `recurring.ts:77,84,102`
+- Purpose: Completion tracking for recurring tasks
+
+**Why Not Fix It Server-Side?**
+- `instanceDate` is for **backend logic** (tracking which instance was completed)
+- Display grouping should use **local timezone** (what user sees)
+- Separation of concerns: backend tracking vs frontend display
+
+### Key Learnings
+
+1. **Date Object Behavior**:
+   - `new Date(utcString)` automatically converts to local timezone
+   - `.getFullYear()`, `.getMonth()`, `.getDate()` use LOCAL timezone
+   - `.getUTCFullYear()`, etc. use UTC timezone
+   - `.toISOString()` converts to UTC and formats as ISO string
+
+2. **datetime-local Input**:
+   - Value format: `YYYY-MM-DDTHH:mm` (no timezone)
+   - Browser interprets as LOCAL timezone
+   - Must convert to UTC before sending to server
+
+3. **instanceDate is Not for Display**:
+   - Purpose: Backend tracking of recurring task instances
+   - Format: UTC date (YYYY-MM-DD)
+   - Display grouping: Must use dueDate converted to local
+
+4. **User Expectation**:
+   - Everything visible = local timezone
+   - Everything stored = UTC
+   - No timezone shifting when editing
+
+### Testing Checklist
+
+- [x] Create task with local time - stores as UTC
+- [x] Edit task - displays correct local time
+- [x] Save edited task - no time shift
+- [x] Recurring tasks appear in correct day columns
+- [x] Tasks grouped by local date, not UTC date
+
+**Result**: Clean separation of concerns - UTC for storage, local for display, proper conversion at boundaries.
+
 ## 2025-10-01 - OIDC Authentication & Route Guards
 
 ### OIDC/OAuth Implementation with Keycloak

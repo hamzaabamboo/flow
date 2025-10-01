@@ -15,9 +15,13 @@ export interface CalendarEvent {
   recurringEndDate?: string;
   parentTaskId?: string;
   columnId?: string;
+  boardId?: string;
+  boardName?: string;
+  columnName?: string;
   labels?: string[];
   subtasks?: Subtask[];
   instanceDate?: string; // For tracking specific instances of recurring tasks
+  link?: string;
 }
 
 export interface ExtendedTask {

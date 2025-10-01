@@ -20,14 +20,18 @@ export function expandRecurringTasks(
     };
 
     if (!task.recurringPattern) {
-      if (taskDueDate >= startDate && taskDueDate <= endDate) {
-        const dateStr = taskDueDate.toISOString().split('T')[0];
-        const isCompleted = task.completed || (completionMap.get(task.id)?.has(dateStr) ?? false);
+      // Compare using date strings to avoid timezone issues
+      const taskDateStr = taskDueDate.toISOString().split('T')[0];
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      if (taskDateStr >= startDateStr && taskDateStr <= endDateStr) {
+        const isCompleted = task.completed || (completionMap.get(task.id)?.has(taskDateStr) ?? false);
 
         events.push({
           ...formattedTask,
           completed: isCompleted,
-          instanceDate: dateStr
+          instanceDate: taskDateStr
         });
       }
       continue;

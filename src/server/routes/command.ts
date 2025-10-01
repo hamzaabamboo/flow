@@ -32,9 +32,9 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             }
           } else if (toolCall.toolName === 'parse-datetime') {
             if (commandProcessor.tools.parseDateTime?.execute) {
-              parseDateTimeResult = (await commandProcessor.tools.parseDateTime.execute(
+              parseDateTimeResult = await commandProcessor.tools.parseDateTime.execute(
                 toolCall.args
-              )) as string;
+              );
             }
           }
         }

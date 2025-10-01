@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Tag, RefreshCw, Calendar, CheckSquare, Bell } from 'lucide-react';
 import { Portal } from '@ark-ui/react/portal';
+import { useQuery } from '@tanstack/react-query';
 import type { Task, Column, SimpleSubtask } from '../../shared/types';
+import { useSpace } from '../../contexts/SpaceContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -51,6 +53,7 @@ export function TaskDialog({
   defaultColumnId
 }: TaskDialogProps) {
   const isEdit = mode === 'edit';
+  const { currentSpace } = useSpace();
   const [labels, setLabels] = useState<string[]>([]);
   const [subtasks, setSubtasks] = useState<SimpleSubtask[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
@@ -59,6 +62,36 @@ export function TaskDialog({
   const [recurringPattern, setRecurringPattern] = useState('');
   const [recurringEndDate, setRecurringEndDate] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>('');
+  const [selectedColumnId, setSelectedColumnId] = useState<string>('');
+
+  // Fetch boards if no columns provided (agenda page scenario)
+  const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
+    queryKey: ['boards', currentSpace],
+    queryFn: async () => {
+      const response = await fetch(`/api/boards?space=${currentSpace}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch boards');
+      const boardsData = await response.json();
+      // Fetch columns for each board
+      const boardsWithColumns = await Promise.all(
+        boardsData.map(async (board: { id: string; name: string }) => {
+          const colResponse = await fetch(`/api/boards/${board.id}`, {
+            credentials: 'include'
+          });
+          if (!colResponse.ok) return { ...board, columns: [] };
+          const boardData = await colResponse.json();
+          return { ...board, columns: boardData.columns || [] };
+        })
+      );
+      return boardsWithColumns;
+    },
+    enabled: !columns && open // Only fetch if no columns provided and dialog is open
+  });
+
+  const availableColumns =
+    columns || (selectedBoardId ? boards.find((b) => b.id === selectedBoardId)?.columns || [] : []);
 
   // Reset state when dialog opens/closes or task changes
   useEffect(() => {
@@ -77,6 +110,16 @@ export function TaskDialog({
       setRecurringEndDate(task?.recurringEndDate || '');
       setNewSubtask('');
       setNewLabel('');
+
+      // Set default board and column if not provided
+      if (!columns && boards.length > 0 && !selectedBoardId) {
+        const firstBoard = boards[0];
+        setSelectedBoardId(firstBoard.id);
+        if (firstBoard.columns && firstBoard.columns.length > 0) {
+          setSelectedColumnId(firstBoard.columns[0].id);
+        }
+      }
+
       // Show advanced if any advanced features are used
       setShowAdvanced(
         !!(
@@ -96,14 +139,35 @@ export function TaskDialog({
       setNewSubtask('');
       setNewLabel('');
       setShowAdvanced(false);
+      setSelectedBoardId('');
+      setSelectedColumnId('');
     }
-  }, [open, task]);
+  }, [open, task, boards, columns, selectedBoardId]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Add hidden fields for enhanced features
     const form = e.currentTarget;
+
+    // Convert datetime-local to UTC ISO string
+    const dueDateInput = form.querySelector('input[name="dueDate"]') as HTMLInputElement;
+    if (dueDateInput && dueDateInput.value) {
+      // datetime-local value is in local timezone (YYYY-MM-DDTHH:mm)
+      // Convert to UTC ISO string for server
+      const localDate = new Date(dueDateInput.value);
+      const utcISOString = localDate.toISOString();
+
+      // Replace the input value with UTC ISO string
+      const utcInput = document.createElement('input');
+      utcInput.type = 'hidden';
+      utcInput.name = 'dueDate';
+      utcInput.value = utcISOString;
+      form.appendChild(utcInput);
+
+      // Hide the original datetime-local input from form submission
+      dueDateInput.name = 'dueDate_local';
+    }
 
     // Add labels as JSON
     const labelsInput = document.createElement('input');
@@ -144,6 +208,11 @@ export function TaskDialog({
     originalOnSubmit(e);
 
     // Clean up the added inputs
+    if (dueDateInput && dueDateInput.value) {
+      dueDateInput.name = 'dueDate'; // Restore original name
+      const utcInput = form.querySelector('input[name="dueDate"][type="hidden"]');
+      if (utcInput) form.removeChild(utcInput);
+    }
     form.removeChild(labelsInput);
     form.removeChild(subtasksInput);
     form.removeChild(recurringInput);
@@ -199,7 +268,14 @@ export function TaskDialog({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="600px">
+          <Dialog.Content
+            borderColor="border.default"
+            maxW="800px"
+            w="90vw"
+            maxH="90vh"
+            overflowY="auto"
+            bg="bg.default"
+          >
             <VStack gap="6" p="6">
               <VStack gap="1">
                 <Dialog.Title>{isEdit ? 'Edit Task' : 'Create New Task'}</Dialog.Title>
@@ -210,7 +286,7 @@ export function TaskDialog({
                 </Dialog.Description>
               </VStack>
 
-              <form id="task-form" onSubmit={handleSubmit} style={{ width: '100%' }}>
+              <form id="task-form" key={open ? (task?.id || 'new') : 'closed'} onSubmit={handleSubmit} style={{ width: '100%' }}>
                 <VStack gap="4">
                   {/* Title */}
                   <Box w="full">
@@ -238,8 +314,105 @@ export function TaskDialog({
                     />
                   </Box>
 
-                  <Grid gap="4" w="full" columns={2}>
-                    {/* Column Selection */}
+                  {/* Link */}
+                  <Box w="full">
+                    <Text mb="1" fontSize="sm" fontWeight="medium">
+                      Link
+                    </Text>
+                    <Input
+                      name="link"
+                      type="url"
+                      defaultValue={task?.link}
+                      placeholder="https://example.com"
+                    />
+                  </Box>
+
+                  <Grid gap="4" w="full" columns={{ base: 1, md: 2 }}>
+                    {/* Board Selection (only show if no columns provided - agenda page scenario) */}
+                    {!columns && boards.length > 0 && (
+                      <>
+                        <Box>
+                          <Text mb="1" fontSize="sm" fontWeight="medium">
+                            Board
+                          </Text>
+                          <Select.Root
+                            collection={createListCollection({
+                              items: boards.map((board) => ({ label: board.name, value: board.id }))
+                            })}
+                            value={[selectedBoardId]}
+                            onValueChange={(details) => {
+                              const newBoardId = details.value[0];
+                              setSelectedBoardId(newBoardId);
+                              const board = boards.find((b) => b.id === newBoardId);
+                              if (board?.columns && board.columns.length > 0) {
+                                setSelectedColumnId(board.columns[0].id);
+                              }
+                            }}
+                          >
+                            <Select.Control>
+                              <Select.Trigger w="full">
+                                <Select.ValueText placeholder="Select Board" />
+                              </Select.Trigger>
+                            </Select.Control>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {boards.map((board) => (
+                                  <Select.Item
+                                    key={board.id}
+                                    item={{ label: board.name, value: board.id }}
+                                  >
+                                    <Select.ItemText>{board.name}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Select.Root>
+                        </Box>
+                        <Box>
+                          <Text mb="1" fontSize="sm" fontWeight="medium">
+                            Column
+                          </Text>
+                          <input type="hidden" name="columnId" value={selectedColumnId} />
+                          <Select.Root
+                            collection={createListCollection({
+                              items: availableColumns.map((col) => ({
+                                label: col.name,
+                                value: col.id
+                              }))
+                            })}
+                            value={[selectedColumnId]}
+                            onValueChange={(details) => {
+                              setSelectedColumnId(details.value[0]);
+                              const hiddenInput = document.querySelector(
+                                'input[name="columnId"]'
+                              ) as HTMLInputElement;
+                              if (hiddenInput) {
+                                hiddenInput.value = details.value[0];
+                              }
+                            }}
+                          >
+                            <Select.Control>
+                              <Select.Trigger w="full">
+                                <Select.ValueText placeholder="Select Column" />
+                              </Select.Trigger>
+                            </Select.Control>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {availableColumns.map((col) => (
+                                  <Select.Item
+                                    key={col.id}
+                                    item={{ label: col.name, value: col.id }}
+                                  >
+                                    <Select.ItemText>{col.name}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Select.Root>
+                        </Box>
+                      </>
+                    )}
+                    {/* Column Selection (when columns provided - board page scenario) */}
                     {columns && columns.length > 0 && (
                       <Box>
                         <Text mb="1" fontSize="sm" fontWeight="medium">
@@ -333,7 +506,20 @@ export function TaskDialog({
                         type="datetime-local"
                         name="dueDate"
                         defaultValue={
-                          task?.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
+                          task?.dueDate
+                            ? (() => {
+                                // Server sends UTC ISO string, convert to local for display
+                                const date = new Date(task.dueDate);
+                                if (isNaN(date.getTime())) return ''; // Invalid date
+                                // Use local timezone methods to format for datetime-local input
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                const hours = String(date.getHours()).padStart(2, '0');
+                                const minutes = String(date.getMinutes()).padStart(2, '0');
+                                return `${year}-${month}-${day}T${hours}:${minutes}`;
+                              })()
+                            : ''
                         }
                       />
                     </Box>

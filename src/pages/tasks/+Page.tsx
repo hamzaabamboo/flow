@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, LayoutGrid } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import TaskDialog from '../../components/Board/TaskDialog';
-import { Countdown } from '../../components/ui/countdown';
+import { TaskItem } from '../../components/Agenda/TaskItem';
 import { Button } from '../../components/ui/button';
-import * as Checkbox from '../../components/ui/styled/checkbox';
 import { IconButton } from '../../components/ui/icon-button';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
@@ -16,6 +15,7 @@ import { Box, VStack, HStack, Grid, Center } from 'styled-system/jsx';
 import { createListCollection, Select } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import type { ExtendedTask } from '~/shared/types/calendar';
+import type { CalendarEvent } from '~/shared/types/calendar';
 import { Spinner } from '~/components/ui/spinner';
 
 export default function TasksPage() {
@@ -191,7 +191,12 @@ export default function TasksPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+    <Box
+      colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}
+      maxH="100vh"
+      p={{ base: '2', md: '4' }}
+      overflow="auto"
+    >
       {/* Header */}
       <VStack gap="6" justifyContent="flex-start" alignItems="stretch" w="full">
         <VStack gap="1" alignItems="start">
@@ -200,7 +205,7 @@ export default function TasksPage() {
         </VStack>
 
         {/* Summary Cards */}
-        <Grid gap="4" w="full" columns={5}>
+        <Grid gap="4" w="full" columns={{ base: 2, sm: 3, md: 5 }}>
           <Box borderRadius="lg" p="4" bg="bg.muted">
             <VStack gap="1" justifyContent="flex-start">
               <Text color="fg.muted" fontSize="sm">
@@ -391,108 +396,59 @@ export default function TasksPage() {
           <Box w="full">
             <VStack gap="2" justifyContent="flex-start" w="full">
               {filteredTasks.map((task) => (
-                <Box
+                <TaskItem
                   key={task.id}
-                  borderColor="border.default"
-                  borderRadius="md"
-                  borderWidth="1px"
-                  w="full"
-                  p="4"
-                  bg="bg.default"
-                  transition="all 0.2s"
-                  _hover={{ borderColor: 'colorPalette.default' }}
-                >
-                  <HStack justify="space-between" w="full">
-                    <HStack flex="1" gap="3">
-                      <Checkbox.Root
-                        checked={task.completed}
-                        onCheckedChange={(details) => {
-                          console.log(
-                            'Checkbox changed for task:',
-                            task.id,
-                            'to:',
-                            details.checked
-                          );
-                          updateTaskMutation.mutate({
-                            taskId: task.id,
-                            updates: {
-                              completed: details.checked === true
-                            }
-                          });
-                        }}
-                      >
-                        <Checkbox.Control>
-                          <Checkbox.Indicator>✓</Checkbox.Indicator>
-                        </Checkbox.Control>
-                        <Checkbox.HiddenInput />
-                      </Checkbox.Root>
-
-                      <VStack flex="1" gap="1" justifyContent="flex-start">
-                        <HStack gap="2" alignItems="center">
-                          <Text
-                            color={task.completed ? 'fg.muted' : 'fg.default'}
-                            textDecoration={task.completed ? 'line-through' : 'none'}
-                            fontWeight="medium"
-                          >
-                            {task.title}
-                          </Text>
-                          {task.priority && (
-                            <Badge size="sm" colorPalette={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                          )}
-                          <Badge size="sm" variant="outline">
-                            {task.boardName}
-                          </Badge>
-                          <Badge size="sm" variant="subtle">
-                            {task.columnName}
-                          </Badge>
-                        </HStack>
-                        {task.description && (
-                          <Text color="fg.muted" fontSize="sm">
-                            {task.description}
-                          </Text>
-                        )}
-                        <HStack gap="3">
-                          {task.dueDate && <Countdown targetDate={task.dueDate} size="sm" />}
-                          <Text color="fg.muted" fontSize="xs">
-                            Updated {new Date(task.updatedAt).toLocaleDateString()}
-                          </Text>
-                        </HStack>
-                      </VStack>
-                    </HStack>
-
-                    <HStack gap="1">
+                  event={task as CalendarEvent}
+                  onToggleComplete={() => {
+                    updateTaskMutation.mutate({
+                      taskId: task.id,
+                      updates: {
+                        completed: !task.completed
+                      }
+                    });
+                  }}
+                  onTaskClick={() => {
+                    setEditingTask(task);
+                    setIsTaskDialogOpen(true);
+                  }}
+                  extraBadges={
+                    <>
+                      <Badge size="sm" variant="outline">
+                        {task.boardName}
+                      </Badge>
+                      <Badge size="sm" variant="subtle">
+                        {task.columnName}
+                      </Badge>
+                    </>
+                  }
+                  actions={
+                    <>
                       <IconButton
                         variant="ghost"
                         size="sm"
                         onClick={() => {
                           void navigate(`/board/${task.boardId}`);
                         }}
+                        aria-label="View Board"
                       >
-                        View Board
+                        <LayoutGrid width="16" height="16" />
                       </IconButton>
                       <IconButton
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setEditingTask(task);
-                          setIsTaskDialogOpen(true);
+                          if (confirm('Are you sure you want to delete this task?')) {
+                            deleteTaskMutation.mutate(task.id);
+                          }
                         }}
-                      >
-                        <Edit2 />
-                      </IconButton>
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteTaskMutation.mutate(task.id)}
                         colorPalette="red"
+                        aria-label="Delete task"
                       >
                         <Trash2 />
                       </IconButton>
-                    </HStack>
-                  </HStack>
-                </Box>
+                    </>
+                  }
+                />
               ))}
 
               {filteredTasks.length === 0 && (
@@ -528,11 +484,7 @@ export default function TasksPage() {
                             {task.title}
                           </Text>
                           <HStack gap="2">
-                            {task.priority && (
-                              <Badge size="sm" colorPalette={getPriorityColor(task.priority)}>
-                                {task.priority}
-                              </Badge>
-                            )}
+                            {task.priority && <PriorityBadge priority={task.priority} size="sm" />}
                             <Badge size="sm" variant="subtle">
                               {task.columnName}
                             </Badge>

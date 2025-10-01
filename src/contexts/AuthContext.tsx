@@ -51,13 +51,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Logout mutation
   const logoutMutation = useMutation({
-    // eslint-disable-next-line @typescript-eslint/require-await
     mutationFn: async () => {
-      queryClient.setQueryData(['auth', 'user'], null);
-      queryClient.clear();
+      try {
+        // Call the logout endpoint
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
 
-      // Server will redirect to OIDC logout
-      window.location.href = '/api/auth/logout';
+        // Clear client-side state
+        queryClient.setQueryData(['auth', 'user'], null);
+        queryClient.clear();
+
+        // Redirect to login page
+        window.location.href = '/login';
+      } catch (error) {
+        console.error('Logout failed:', error);
+        // Still redirect even if request fails
+        window.location.href = '/login';
+      }
     }
   });
 

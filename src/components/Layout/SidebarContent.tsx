@@ -31,8 +31,8 @@ interface SidebarNavItem {
 
 const navItems: SidebarNavItem[] = [
   { label: 'Agenda', href: '/', icon: Calendar, badgeKey: 'agenda' },
-  { label: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Boards', href: '/boards', icon: LayoutGrid },
+  { label: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'inbox' },
   { label: 'Habits', href: '/habits', icon: Target }
 ];
@@ -114,7 +114,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       <Box w="full" p="4">
         <Button
           onClick={toggleSpace}
-          variant="outline"
+          variant="solid"
           size="lg"
           colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}
           gap="3"
@@ -165,7 +165,6 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                     ml="auto"
                     py="0.5"
                     px="2"
-                    color="colorPalette.fg"
                     fontSize="xs"
                     fontWeight="bold"
                     bg="colorPalette.default"

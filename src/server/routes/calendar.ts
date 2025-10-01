@@ -347,10 +347,14 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           recurringPattern: tasks.recurringPattern,
           recurringEndDate: tasks.recurringEndDate,
           parentTaskId: tasks.parentTaskId,
+          metadata: tasks.metadata,
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           // Manually join board space for filtering
-          space: boards.space
+          space: boards.space,
+          boardId: boards.id,
+          boardName: boards.name,
+          columnName: columns.name
         })
         .from(tasks)
         .leftJoin(columns, eq(tasks.columnId, columns.id))
@@ -381,6 +385,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         recurringEndDate: task.recurringEndDate ? task.recurringEndDate.toISOString() : undefined,
         parentTaskId: task.parentTaskId ?? undefined,
         space: task.space ?? undefined,
+        boardId: task.boardId ?? undefined,
+        boardName: task.boardName ?? undefined,
+        columnName: task.columnName ?? undefined,
+        link: task.metadata?.link ?? undefined,
         createdAt: task.createdAt?.toISOString(),
         updatedAt: task.updatedAt?.toISOString(),
         subtasks: subtasksData

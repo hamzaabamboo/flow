@@ -93,6 +93,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           labels: tasks.labels,
           recurringPattern: tasks.recurringPattern,
           parentTaskId: tasks.parentTaskId,
+          metadata: tasks.metadata,
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           columnName: columns.name,
@@ -125,7 +126,10 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     '/:columnId',
     async ({ params, db }) => {
       const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, params.columnId));
-      return columnTasks;
+      return columnTasks.map((task) => ({
+        ...task,
+        link: task.metadata?.link
+      }));
     },
     {
       params: t.Object({ columnId: t.String() })
@@ -134,6 +138,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   .post(
     '/',
     async ({ body, db, user }) => {
+      const metadata = body.link ? { link: body.link } : {};
+
       const [newTask] = await db
         .insert(tasks)
         .values({
@@ -144,7 +150,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           labels: body.labels || [],
           recurringPattern: body.recurringPattern,
           recurringEndDate: body.recurringEndDate ? new Date(body.recurringEndDate) : null,
-          parentTaskId: body.parentTaskId
+          parentTaskId: body.parentTaskId,
+          metadata
         })
         .returning();
 
@@ -171,7 +178,10 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       // Broadcast task creation
       wsManager.broadcastTaskUpdate(newTask.id, newTask.columnId, 'created');
 
-      return newTask;
+      return {
+        ...newTask,
+        link: newTask.metadata?.link
+      };
     },
     {
       body: t.Object({
@@ -186,7 +196,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         recurringPattern: t.Optional(t.Union([t.String(), t.Null()])),
         recurringEndDate: t.Optional(t.Union([t.String(), t.Null()])),
         parentTaskId: t.Optional(t.String()),
-        createReminder: t.Optional(t.Boolean())
+        createReminder: t.Optional(t.Boolean()),
+        link: t.Optional(t.String())
       })
     }
   )
@@ -216,6 +227,9 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           : null;
       if (body.dueDate !== undefined) {
         updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+      }
+      if (body.link !== undefined) {
+        updateData.metadata = { ...(currentTask.metadata || {}), link: body.link };
       }
 
       // For recurring tasks, track completion per date instead of updating the task
@@ -302,7 +316,10 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       // Broadcast task update
       wsManager.broadcastTaskUpdate(updated.id, updated.columnId, 'updated');
 
-      return updated;
+      return {
+        ...updated,
+        link: updated.metadata?.link
+      };
     },
     {
       params: t.Object({ id: t.String() }),
@@ -318,7 +335,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         recurringPattern: t.Optional(t.String()),
         recurringEndDate: t.Optional(t.String()),
         updateReminder: t.Optional(t.Boolean()),
-        instanceDate: t.Optional(t.String())
+        instanceDate: t.Optional(t.String()),
+        link: t.Optional(t.String())
       })
     }
   )

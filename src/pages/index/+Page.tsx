@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { format, startOfWeek, endOfWeek, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addDays, isSameDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid } from 'lucide-react';
+import { navigate } from 'vike/client/router';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
@@ -41,8 +42,22 @@ export default function AgendaPage() {
   } = useQuery<CalendarEvent[]>({
     queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace],
     queryFn: async () => {
-      const start = viewMode === 'day' ? startOfDay(selectedDate) : startOfWeek(selectedDate);
-      const end = viewMode === 'day' ? endOfDay(selectedDate) : endOfWeek(selectedDate);
+      let start: Date, end: Date;
+
+      if (viewMode === 'day') {
+        // Use UTC dates to avoid timezone issues
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        start = new Date(`${dateStr}T00:00:00.000Z`);
+        end = new Date(`${dateStr}T23:59:59.999Z`);
+      } else {
+        // Use UTC dates for week view too
+        const weekStart = startOfWeek(selectedDate);
+        const weekEnd = endOfWeek(selectedDate);
+        const startStr = format(weekStart, 'yyyy-MM-dd');
+        const endStr = format(weekEnd, 'yyyy-MM-dd');
+        start = new Date(`${startStr}T00:00:00.000Z`);
+        end = new Date(`${endStr}T23:59:59.999Z`);
+      }
 
       const response = await fetch(
         `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}&space=${currentSpace}`
@@ -151,6 +166,7 @@ export default function AgendaPage() {
     }
   });
 
+
   const completeTask = (event: CalendarEvent) => {
     completeTaskMutation.mutate({
       id: event.id,
@@ -183,7 +199,16 @@ export default function AgendaPage() {
         };
 
     if (data.dueDate) {
-      taskData.dueDate = new Date(data.dueDate).toISOString();
+      // Convert datetime-local to UTC ISO string
+      const dateStr = data.dueDate as string;
+      // If already UTC ISO string (from TaskDialog), keep it
+      if (dateStr.includes('Z')) {
+        taskData.dueDate = dateStr;
+      } else {
+        // datetime-local format: YYYY-MM-DDTHH:mm - convert to UTC
+        const localDate = new Date(dateStr);
+        taskData.dueDate = localDate.toISOString();
+      }
     }
 
     if (data.priority && data.priority !== 'none') {
@@ -218,6 +243,10 @@ export default function AgendaPage() {
       taskData.createReminder = data.createReminder === 'true';
     }
 
+    if (data.link) {
+      taskData.link = data.link as string;
+    }
+
     if (editingTask) {
       updateTaskMutation.mutate(taskData);
     } else {
@@ -242,11 +271,19 @@ export default function AgendaPage() {
 
     // Group events
     events?.forEach((event) => {
-      if (event.dueDate) {
-        const dateKey = format(new Date(event.dueDate), 'yyyy-MM-dd');
-        if (grouped[dateKey]) {
-          grouped[dateKey].push(event);
-        }
+      // Always use dueDate converted to local timezone for grouping (ignore instanceDate)
+      // instanceDate is in UTC format and causes timezone issues
+      if (!event.dueDate) return;
+
+      // Parse the UTC date and extract local date for grouping
+      const eventDate = new Date(event.dueDate);
+      const year = eventDate.getFullYear();
+      const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+      const day = String(eventDate.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+
+      if (grouped[dateKey]) {
+        grouped[dateKey].push(event);
       }
     });
 
@@ -306,83 +343,90 @@ export default function AgendaPage() {
   }, [events, viewMode, selectedDate]);
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+    <Box
+      colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}
+      maxH="100vh"
+      p={{ base: '2', md: '4' }}
+      overflow="auto"
+    >
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
-        <HStack justifyContent="space-between" alignItems="center" width="100%">
-          <VStack gap="1" alignItems="start">
-            <Heading size="2xl">Agenda</Heading>
-            <Text color="fg.muted">
-              {viewMode === 'day'
-                ? format(selectedDate, 'EEEE, MMM d, yyyy')
-                : `Week of ${format(startOfWeek(selectedDate), 'MMM d, yyyy')}`}
-            </Text>
-          </VStack>
+        <VStack gap="4" alignItems="stretch" width="100%">
+          <HStack justifyContent="space-between" alignItems="center" flexWrap={{ base: 'wrap', md: 'nowrap' }} gap="3">
+            <VStack gap="1" alignItems="start" flex="1" minW={{ base: 'full', md: 'auto' }}>
+              <Heading size={{ base: 'xl', md: '2xl' }}>Agenda</Heading>
+              <Text color="fg.muted" fontSize={{ base: 'xs', md: 'sm' }}>
+                {viewMode === 'day'
+                  ? format(selectedDate, 'EEEE, MMM d, yyyy')
+                  : `Week of ${format(startOfWeek(selectedDate), 'MMM d, yyyy')}`}
+              </Text>
+            </VStack>
 
-          <HStack gap="3">
-            {/* Create Task Button */}
-            <Button
-              variant="solid"
-              size="sm"
-              onClick={() => {
-                setEditingTask(null);
-                setIsTaskDialogOpen(true);
-              }}
-            >
-              <Plus width="16" height="16" />
-              New Task
-            </Button>
-
-            {/* View Mode Toggle */}
-            <HStack gap="1">
+            <HStack gap="2" flexWrap="wrap" justifyContent={{ base: 'flex-start', md: 'flex-end' }}>
+              {/* Create Task Button */}
               <Button
-                variant={viewMode === 'day' ? 'solid' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('day')}
+                variant="solid"
+                size={{ base: 'xs', sm: 'sm' }}
+                onClick={() => {
+                  setEditingTask(null);
+                  setIsTaskDialogOpen(true);
+                }}
               >
-                Day
+                <Plus width="16" height="16" />
+                <Box display={{ base: 'none', sm: 'block' }}>New Task</Box>
               </Button>
-              <Button
-                variant={viewMode === 'week' ? 'solid' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('week')}
-              >
-                Week
-              </Button>
-            </HStack>
 
-            {/* Date Navigation */}
-            <HStack gap="1">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setSelectedDate(
-                    viewMode === 'day' ? addDays(selectedDate, -1) : addDays(selectedDate, -7)
-                  )
-                }
-                aria-label="Previous"
-              >
-                <ChevronLeft width="16" height="16" />
-              </IconButton>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(new Date())}>
-                Today
-              </Button>
-              <IconButton
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setSelectedDate(
-                    viewMode === 'day' ? addDays(selectedDate, 1) : addDays(selectedDate, 7)
-                  )
-                }
-                aria-label="Next"
-              >
-                <ChevronRight width="16" height="16" />
-              </IconButton>
+              {/* View Mode Toggle */}
+              <HStack gap="1">
+                <Button
+                  variant={viewMode === 'day' ? 'solid' : 'ghost'}
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() => setViewMode('day')}
+                >
+                  Day
+                </Button>
+                <Button
+                  variant={viewMode === 'week' ? 'solid' : 'ghost'}
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() => setViewMode('week')}
+                >
+                  Week
+                </Button>
+              </HStack>
+
+              {/* Date Navigation */}
+              <HStack gap="1">
+                <IconButton
+                  variant="ghost"
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() =>
+                    setSelectedDate(
+                      viewMode === 'day' ? addDays(selectedDate, -1) : addDays(selectedDate, -7)
+                    )
+                  }
+                  aria-label="Previous"
+                >
+                  <ChevronLeft width="16" height="16" />
+                </IconButton>
+                <Button variant="ghost" size={{ base: 'xs', sm: 'sm' }} onClick={() => setSelectedDate(new Date())}>
+                  Today
+                </Button>
+                <IconButton
+                  variant="ghost"
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() =>
+                    setSelectedDate(
+                      viewMode === 'day' ? addDays(selectedDate, 1) : addDays(selectedDate, 7)
+                    )
+                  }
+                  aria-label="Next"
+                >
+                  <ChevronRight width="16" height="16" />
+                </IconButton>
+              </HStack>
             </HStack>
           </HStack>
-        </HStack>
+        </VStack>
 
         {/* Main Content */}
         {isLoadingEvents ? (
@@ -392,11 +436,11 @@ export default function AgendaPage() {
         ) : isErrorEvents ? (
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '3fr 1fr' }} w="full">
+          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full">
             {/* Week View - Grid Layout */}
             <VStack gap="3" alignItems="stretch" w="full">
               {/* Grid Header */}
-              <Grid gap="2" gridTemplateColumns="repeat(7, 1fr)" w="full">
+              <Grid gap="2" gridTemplateColumns={{ base: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)', md: 'repeat(7, 1fr)' }} w="full">
                 {weekDates.map((date) => {
                   const isToday = isSameDay(date, new Date());
                   const dateKey = format(date, 'yyyy-MM-dd');
@@ -441,62 +485,129 @@ export default function AgendaPage() {
 
                       {/* Day Content */}
                       <Box minH="xs" maxH="md" p="2" overflowY="auto">
-                        <VStack gap="2" alignItems="stretch">
-                          {/* Habits Section */}
-                          {habits
-                            ?.filter((habit) => {
+                        <VStack gap="1.5" alignItems="stretch">
+                          {/* Combined Habits and Tasks - Sorted by Time */}
+                          {(() => {
+                            const dayHabits = habits?.filter((habit) => {
                               if (habit.frequency === 'daily') return true;
                               if (habit.frequency === 'weekly' && habit.targetDays) {
                                 return habit.targetDays.includes(date.getDay());
                               }
                               return false;
-                            })
-                            .map((habit) => (
-                              <Box
-                                key={`habit-${habit.id}-${dateKey}`}
-                                onClick={() =>
-                                  toggleHabitMutation.mutate({
-                                    habitId: habit.id,
-                                    date,
-                                    completed: !habit.completedToday
-                                  })
-                                }
-                                cursor="pointer"
-                                borderLeftWidth="3px"
-                                borderLeftColor="colorPalette.default"
-                                borderRadius="md"
-                                p="2"
-                                bg={habit.completedToday ? 'green.subtle' : 'bg.default'}
-                                transition="all 0.2s"
-                              >
-                                <HStack gap="2">
-                                  <Checkbox checked={habit.completedToday} size="sm" readOnly />
-                                  <Text
-                                    flex="1"
-                                    textDecoration={habit.completedToday ? 'line-through' : 'none'}
-                                    fontSize="xs"
-                                    fontWeight="medium"
-                                  >
-                                    {habit.name}
-                                  </Text>
-                                  {(habit.currentStreak ?? 0) > 0 && (
-                                    <Badge variant="subtle" size="sm">
-                                      🔥{habit.currentStreak}
-                                    </Badge>
-                                  )}
-                                </HStack>
-                              </Box>
-                            ))}
+                            }) || [];
 
-                          {/* Tasks Section */}
-                          {dayEvents.map((event) => (
-                            <TaskItem
-                              key={`${event.id}-${event.instanceDate}`}
-                              event={event}
-                              onToggleComplete={() => completeTask(event)}
-                              onTaskClick={() => handleTaskClick(event)}
-                            />
-                          ))}
+                            // Combine habits and tasks with a type indicator
+                            const combined = [
+                              ...dayHabits.map(h => ({ type: 'habit' as const, item: h, time: h.reminderTime })),
+                              ...dayEvents.map(e => ({ type: 'task' as const, item: e, time: e.dueDate }))
+                            ];
+
+                            // Sort by time
+                            combined.sort((a, b) => {
+                              if (a.time && b.time) {
+                                const aDate = new Date(a.time);
+                                const bDate = new Date(b.time);
+                                return aDate.getTime() - bDate.getTime();
+                              }
+                              // Items without time go to bottom
+                              if (!a.time) return 1;
+                              if (!b.time) return -1;
+                              return 0;
+                            });
+
+                            return combined.map((item) => {
+                              if (item.type === 'habit') {
+                                const habit = item.item;
+                                return (
+                                  <Box
+                                    key={`habit-${habit.id}-${dateKey}`}
+                                    onClick={() =>
+                                      toggleHabitMutation.mutate({
+                                        habitId: habit.id,
+                                        date,
+                                        completed: !habit.completedToday
+                                      })
+                                    }
+                                    cursor="pointer"
+                                    borderLeftWidth="3px"
+                                    borderLeftColor="colorPalette.default"
+                                    borderRadius="sm"
+                                    p="1.5"
+                                    bg={habit.completedToday ? 'green.subtle' : 'bg.muted'}
+                                    transition="all 0.2s"
+                                    _hover={{ bg: 'bg.subtle' }}
+                                  >
+                                    <HStack gap="1.5" alignItems="center">
+                                      <Checkbox checked={habit.completedToday} size="sm" readOnly />
+                                      <VStack flex="1" gap="0.5" alignItems="start">
+                                        <Text
+                                          textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                                          fontSize="xs"
+                                          fontWeight="medium"
+                                          lineHeight="1.2"
+                                        >
+                                          {habit.name}
+                                        </Text>
+                                        {habit.reminderTime && (
+                                          <Text color="fg.muted" fontSize="2xs" lineHeight="1">
+                                            {format(new Date(`2000-01-01T${habit.reminderTime}`), 'h:mm a')}
+                                          </Text>
+                                        )}
+                                      </VStack>
+                                      {(habit.currentStreak ?? 0) > 0 && (
+                                        <Text fontSize="xs" fontWeight="bold">
+                                          🔥{habit.currentStreak}
+                                        </Text>
+                                      )}
+                                    </HStack>
+                                  </Box>
+                                );
+                              } else {
+                                const event = item.item;
+                                const colorPalette = event.priority === 'urgent' ? 'red' : event.priority === 'high' ? 'orange' : event.priority === 'medium' ? 'yellow' : 'gray';
+                                return (
+                                  <Box
+                                    key={`${event.id}-${event.instanceDate}`}
+                                    onClick={() => handleTaskClick(event)}
+                                    cursor="pointer"
+                                    borderLeftWidth="3px"
+                                    borderLeftColor={`${colorPalette}.default`}
+                                    borderRadius="sm"
+                                    p="1.5"
+                                    bg="bg.muted"
+                                    transition="all 0.2s"
+                                    _hover={{ bg: 'bg.subtle', borderLeftColor: `${colorPalette}.emphasized` }}
+                                  >
+                                    <HStack gap="1.5" alignItems="start">
+                                      <Checkbox
+                                        size="sm"
+                                        checked={event.completed}
+                                        onCheckedChange={() => completeTask(event)}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <VStack flex="1" gap="0.5" alignItems="start">
+                                        <Text
+                                          color={event.completed ? 'fg.subtle' : 'fg.default'}
+                                          textDecoration={event.completed ? 'line-through' : 'none'}
+                                          fontSize="xs"
+                                          fontWeight="medium"
+                                          lineHeight="1.2"
+                                          lineClamp="2"
+                                        >
+                                          {event.title}
+                                        </Text>
+                                        {event.dueDate && (
+                                          <Text color="fg.muted" fontSize="2xs" lineHeight="1">
+                                            {format(new Date(event.dueDate), 'h:mm a')}
+                                          </Text>
+                                        )}
+                                      </VStack>
+                                    </HStack>
+                                  </Box>
+                                );
+                              }
+                            });
+                          })()}
                           {dayEvents.length === 0 &&
                             !habits?.filter((h) => {
                               if (h.frequency === 'daily') return true;
@@ -505,7 +616,7 @@ export default function AgendaPage() {
                               }
                               return false;
                             }).length && (
-                              <Text py="4" color="fg.subtle" fontSize="sm" textAlign="center">
+                              <Text py="4" color="fg.subtle" fontSize="xs" textAlign="center">
                                 No tasks or habits
                               </Text>
                             )}
@@ -517,37 +628,37 @@ export default function AgendaPage() {
               </Grid>
             </VStack>
             {/* Sidebar for Habits and Stats */}
-            <VStack display={{ base: 'none', lg: 'flex' }} gap={4}>
+            <VStack display={{ base: 'none', lg: 'flex' }} gap={3}>
               {/* Weekly Stats Section */}
               <Card.Root w="full">
-                <Card.Header>
-                  <Card.Title>Weekly Stats</Card.Title>
+                <Card.Header p="3">
+                  <Card.Title fontSize="sm">Weekly Stats</Card.Title>
                 </Card.Header>
-                <Card.Body>
-                  <VStack gap={3} alignItems="stretch">
+                <Card.Body p="3" pt="0">
+                  <VStack gap={2} alignItems="stretch">
                     <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="sm">
+                      <Text color="fg.muted" fontSize="xs">
                         Todo
                       </Text>
-                      <Text fontSize="2xl" fontWeight="bold">
+                      <Text fontSize="xl" fontWeight="bold">
                         {stats.todo}
                       </Text>
                     </HStack>
                     {stats.overdue > 0 && (
                       <HStack justifyContent="space-between">
-                        <Text color="fg.muted" fontSize="sm">
+                        <Text color="fg.muted" fontSize="xs">
                           Overdue
                         </Text>
-                        <Text color="red.default" fontSize="lg" fontWeight="semibold">
+                        <Text color="red.default" fontSize="md" fontWeight="semibold">
                           {stats.overdue}
                         </Text>
                       </HStack>
                     )}
                     <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="sm">
+                      <Text color="fg.muted" fontSize="xs">
                         Completed
                       </Text>
-                      <Text color="green.default" fontSize="lg" fontWeight="semibold">
+                      <Text color="green.default" fontSize="md" fontWeight="semibold">
                         {stats.completed}/{stats.total}
                       </Text>
                     </HStack>
@@ -558,7 +669,7 @@ export default function AgendaPage() {
           </Grid>
         ) : (
           // Day View - Grid Layout
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '3fr 1fr' }} w="full">
+          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full">
             {/* Tasks for the day */}
             <VStack gap="3" alignItems="stretch" w="full">
               <Box borderRadius="lg" borderWidth="1px" minH="lg" p="4" bg="bg.default">
@@ -566,14 +677,51 @@ export default function AgendaPage() {
                   <Text mb="2" fontSize="lg" fontWeight="semibold">
                     Tasks for {format(selectedDate, 'MMM d')}
                   </Text>
-                  {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]?.map((event) => (
-                    <TaskItem
-                      key={`${event.id}-${event.instanceDate}`}
-                      event={event}
-                      onToggleComplete={() => completeTask(event)}
-                      onTaskClick={() => handleTaskClick(event)}
-                    />
-                  ))}
+                  {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]
+                    ?.sort((a, b) => {
+                      // Sort by dueDate time (earliest first)
+                      if (a.dueDate && b.dueDate) {
+                        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                      }
+                      // Tasks without due times go to bottom
+                      if (!a.dueDate) return 1;
+                      if (!b.dueDate) return -1;
+                      return 0;
+                    })
+                    .map((event) => (
+                      <TaskItem
+                        key={`${event.id}-${event.instanceDate}`}
+                        event={event}
+                        onToggleComplete={() => completeTask(event)}
+                        onTaskClick={() => handleTaskClick(event)}
+                        extraBadges={
+                          event.boardName && event.columnName ? (
+                            <>
+                              <Badge size="sm" variant="outline">
+                                {event.boardName}
+                              </Badge>
+                              <Badge size="sm" variant="subtle">
+                                {event.columnName}
+                              </Badge>
+                            </>
+                          ) : null
+                        }
+                        actions={
+                          event.boardId ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                void navigate(`/board/${event.boardId}`);
+                              }}
+                              aria-label="View Board"
+                            >
+                              <LayoutGrid width="16" height="16" />
+                            </IconButton>
+                          ) : undefined
+                        }
+                      />
+                    ))}
                   {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
                     groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
                     <Text py="8" color="fg.subtle" textAlign="center">
@@ -585,24 +733,24 @@ export default function AgendaPage() {
             </VStack>
 
             {/* Sidebar for Habits and Stats */}
-            <VStack display={{ base: 'none', lg: 'flex' }} gap={4}>
+            <VStack display={{ base: 'none', lg: 'flex' }} gap={3}>
               {/* Habits Section */}
               <Card.Root w="full">
-                <Card.Header>
-                  <Card.Title>Daily Habits</Card.Title>
+                <Card.Header p="3">
+                  <Card.Title fontSize="sm">Daily Habits</Card.Title>
                 </Card.Header>
-                <Card.Body>
+                <Card.Body p="3" pt="0">
                   {isLoadingHabits ? (
                     <Center>Loading habits...</Center>
                   ) : isErrorHabits ? (
                     <Center>Error loading habits</Center>
                   ) : (
-                    <VStack gap="2" alignItems="stretch">
+                    <VStack gap="1.5" alignItems="stretch">
                       {habits?.map((habit) => (
                         <HStack
                           key={habit.id}
                           borderRadius="md"
-                          p="2"
+                          p="1.5"
                           bg={habit.completedToday ? 'green.subtle' : 'bg.subtle'}
                           transition="all 0.2s"
                         >
@@ -617,24 +765,23 @@ export default function AgendaPage() {
                             }
                             size="sm"
                           />
-                          <VStack flex="1" gap="0.5" alignItems="start">
-                            <Text
-                              textDecoration={habit.completedToday ? 'line-through' : 'none'}
-                              fontSize="sm"
-                              fontWeight="medium"
-                            >
-                              {habit.name}
-                            </Text>
-                            {(habit.currentStreak ?? 0) > 0 && (
-                              <Badge variant="subtle" size="sm">
-                                🔥 {habit.currentStreak} days
-                              </Badge>
-                            )}
-                          </VStack>
+                          <Text
+                            textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                            fontSize="xs"
+                            fontWeight="medium"
+                            flex="1"
+                          >
+                            {habit.name}
+                          </Text>
+                          {(habit.currentStreak ?? 0) > 0 && (
+                            <Badge variant="subtle" size="xs">
+                              🔥{habit.currentStreak}
+                            </Badge>
+                          )}
                         </HStack>
                       ))}
                       {(!habits || habits.length === 0) && (
-                        <Text py="4" color="fg.subtle" fontSize="sm" textAlign="center">
+                        <Text py="2" color="fg.subtle" fontSize="xs" textAlign="center">
                           No habits yet
                         </Text>
                       )}
@@ -645,22 +792,22 @@ export default function AgendaPage() {
 
               {/* Daily Stats Section */}
               <Card.Root w="full">
-                <Card.Header>
-                  <Card.Title>Daily Stats</Card.Title>
+                <Card.Header p="3">
+                  <Card.Title fontSize="sm">Daily Stats</Card.Title>
                 </Card.Header>
-                <Card.Body>
-                  <VStack gap={3} alignItems="stretch">
+                <Card.Body p="3" pt="0">
+                  <VStack gap={2} alignItems="stretch">
                     <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="sm">
+                      <Text color="fg.muted" fontSize="xs">
                         Todo
                       </Text>
-                      <Text fontSize="2xl" fontWeight="bold">
+                      <Text fontSize="xl" fontWeight="bold">
                         {stats.todo}
                       </Text>
                     </HStack>
                     {stats.overdue > 0 && (
                       <HStack justifyContent="space-between">
-                        <Text color="fg.muted" fontSize="sm">
+                        <Text color="fg.muted" fontSize="xs">
                           Overdue
                         </Text>
                         <Text color="red.default" fontSize="lg" fontWeight="semibold">
@@ -669,10 +816,10 @@ export default function AgendaPage() {
                       </HStack>
                     )}
                     <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="sm">
+                      <Text color="fg.muted" fontSize="xs">
                         Completed
                       </Text>
-                      <Text color="green.default" fontSize="lg" fontWeight="semibold">
+                      <Text color="green.default" fontSize="md" fontWeight="semibold">
                         {stats.completed}/{stats.total}
                       </Text>
                     </HStack>

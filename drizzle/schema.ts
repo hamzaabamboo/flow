@@ -72,6 +72,14 @@ export const tasks = pgTable('tasks', {
   parentTaskId: uuid('parent_task_id').references((): AnyPgColumn => tasks.id, {
     onDelete: 'cascade'
   }),
+  metadata: jsonb('metadata').$type<{
+    link?: string;
+    attachments?: string[];
+    estimatedTime?: number;
+    actualTime?: number;
+    tags?: string[];
+    customFields?: Record<string, unknown>;
+  }>().default({}), // Flexible metadata for future extensions
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
