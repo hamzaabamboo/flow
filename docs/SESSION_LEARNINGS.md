@@ -2,7 +2,155 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
-## 2025-10-01 - Major Refactoring Session
+## 2025-10-01 - OIDC Authentication & Route Guards
+
+### OIDC/OAuth Implementation with Keycloak
+
+**Problem**: Simple cookie-based auth not sufficient for production use.
+
+**User Feedback**:
+- "how do it set up oauth lah"
+- "where is google from???? I am trying to use my custom auth"
+- "why are we not logging out via oidc"
+
+**Solution**: Full OIDC integration with Keycloak
+```typescript
+// Key endpoints for Keycloak
+const authUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/auth`;
+const tokenUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/token`;
+const userInfoUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/userinfo`;
+const logoutUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/logout`;
+```
+
+**Important**: Keycloak uses `/protocol/openid-connect/*` paths, not just `/*`.
+
+### Elysia Redirects
+
+**Problem**: `set.redirect = url` doesn't work in Elysia.
+
+**Solution**: Use explicit status code and Location header
+```typescript
+set.status = 302;
+set.headers['Location'] = authUrl;
+return;
+```
+
+### Vike Route Guards Pattern
+
+**User Guidance**: "have a look at server.ts in renderPage, you can pass in user and stuff that will go into the guard"
+
+**Solution**: Pass user data from renderPage to pageContext
+```typescript
+// server/index.ts - renderPage handler
+.get('/*', async ({ request, cookie, jwt }) => {
+  // Verify JWT and get user
+  let user = null;
+  const token = cookie.auth.value;
+  if (token) {
+    const payload = await jwt.verify(token);
+    if (payload) {
+      const [dbUser] = await db.select().from(users)
+        .where(eq(users.id, payload.userId));
+      if (dbUser) {
+        user = { id: dbUser.id, email: dbUser.email, name: dbUser.name };
+      }
+    }
+  }
+
+  const pageContextInit = {
+    urlOriginal: request.url,
+    user,  // Pass to guards
+    headers: Object.fromEntries(request.headers.entries())
+  };
+  const pageContext = await renderPage(pageContextInit);
+});
+
+// pages/+guard.ts
+export const guard = (pageContext: PageContext) => {
+  const { urlPathname, user } = pageContext;
+
+  if (urlPathname === '/login') return;
+
+  if (!user) {
+    throw redirect(`/login?returnUrl=${encodeURIComponent(urlPathname)}`);
+  }
+};
+```
+
+**Key Lesson**: Guards run in server environment and can access data from renderPage context - no need to fetch `/api/auth/me`.
+
+### TypeScript Type Extension for Vike
+
+**Problem**: TypeScript doesn't know about custom pageContext properties.
+
+**Solution**: Extend Vike namespace globally
+```typescript
+// src/vike.d.ts
+declare global {
+  namespace Vike {
+    interface PageContext {
+      user?: {
+        id: string;
+        email: string;
+        name: string;
+      } | null;
+    }
+  }
+}
+
+export {};
+```
+
+### Timezone-Consistent Date Handling
+
+**Problem**: Habits API not respecting selected date due to timezone issues.
+
+**User Feedback**: "THE RESPONSE IS STILL BASED ON WRONG DATE"
+
+**Root Cause**: Using `new Date()` constructor with string causes UTC interpretation vs local timezone.
+
+**Solution**: Treat dates as calendar dates (year-month-day), not timestamps
+```typescript
+// Client - use local timezone formatting
+const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+// Server - parse as UTC midnight for consistent database comparisons
+const checkDate = new Date(`${query.date}T00:00:00.000Z`);
+```
+
+**Key Rule**: Calendar dates should be ISO strings without timezone info, then parsed as UTC midnight server-side for consistency.
+
+### OIDC Logout Flow
+
+**Problem**: Just clearing cookie doesn't end session on auth server.
+
+**Solution**: Redirect to OIDC logout endpoint
+```typescript
+.post('/api/auth/logout', ({ cookie, set }) => {
+  const token = cookie.auth.value;
+  cookie.auth.remove();
+
+  const logoutUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/logout?${
+    new URLSearchParams({
+      post_logout_redirect_uri: process.env.FRONTEND_URL || 'http://localhost:3000',
+      id_token_hint: token
+    })
+  }`;
+
+  set.status = 302;
+  set.headers['Location'] = logoutUrl;
+});
+```
+
+Client simplifies to just navigate:
+```typescript
+const logout = async () => {
+  queryClient.clear();
+  window.location.href = '/api/auth/logout';
+};
+```
+
+## 2025-10-01 - Major Refactoring Session (earlier)
 
 ### Type System Centralization
 
