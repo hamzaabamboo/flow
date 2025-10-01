@@ -12,10 +12,11 @@ import { IconButton } from '../../components/ui/icon-button';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import { Badge } from '../../components/ui/badge';
-import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
+import { Box, VStack, HStack, Grid, Center } from 'styled-system/jsx';
 import { createListCollection, Select } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import type { ExtendedTask } from '~/shared/types/calendar';
+import { Spinner } from '~/components/ui/spinner';
 
 export default function TasksPage() {
   const { currentSpace } = useSpace();
@@ -66,7 +67,7 @@ export default function TasksPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
       setEditingTask(null);
       setIsTaskDialogOpen(false);
     }
@@ -83,25 +84,44 @@ export default function TasksPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
     }
   });
 
-  // Filter tasks based on current filters
-  const filteredTasks = allTasks.filter((task) => {
-    if (
-      searchTerm &&
-      !task.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      !task.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) {
-      return false;
-    }
-    if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
-    if (filterStatus === 'completed' && !task.completed) return false;
-    if (filterStatus === 'active' && task.completed) return false;
-    if (filterBoard !== 'all' && task.boardId !== filterBoard) return false;
-    return true;
-  });
+  // Priority weights for sorting
+  const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
+
+  // Filter and sort tasks
+  const filteredTasks = allTasks
+    .filter((task) => {
+      if (
+        searchTerm &&
+        !task.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      ) {
+        return false;
+      }
+      if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
+      if (filterStatus === 'completed' && !task.completed) return false;
+      if (filterStatus === 'active' && task.completed) return false;
+      if (filterBoard !== 'all' && task.boardId !== filterBoard) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by deadline first (tasks with no deadline go to the end)
+      const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+
+      if (aDate !== bDate) {
+        return aDate - bDate;
+      }
+
+      // If deadlines are equal, sort by priority
+      const aPriority = priorityWeight[a.priority || 'none'];
+      const bPriority = priorityWeight[b.priority || 'none'];
+
+      return bPriority - aPriority;
+    });
 
   // Group tasks by status for summary
   const taskSummary = {
@@ -164,22 +184,20 @@ export default function TasksPage() {
 
   if (isLoading) {
     return (
-      <Box p="8">
-        <Text>Loading tasks...</Text>
-      </Box>
+      <Center minH="60vh">
+        <Spinner size="xl" label="Loading tasks..." />
+      </Center>
     );
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
       {/* Header */}
-      <VStack gap="6" justifyContent="flex-start" w="full">
-        <Box w="full">
-          <Heading size="3xl" mb="2">
-            Tasks
-          </Heading>
+      <VStack gap="6" justifyContent="flex-start" alignItems="stretch" w="full">
+        <VStack gap="1" alignItems="start">
+          <Heading size="2xl">Tasks</Heading>
           <Text color="fg.muted">Comprehensive view of all your tasks across all boards</Text>
-        </Box>
+        </VStack>
 
         {/* Summary Cards */}
         <Grid gap="4" w="full" columns={5}>

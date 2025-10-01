@@ -132,9 +132,46 @@ app
   .get('/*', async ({ request, cookie, jwt }) => {
     // Check for authentication and add user to pageContext
     let user = null;
-    const token = cookie.auth.value;
+    let token = cookie.auth.value;
 
-    if (token) {
+    // Auto-login in development if no token
+    if (!token && !isProduction) {
+      logger.info('No auth token found - auto-logging in as first user (development mode)');
+
+      // Get the first user from database
+      const [firstUser] = await db.select().from(users).limit(1);
+
+      if (firstUser) {
+        // Create JWT token for this user
+        const autoToken = await jwt.sign({
+          userId: firstUser.id,
+          email: firstUser.email,
+          name: firstUser.name
+        });
+
+        // Set cookie
+        cookie.auth.set({
+          value: autoToken,
+          httpOnly: true,
+          secure: false, // Development
+          sameSite: 'lax',
+          maxAge: 30 * 86400, // 30 days
+          path: '/'
+        });
+
+        logger.info(`Auto-logged in as: ${firstUser.email}`);
+
+        user = {
+          id: firstUser.id,
+          email: firstUser.email,
+          name: firstUser.name
+        };
+
+        token = autoToken;
+      }
+    }
+
+    if (token && !user) {
       try {
         const payload = await jwt.verify(token as string);
         if (payload) {

@@ -417,7 +417,12 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       }
 
       // Expand recurring tasks into individual instances
-      const taskEvents = expandRecurringTasks(tasksWithSubtasks as Task[], startDate, endDate, completionMap);
+      const taskEvents = expandRecurringTasks(
+        tasksWithSubtasks as Task[],
+        startDate,
+        endDate,
+        completionMap
+      );
 
       // Fetch reminders in range
       const remindersData = await db

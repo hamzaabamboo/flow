@@ -18,6 +18,6 @@ export function calendarEventToExtendedTask(event: CalendarEvent): ExtendedTask 
     labels: event.labels,
     subtasks: event.subtasks,
     recurringPattern: event.recurringPattern,
-    recurringEndDate: event.recurringEndDate,
+    recurringEndDate: event.recurringEndDate
   };
 }

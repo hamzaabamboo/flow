@@ -20,13 +20,13 @@ export default function LoginPage() {
       <Card.Root width="100%" maxWidth="400px">
         <Card.Header>
           <Card.Title textAlign="center">Welcome to HamFlow</Card.Title>
-          <Box color="fg.muted" fontSize="sm" textAlign="center" mt="2">
+          <Box mt="2" color="fg.muted" fontSize="sm" textAlign="center">
             Sign in to continue
           </Box>
         </Card.Header>
         <Card.Body>
           <VStack gap="3">
-            <Button onClick={handleOAuthLogin} variant="solid" width="100%" size="lg">
+            <Button onClick={handleOAuthLogin} variant="solid" size="lg" width="100%">
               Sign in
             </Button>
             <Box color="fg.muted" fontSize="xs" textAlign="center">

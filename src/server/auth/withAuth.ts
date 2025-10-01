@@ -27,6 +27,43 @@ export const withAuth = () =>
     .derive({ as: 'global' }, async ({ cookie, jwt, db, set }) => {
       const token = cookie.auth?.value;
 
+      // Auto-login in development if no token
+      if (!token && process.env.NODE_ENV !== 'production') {
+        logger.info('No auth token found - auto-logging in as first user (development mode)');
+
+        // Get the first user from database
+        const [firstUser] = await db.select().from(users).limit(1);
+
+        if (firstUser) {
+          // Create JWT token for this user
+          const autoToken = await jwt.sign({
+            userId: firstUser.id,
+            email: firstUser.email,
+            name: firstUser.name
+          });
+
+          // Set cookie
+          cookie.auth.set({
+            value: autoToken,
+            httpOnly: true,
+            secure: false, // Development
+            sameSite: 'lax',
+            maxAge: 30 * 86400, // 30 days
+            path: '/'
+          });
+
+          logger.info(`Auto-logged in as: ${firstUser.email}`);
+
+          return {
+            user: {
+              id: firstUser.id,
+              email: firstUser.email,
+              name: firstUser.name
+            } as AuthUser
+          };
+        }
+      }
+
       if (!token) {
         set.status = 401;
         throw new Error('Authentication required');

@@ -10,23 +10,34 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ### ✅ Completed This Session
 
-- **OIDC Authentication Implemented** - Full OAuth/OIDC integration with Keycloak
-  - Configured OIDC endpoints for authorization, token exchange, userinfo
-  - Implemented PKCE flow for secure authentication
-  - Server-side JWT verification and user management
-  - Proper OIDC logout with session termination on auth server
-  - Vike route guards for protected pages
+- **UI/UX Improvements** - Enhanced user interface and navigation
+  - Made Agenda the home page (`/`) with Boards moved to `/boards`
+  - Added "New Task" button to Agenda page header
+  - Fixed week agenda color theming (now uses colorPalette for space-based colors)
+  - Standardized page layouts with consistent padding (`p="6"`) and spacing
+  - Replaced all loading text with proper Spinner components
+  - Changed habit display from full border to left-side accent border (3px)
+  - Made day view the default view for Agenda page
 
-- **Route Guards Added** - Server-side authentication checks using Vike guards
-  - Root guard (`src/pages/+guard.ts`) protects all routes except login
-  - Login guard (`src/pages/login/+guard.ts`) redirects authenticated users
-  - User data passed from renderPage to pageContext for guards
-  - Type-safe PageContext extension via `src/vike.d.ts`
+- **Task Statistics** - Improved task tracking and visibility
+  - Updated stats to show "Todo" (upcoming incomplete tasks) instead of "Tasks Left"
+  - Added "Overdue" count (shown in red when > 0)
+  - Todo count excludes overdue tasks for better clarity
+  - Applied to both Weekly Stats and Daily Stats sections
 
-- **Timezone-Consistent Date Handling** - Fixed habit tracking across timezones
-  - Client uses local timezone formatting: `format(date, 'yyyy-MM-dd')`
-  - Server parses as UTC midnight: `new Date('${date}T00:00:00.000Z')`
-  - Consistent calendar date handling without timestamp issues
+- **Task Sorting** - Better task organization
+  - Tasks page now sorts by deadline first (no deadline goes to end)
+  - Secondary sort by priority (urgent > high > medium > low > none)
+
+- **React Query Cache Management** - Fixed space switching issues
+  - Updated all `invalidateQueries` to include `currentSpace` in queryKey
+  - Fixes board/task data not switching when toggling between work/personal spaces
+  - Applied to: boards, tasks, habits, inbox pages
+
+- **Development Mode Enhancement** - Faster local development
+  - Added auto-login in development mode (server-side)
+  - Works in both API route protection (`withAuth.ts`) and SSR route guard
+  - Only active when `NODE_ENV !== 'production'`
 
 ### 🚧 In Progress
 

@@ -11,7 +11,8 @@ import { Heading } from '../../../components/ui/heading';
 import { Badge } from '../../../components/ui/badge';
 import { Countdown } from '../../../components/ui/countdown';
 import type { Task, BoardWithColumns as Board } from '../../../shared/types/board';
-import { Box, VStack, HStack } from 'styled-system/jsx';
+import { Spinner } from '../../../components/ui/spinner';
+import { Box, VStack, HStack, Center } from 'styled-system/jsx';
 
 export default function AllTasksPage() {
   const { currentSpace } = useSpace();
@@ -187,14 +188,14 @@ export default function AllTasksPage() {
 
   if (isLoading) {
     return (
-      <Box p="8">
-        <Text color="fg.default">Loading tasks...</Text>
-      </Box>
+      <Center minH="60vh">
+        <Spinner size="xl" label="Loading tasks..." />
+      </Center>
     );
   }
 
   return (
-    <Box minHeight="calc(100vh - 128px)">
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} minHeight="calc(100vh - 128px)">
       {/* Header */}
       <Box borderColor="border.default" borderBottomWidth="1px" bg="bg.default">
         <VStack gap="4" p="6">

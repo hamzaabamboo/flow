@@ -11,7 +11,7 @@ import {
   Award,
   Power
 } from 'lucide-react';
-import { Container, Box, VStack, HStack } from '../../../styled-system/jsx';
+import { Box, VStack, HStack } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -70,7 +70,7 @@ export default function HabitsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
       setIsCreateOpen(false);
       resetForm();
     }
@@ -88,7 +88,7 @@ export default function HabitsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
       setEditingHabit(null);
       resetForm();
     }
@@ -102,7 +102,7 @@ export default function HabitsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
     }
   });
 
@@ -114,7 +114,7 @@ export default function HabitsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
     }
   });
 
@@ -130,7 +130,7 @@ export default function HabitsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
     }
   });
 
@@ -177,7 +177,7 @@ export default function HabitsPage() {
   const filteredHabits = habits?.filter((h) => h.space === currentSpace) || [];
 
   return (
-    <Container maxW="6xl" py="8">
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <HStack justifyContent="space-between">
@@ -573,6 +573,6 @@ export default function HabitsPage() {
           </Dialog.Positioner>
         </Dialog.Root>
       </VStack>
-    </Container>
+    </Box>
   );
 }

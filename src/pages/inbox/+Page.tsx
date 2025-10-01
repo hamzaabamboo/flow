@@ -8,7 +8,8 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import type { InboxItem } from '../../shared/types/misc';
-import { VStack, HStack, Box, Container } from 'styled-system/jsx';
+import { Spinner } from '../ui/spinner';
+import { VStack, HStack, Box, Center } from 'styled-system/jsx';
 
 export default function InboxPage() {
   const { currentSpace } = useSpace();
@@ -37,7 +38,7 @@ export default function InboxPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
       setSelectedItems(new Set());
     }
   });
@@ -54,7 +55,7 @@ export default function InboxPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
       setSelectedItems(new Set());
     }
   });
@@ -84,113 +85,118 @@ export default function InboxPage() {
 
   if (isLoading) {
     return (
-      <Container maxW="4xl" py="8">
-        <Text>Loading inbox...</Text>
-      </Container>
+      <Center minH="60vh">
+        <Spinner size="xl" label="Loading inbox..." />
+      </Center>
     );
   }
 
   return (
-    <Container maxW="4xl" py="8">
-      <HStack justifyContent="space-between" alignItems="center" mb="8">
-        <Heading size="3xl">Inbox ({currentSpace})</Heading>
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+      <VStack gap="6" alignItems="stretch">
+        <HStack justifyContent="space-between" alignItems="center">
+          <VStack gap="1" alignItems="start">
+            <Heading size="2xl">Inbox</Heading>
+            <Text color="fg.muted">Process and organize your incoming items</Text>
+          </VStack>
 
-        {selectedItems.size > 0 && (
-          <HStack gap="4">
-            <Button
-              onClick={() => {
-                // TODO: Show board selector
-                const boardId = prompt('Enter board ID:');
-                if (boardId) {
-                  moveToBoard.mutate({
-                    itemIds: Array.from(selectedItems),
-                    boardId
-                  });
-                }
-              }}
-              variant="solid"
-            >
-              Move to Board ({selectedItems.size})
-            </Button>
+          {selectedItems.size > 0 && (
+            <HStack gap="4">
+              <Button
+                onClick={() => {
+                  // TODO: Show board selector
+                  const boardId = prompt('Enter board ID:');
+                  if (boardId) {
+                    moveToBoard.mutate({
+                      itemIds: Array.from(selectedItems),
+                      boardId
+                    });
+                  }
+                }}
+                variant="solid"
+              >
+                Move to Board ({selectedItems.size})
+              </Button>
 
-            <Button
-              onClick={() => {
-                if (confirm('Delete selected items?')) {
-                  deleteItems.mutate(Array.from(selectedItems));
-                }
-              }}
-              variant="solid"
-              colorPalette="red"
-            >
-              Delete ({selectedItems.size})
-            </Button>
-          </HStack>
-        )}
-      </HStack>
+              <Button
+                onClick={() => {
+                  if (confirm('Delete selected items?')) {
+                    deleteItems.mutate(Array.from(selectedItems));
+                  }
+                }}
+                variant="solid"
+                colorPalette="red"
+              >
+                Delete ({selectedItems.size})
+              </Button>
+            </HStack>
+          )}
+        </HStack>
 
-      {!items || items.length === 0 ? (
-        <Card.Root width="full" textAlign="center">
-          <Card.Header>
-            <Card.Title>
-              <HStack gap="2" justifyContent="center">
-                <Text>Your inbox is empty!</Text>
-                <PartyPopper width="20" height="20" />
-              </HStack>
-            </Card.Title>
-            <Card.Description>
-              New items will appear here when you use the command bar or receive messages
-            </Card.Description>
-          </Card.Header>
-          <Card.Body py="8">
-            <Text color="fg.muted" fontSize="sm">
-              No pending items in your {currentSpace} inbox
-            </Text>
-          </Card.Body>
-        </Card.Root>
-      ) : (
-        <VStack gap="3">
-          {items.map((item) => (
-            <Card.Root
-              key={item.id}
-              onClick={() => toggleItemSelection(item.id)}
-              cursor="pointer"
-              borderColor={selectedItems.has(item.id) ? 'colorPalette.default' : 'border.default'}
-              borderWidth="2px"
-              width="full"
-              bg={selectedItems.has(item.id) ? 'colorPalette.subtle' : 'bg.default'}
-              transition="all 0.2s"
-              _hover={{
-                borderColor: 'colorPalette.emphasized'
-              }}
-            >
-              <Card.Header>
-                <HStack gap="3" alignItems="center" w="full">
-                  <Checkbox
-                    checked={selectedItems.has(item.id)}
-                    onChange={() => toggleItemSelection(item.id)}
-                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  />
-                  <Text fontSize="xl">{getSourceIcon(item.source)}</Text>
-                  <Box flex="1">
-                    <Card.Title>{item.title}</Card.Title>
-                    <Card.Description>
-                      From {item.source} • {new Date(item.createdAt).toLocaleDateString()}
-                    </Card.Description>
-                  </Box>
+        {!items || items.length === 0 ? (
+          <Card.Root width="full" textAlign="center">
+            <Card.Header>
+              <Card.Title>
+                <HStack gap="2" justifyContent="center">
+                  <Text>Your inbox is empty!</Text>
+                  <PartyPopper width="20" height="20" />
                 </HStack>
-              </Card.Header>
+              </Card.Title>
+              <Card.Description>
+                New items will appear here when you use the command bar or receive messages
+              </Card.Description>
+            </Card.Header>
+            <Card.Body py="8">
+              <Text color="fg.muted" fontSize="sm">
+                No pending items in your {currentSpace} inbox
+              </Text>
+            </Card.Body>
+          </Card.Root>
+        ) : (
+          <VStack gap="3">
+            {items.map((item) => (
+              <Card.Root
+                key={item.id}
+                onClick={() => toggleItemSelection(item.id)}
+                cursor="pointer"
+                borderColor={selectedItems.has(item.id) ? 'colorPalette.default' : 'border.default'}
+                borderWidth="2px"
+                width="full"
+                bg={selectedItems.has(item.id) ? 'colorPalette.subtle' : 'bg.default'}
+                transition="all 0.2s"
+                _hover={{
+                  borderColor: 'colorPalette.emphasized'
+                }}
+              >
+                <Card.Header>
+                  <HStack gap="3" alignItems="center" w="full">
+                    <Checkbox
+                      checked={selectedItems.has(item.id)}
+                      onChange={() => toggleItemSelection(item.id)}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    />
+                    <Text fontSize="xl">{getSourceIcon(item.source)}</Text>
+                    <Box flex="1">
+                      <Card.Title>{item.title}</Card.Title>
+                      <Card.Description>
+                        From {item.source} • {new Date(item.createdAt).toLocaleDateString()}
+                      </Card.Description>
+                    </Box>
+                  </HStack>
+                </Card.Header>
 
-              {item.description && (
-                <Card.Body>
-                  <Text color="fg.muted" fontSize="sm">
-                    {item.description}
-                  </Text>
-                </Card.Body>
-              )}
-            </Card.Root>
-          ))}
-        </VStack>
-      )}
-    </Container>
+                {item.description && (
+                  <Card.Body>
+                    <Text color="fg.muted" fontSize="sm">
+                      {item.description}
+                    </Text>
+                  </Card.Body>
+                )}
+              </Card.Root>
+            ))}
+          </VStack>
+        )}
+      </VStack>
+    </Box>
   );
 }

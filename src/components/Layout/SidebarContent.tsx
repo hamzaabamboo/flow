@@ -4,7 +4,6 @@ import {
   Calendar,
   Inbox,
   Target,
-  BarChart3,
   Briefcase,
   Home,
   Command,
@@ -31,9 +30,9 @@ interface SidebarNavItem {
 }
 
 const navItems: SidebarNavItem[] = [
-  { label: 'Agenda', href: '/agenda', icon: Calendar, badgeKey: 'agenda' },
+  { label: 'Agenda', href: '/', icon: Calendar, badgeKey: 'agenda' },
   { label: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
-  { label: 'Boards', href: '/', icon: LayoutGrid },
+  { label: 'Boards', href: '/boards', icon: LayoutGrid },
   { label: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'inbox' },
   { label: 'Habits', href: '/habits', icon: Target }
 ];
