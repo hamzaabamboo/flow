@@ -27,11 +27,12 @@ HamFlow is a personalized productivity hub SPA designed to integrate with existi
 
 ## Development Progress Tracker
 
-### Current Status: Phase 3 Complete ✅ + Code Refactoring Complete
+### Current Status: Phase 3 Complete ✅ + Recurring Tasks Fixed + Migrations Squashed
 
 **All Major Features Implemented:**
 - ✅ Full Kanban system (boards, columns, tasks, subtasks)
 - ✅ Task management with labels, recurring patterns, reminders
+- ✅ **Recurring task completion tracking** - Each instance can be checked independently
 - ✅ Habit tracking with completion status and streaks
 - ✅ Calendar integration (iCal feeds with RRULE support)
 - ✅ Agenda view (Day/Week toggle with date navigation)
@@ -39,13 +40,13 @@ HamFlow is a personalized productivity hub SPA designed to integrate with existi
 - ✅ Work/Personal space separation with proper filtering
 - ✅ URL query parameter state management
 
-**Code Organization (2025-10-01):**
-- ✅ Refactored massive apiRoutes.ts (1269 lines) into 10 modular route files
-- ✅ All routes properly namespaced: boards, columns, tasks, subtasks, inbox, pomodoro, habits, command, search, settings
-- ✅ Consistent auth pattern: all routes use `withAuth()` with `{ as: 'global' }` context propagation
-- ✅ Build verified: 2.99s client + 888ms server
-- ✅ Fixed task update endpoint to properly save subtasks (foreign key relations pattern)
-- ✅ Fixed schema self-referencing with `type AnyPgColumn` pattern
+**Latest Fixes (2025-10-01):**
+- ✅ **Fixed recurring task duplication bug** - Now uses task_completions table for per-date tracking
+- ✅ **Fixed checkbox click propagation** - Can toggle tasks without opening modal
+- ✅ **Squashed migrations** - Single clean migration file for easier deployment
+- ✅ Frontend properly passes instanceDate for recurring task completion
+- ✅ Calendar events API includes completion status per instance
+- ✅ Build verified: Successfully compiles with all fixes
 
 **Phase 4 - Next Steps:**
 - [ ] HamBot API Integration for notifications
@@ -546,6 +547,35 @@ This is set at the AppContent level in `+Layout.tsx` and inherited throughout th
 - **Pattern recognition**: Sample code directory becomes critical reference for consistency
 - **Debugging workflow**: Dev server outputs reveal architectural issues faster than code review
 - **Type safety impact**: Strict TypeScript prevents runtime errors but requires careful interface design
+
+**Session Learnings (2025-10-01 - Recurring Task Completion & Migration Cleanup):**
+
+- **Recurring Task Bug Solution**:
+  - **Problem**: Recurring tasks were creating duplicate database records when marked complete
+  - **User Requirement**: Wanted calendar-like behavior - virtual expansion with independent completion per date
+  - **Solution**: Created `task_completions` table to track completions by (task_id, date) pairs
+  - **Implementation**:
+    - Created task_completions table with unique constraint on (task_id, completed_date)
+    - Tasks PATCH endpoint checks for instanceDate parameter for recurring tasks src/server/routes/tasks.ts:218-258
+    - Calendar events endpoint fetches completions and marks each expanded instance src/server/routes/calendar.ts:319-340
+    - Fixed frontend to pass instanceDate when toggling recurring tasks src/pages/agenda/+Page.tsx:143-157
+    - No duplicate task records created, just tracking completion status per date
+  - **Key Pattern**: One-to-many relationship (one recurring task → many date-specific completions)
+  - **Frontend Integration**: Pass `instanceDate` in PATCH body when toggling recurring task completion
+
+- **Checkbox Click Propagation Fix**:
+  - **Problem**: Clicking checkboxes in week view was opening the task edit modal
+  - **Solution**: Added `onClick={(e) => e.stopPropagation()}` to Checkbox components
+  - **Result**: Checkboxes can now be toggled without triggering parent click handlers
+
+- **Migration Squashing**:
+  - **Problem**: Had 14 separate migration files making it hard to manage
+  - **Solution**: Created single `0000_squashed_initial.sql` containing complete schema
+  - **Process**:
+    - Backed up old migrations to `drizzle/migrations_backup/`
+    - Created comprehensive squashed migration with all tables and constraints
+    - Updated journal and snapshot files to reference only the squashed migration
+  - **Benefits**: Cleaner migration history, easier deployment, faster initial setup
 
 **Session Learnings (2025-10-01 - Code Refactoring & Route Organization):**
 

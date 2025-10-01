@@ -130,10 +130,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       await db.delete(columns).where(eq(columns.boardId, params.boardId));
 
       // Delete the board
-      const [deleted] = await db
-        .delete(boards)
-        .where(eq(boards.id, params.boardId))
-        .returning();
+      const [deleted] = await db.delete(boards).where(eq(boards.id, params.boardId)).returning();
 
       return deleted;
     },

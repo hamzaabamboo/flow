@@ -1,1 +1,0 @@
-ALTER TABLE "tasks" ADD COLUMN "recurring_end_date" timestamp;

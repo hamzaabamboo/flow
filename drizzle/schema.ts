@@ -8,6 +8,7 @@ import {
   boolean,
   integer,
   pgEnum,
+  date,
   type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -187,7 +188,8 @@ export const tasksRelations = relations(tasks, ({ many, one }) => ({
   column: one(columns, {
     fields: [tasks.columnId],
     references: [columns.id]
-  })
+  }),
+  completions: many(taskCompletions)
 }));
 
 export const subtasksRelations = relations(subtasks, ({ one }) => ({
@@ -207,4 +209,29 @@ export const columnsRelations = relations(columns, ({ one, many }) => ({
 
 export const boardsRelations = relations(boards, ({ many }) => ({
   columns: many(columns)
+}));
+
+// Task completions table to track which dates a recurring task has been completed
+export const taskCompletions = pgTable('task_completions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  taskId: uuid('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  completedDate: date('completed_date').notNull(), // The specific date this instance was completed
+  completedAt: timestamp('completed_at').defaultNow().notNull(), // When the user marked it complete
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+});
+
+// Add relation to tasks
+export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskCompletions.taskId],
+    references: [tasks.id]
+  }),
+  user: one(users, {
+    fields: [taskCompletions.userId],
+    references: [users.id]
+  })
 }));

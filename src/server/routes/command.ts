@@ -1,12 +1,7 @@
-import { withAuth } from '../auth/withAuth';
 import { Elysia, t } from 'elysia';
+import { withAuth } from '../auth/withAuth';
 import { inboxItems, reminders } from '../../../drizzle/schema';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
-
-interface User {
-  id: string;
-  email: string;
-}
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
   .use(withAuth())
@@ -39,11 +34,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             }
           } else if (toolCall.toolName === 'parse-datetime') {
             if (commandProcessor.tools.parseDateTime) {
-              parseDateTimeResult = (
-                commandProcessor.tools.parseDateTime as {
-                  execute: (args: unknown) => string;
-                }
-              ).execute(toolCall.args);
+              parseDateTimeResult = commandProcessor.tools.parseDateTime.execute(toolCall.args);
             }
           }
         }

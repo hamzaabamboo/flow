@@ -155,7 +155,7 @@ export const simpleAuth = new Elysia()
         email: user.email,
         name: user.name
       };
-    } catch (_error) {
+    } catch {
       set.status = 401;
       return { error: 'Invalid token' };
     }

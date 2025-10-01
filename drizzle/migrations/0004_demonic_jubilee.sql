@@ -1,1 +1,0 @@
-ALTER TABLE "columns" ADD COLUMN "wip_limit" integer;

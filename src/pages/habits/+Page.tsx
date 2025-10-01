@@ -120,7 +120,7 @@ export default function HabitsPage() {
   });
 
   // Toggle habit completion (used in Agenda view, not here)
-  const toggleMutation = useMutation({
+  const _toggleMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/habits/${id}/log`, { method: 'POST' });
       if (!response.ok) throw new Error('Failed to log habit');

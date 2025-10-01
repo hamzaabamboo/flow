@@ -123,9 +123,9 @@ export default function AgendaPage() {
   const completingTasks = useRef<Set<string>>(new Set());
 
   // Mark task as complete
-  const completeTask = async (taskId: string, instanceDate?: string) => {
+  const completeTask = async (taskId: string, instanceDate?: string | Date) => {
     // Create unique key for this completion
-    const completionKey = `${taskId}-${instanceDate || 'no-date'}`;
+    const completionKey = `${taskId}-${instanceDate ? String(instanceDate) : 'no-date'}`;
 
     // Prevent duplicate calls
     if (completingTasks.current.has(completionKey)) {
@@ -140,37 +140,24 @@ export default function AgendaPage() {
         .flat()
         .find((e) => e.id === taskId);
 
-      // If this is a recurring task instance (has recurringPattern and no parentTaskId),
-      // create a new task instance for this specific date
-      if (task?.recurringPattern && !task?.parentTaskId && instanceDate) {
-        // Create a new task instance for this specific occurrence
-        const response = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: task.title,
-            description: task.description,
-            dueDate: instanceDate,
-            priority: task.priority,
-            columnId: task.columnId,
-            completed: true,
-            parentTaskId: taskId, // Link to parent recurring task
-            recurringPattern: null // Instance is not recurring
-          })
-        });
-        if (response.ok) {
-          await refetchEvents();
-        }
-      } else {
-        // For non-recurring tasks or already-instanced tasks, just toggle completed
-        const response = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ completed: !task?.completed })
-        });
-        if (response.ok) {
-          await refetchEvents();
-        }
+      // Toggle task completion - for recurring tasks, pass the instanceDate as ISO string
+      const instanceDateStr = instanceDate
+        ? instanceDate instanceof Date
+          ? instanceDate.toISOString()
+          : instanceDate
+        : undefined;
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completed: !task?.completed,
+          ...(task?.recurringPattern && instanceDateStr ? { instanceDate: instanceDateStr } : {})
+        })
+      });
+
+      if (response.ok) {
+        await refetchEvents();
       }
     } catch (error) {
       console.error('Failed to toggle task:', error);
@@ -481,6 +468,7 @@ export default function AgendaPage() {
                                 <Checkbox
                                   checked={event.completed}
                                   onCheckedChange={() => void completeTask(event.id, event.dueDate)}
+                                  onClick={(e) => e.stopPropagation()}
                                   size="sm"
                                 />
                               )}

@@ -1,7 +1,14 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, or, sql, ilike, desc, asc } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
-import { boards, columns, tasks, subtasks, reminders } from '../../../drizzle/schema';
+import {
+  boards,
+  columns,
+  tasks,
+  subtasks,
+  reminders,
+  taskCompletions
+} from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
 
 export const tasksRoutes = new Elysia({ prefix: '/tasks' })
@@ -186,6 +193,11 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   .patch(
     '/:id',
     async ({ params, body, db, user }) => {
+      // First, get the current task to check if it's recurring
+      const [currentTask] = await db.select().from(tasks).where(eq(tasks.id, params.id));
+
+      if (!currentTask) throw new Error('Task not found');
+
       const updateData: Record<string, unknown> = {
         updatedAt: new Date()
       };
@@ -204,6 +216,41 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           : null;
       if (body.dueDate !== undefined) {
         updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+      }
+
+      // For recurring tasks, track completion per date instead of updating the task
+      if (body.completed !== undefined && currentTask.recurringPattern && body.instanceDate) {
+        const instanceDate = new Date(body.instanceDate);
+        const dateStr = instanceDate.toISOString().split('T')[0]; // Get just the date part
+
+        if (body.completed === true) {
+          // Check if already completed for this date
+          const existing = await db
+            .select()
+            .from(taskCompletions)
+            .where(
+              and(eq(taskCompletions.taskId, params.id), eq(taskCompletions.completedDate, dateStr))
+            );
+
+          if (existing.length === 0) {
+            // Create completion record for this specific date
+            await db.insert(taskCompletions).values({
+              taskId: params.id,
+              completedDate: dateStr,
+              userId: user.id
+            });
+          }
+        } else {
+          // Uncomplete - remove the completion record for this date
+          await db
+            .delete(taskCompletions)
+            .where(
+              and(eq(taskCompletions.taskId, params.id), eq(taskCompletions.completedDate, dateStr))
+            );
+        }
+
+        // Don't update the parent task's completed status
+        delete updateData.completed;
       }
 
       const [updated] = await db
@@ -270,7 +317,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         subtasks: t.Optional(t.Any()),
         recurringPattern: t.Optional(t.String()),
         recurringEndDate: t.Optional(t.String()),
-        updateReminder: t.Optional(t.Boolean())
+        updateReminder: t.Optional(t.Boolean()),
+        instanceDate: t.Optional(t.String())
       })
     }
   )

@@ -166,7 +166,7 @@ export const oidcAuth = new Elysia()
         // Redirect to return URL
         set.redirect = returnUrl;
         return;
-      } catch (_error) {
+      } catch {
         console.error('OAuth error:', _error);
         set.status = 500;
         return { error: 'Authentication failed' };
@@ -226,7 +226,7 @@ export const oidcAuth = new Elysia()
         email: user.email,
         name: user.name
       };
-    } catch (_error) {
+    } catch {
       set.status = 401;
       return { error: 'Invalid token' };
     }
@@ -265,7 +265,7 @@ export const oidcAuth = new Elysia()
       });
 
       return { success: true };
-    } catch (_error) {
+    } catch {
       set.status = 401;
       return { error: 'Invalid token' };
     }

@@ -54,7 +54,7 @@ export const authMiddleware = new Elysia({ name: 'auth-middleware' })
           name: user.name
         } as AuthUser
       };
-    } catch (_error) {
+    } catch {
       set.status = 401;
       throw new Error('Authentication failed');
     }

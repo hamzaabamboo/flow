@@ -1,8 +1,14 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { and, eq, gte, lte, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gte, lte, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { tasks, boards, reminders, pomodoroSessions } from '../../../drizzle/schema';
+import {
+  tasks,
+  boards,
+  reminders,
+  pomodoroSessions,
+  taskCompletions
+} from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 
 // Helper function to format date for iCal
@@ -300,8 +306,12 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       const endDate = new Date(end);
 
       // Fetch all tasks with subtasks using relational query
+      // IMPORTANT: Exclude tasks with parentTaskId to avoid showing duplicate completed instances
       const allTasks = await db.query.tasks.findMany({
-        where: eq(tasks.userId, user.id),
+        where: and(
+          eq(tasks.userId, user.id),
+          isNull(tasks.parentTaskId) // Only get parent tasks, not completed instances
+        ),
         with: {
           subtasks: true,
           column: {
@@ -311,6 +321,29 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           }
         }
       });
+
+      // Fetch all task completions for the user's tasks in the date range
+      const completions = await db
+        .select()
+        .from(taskCompletions)
+        .where(
+          and(
+            eq(taskCompletions.userId, user.id),
+            sql`${taskCompletions.completedDate} >= ${startDate.toISOString().split('T')[0]}`,
+            sql`${taskCompletions.completedDate} <= ${endDate.toISOString().split('T')[0]}`
+          )
+        );
+
+      // Create a map of task completions by taskId and date
+      const completionMap = new Map<string, Set<string>>();
+      for (const completion of completions) {
+        const taskId = completion.taskId;
+        const dateStr = completion.completedDate;
+        if (!completionMap.has(taskId)) {
+          completionMap.set(taskId, new Set());
+        }
+        completionMap.get(taskId)!.add(dateStr);
+      }
 
       // Expand recurring tasks into individual instances
       const taskEvents = [];
@@ -329,7 +362,16 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         // If no recurring pattern, only show if within range
         if (!task.recurringPattern) {
           if (taskDueDate >= startDate && taskDueDate <= endDate) {
-            taskEvents.push(formattedTask);
+            // Check if this task is completed for its date
+            const dateStr = taskDueDate.toISOString().split('T')[0];
+            const isCompleted =
+              task.completed || (completionMap.get(task.id)?.has(dateStr) ?? false);
+
+            taskEvents.push({
+              ...formattedTask,
+              completed: isCompleted,
+              instanceDate: dateStr // Add instanceDate for frontend to use
+            });
           }
           continue;
         }
@@ -370,9 +412,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             const instance = new Date(currentDay);
             instance.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
 
+            // Check if this instance is completed
+            const dateStr = instance.toISOString().split('T')[0];
+            const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
+
             taskEvents.push({
               ...formattedTask,
-              dueDate: instance
+              dueDate: instance,
+              completed: isCompleted,
+              instanceDate: dateStr
             });
 
             currentDay.setDate(currentDay.getDate() + 1);
@@ -384,9 +432,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 
           while (current <= effectiveEndDate) {
             if (current >= startDate && current.getDay() === taskDueDate.getDay()) {
+              // Check if this instance is completed
+              const dateStr = current.toISOString().split('T')[0];
+              const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
+
               taskEvents.push({
                 ...formattedTask,
-                dueDate: new Date(current)
+                dueDate: new Date(current),
+                completed: isCompleted,
+                instanceDate: dateStr
               });
             }
             current.setDate(current.getDate() + 1);
@@ -398,9 +452,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 
           while (current <= effectiveEndDate) {
             if (current >= startDate) {
+              // Check if this instance is completed
+              const dateStr = current.toISOString().split('T')[0];
+              const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
+
               taskEvents.push({
                 ...formattedTask,
-                dueDate: new Date(current)
+                dueDate: new Date(current),
+                completed: isCompleted,
+                instanceDate: dateStr
               });
             }
             current.setMonth(current.getMonth() + 1);
@@ -433,8 +493,12 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           )
         );
 
+      // Filter by space if specified
+      const filteredTaskEvents =
+        space === 'all' ? taskEvents : taskEvents.filter((task) => task.space === space);
+
       // Combine and sort by date
-      const allEvents = [...taskEvents, ...reminderEvents].sort((a, b) => {
+      const allEvents = [...filteredTaskEvents, ...reminderEvents].sort((a, b) => {
         const aDate = a.dueDate;
         const bDate = b.dueDate;
         if (!aDate || !bDate) return 0;
