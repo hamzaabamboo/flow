@@ -33,7 +33,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           .where(inArray(columns.boardId, boardIds));
 
         // Group columns by board
-        const columnsMap = new Map<string, any[]>();
+        const columnsMap = new Map<string, unknown[]>();
         allColumns.forEach((col) => {
           if (!columnsMap.has(col.boardId)) {
             columnsMap.set(col.boardId, []);

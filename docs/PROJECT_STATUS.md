@@ -10,6 +10,17 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ### ✅ Completed This Session
 
+- **Auto-Move Tasks on Completion** - Smart column management
+  - When a task is marked complete from Tasks/Agenda pages, it automatically moves to "Done" column
+  - When unchecked, task moves back to "To Do" column
+  - System auto-creates "Done" and "To Do" columns if they don't exist on the board
+  - Backend logic in `src/server/routes/tasks.ts` PATCH endpoint
+
+- **Sidebar Navigation Enhancement** - Active route highlighting
+  - Updated sidebar to use `_active` pseudo-class for highlighting active routes
+  - Matches sample project NavigationItem pattern with `data-active` attribute
+  - Uses `bg: 'bg.emphasized'` for consistent hover and active states
+
 - **Tasks Page Improvements** - Enhanced filters and UI components
   - Refactored task priority picker to use RadioButtonGroup with color coding (green/yellow/orange/red)
   - Moved PriorityBadge component from `/ui` to `/components` (business logic separation)

@@ -219,6 +219,31 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       if (body.columnId !== undefined) updateData.columnId = body.columnId;
       if (body.priority !== undefined) updateData.priority = body.priority;
       if (body.completed !== undefined) updateData.completed = body.completed;
+
+      // Auto-move task to Done/In Progress column when completion status changes
+      if (body.completed !== undefined && currentTask.completed !== body.completed) {
+        // Get the current column to find the board
+        const [currentColumn] = await db
+          .select()
+          .from(columns)
+          .where(eq(columns.id, currentTask.columnId));
+
+        if (currentColumn) {
+          const boardId = currentColumn.boardId;
+          const targetColumnName = body.completed ? 'Done' : 'In Progress';
+
+          // Find the target column
+          const [targetColumn] = await db
+            .select()
+            .from(columns)
+            .where(and(eq(columns.boardId, boardId), eq(columns.name, targetColumnName)));
+
+          // Only move if target column exists
+          if (targetColumn) {
+            updateData.columnId = targetColumn.id;
+          }
+        }
+      }
       if (body.labels !== undefined) updateData.labels = body.labels;
       if (body.recurringPattern !== undefined) updateData.recurringPattern = body.recurringPattern;
       if (body.recurringEndDate !== undefined)

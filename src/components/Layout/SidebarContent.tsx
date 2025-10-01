@@ -152,9 +152,8 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                 position="relative"
                 justifyContent="flex-start"
                 w="full"
-                color={isActive ? 'colorPalette.default' : undefined}
-                bg={isActive ? 'colorPalette.muted/10' : undefined}
-                _hover={{ bg: 'bg.subtle' }}
+                _active={{ bg: 'bg.emphasized' }}
+                _hover={{ bg: 'bg.emphasized' }}
               >
                 <IconComponent style={{ marginRight: '12px' }} width="20" height="20" />
                 {item.label}
