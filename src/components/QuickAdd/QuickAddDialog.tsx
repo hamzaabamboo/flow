@@ -55,7 +55,6 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     if (!input.trim()) return;
 
     setIsParsing(true);
-    console.log('[QuickAdd] Starting to parse input:', input);
 
     try {
       const response = await fetch('/api/command', {
@@ -69,7 +68,6 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('[QuickAdd] Parse result:', result);
 
         // Extract parsed data from command response
         if (result.action === 'create_task' || result.action === 'create_inbox_item') {
@@ -87,15 +85,12 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
             boardId: result.data.boardId,
             columnId: result.data.columnId
           };
-          console.log('[QuickAdd] Setting parsed task:', parsed);
           setParsedTask(parsed);
 
           // Close quick add dialog and open task dialog
-          console.log('[QuickAdd] Closing quick add, will open task dialog in 100ms');
           onOpenChange(false);
           // Delay opening task dialog to ensure state is set
           setTimeout(() => {
-            console.log('[QuickAdd] Opening task dialog now');
             setShowTaskDialog(true);
           }, 100);
         } else {
@@ -286,48 +281,39 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
 
       {/* Task Dialog with Pre-filled Data */}
       {parsedTask && (
-        <>
-          {console.log(
-            '[QuickAdd] Rendering TaskDialog, showTaskDialog:',
-            showTaskDialog,
-            'parsedTask:',
-            parsedTask
-          )}
-          <TaskDialog
-            open={showTaskDialog}
-            onOpenChange={(isOpen) => {
-              console.log('[QuickAdd] TaskDialog onOpenChange:', isOpen);
-              setShowTaskDialog(isOpen);
-              // Clean up when dialog closes
-              if (!isOpen) {
-                setInput('');
-                setParsedTask(null);
-                setIsParsing(false);
-              }
-            }}
-            task={{
-              id: '',
-              title: parsedTask.title,
-              description: parsedTask.description,
-              dueDate: parsedTask.dueDate,
-              priority: parsedTask.priority,
-              labels: parsedTask.labels,
-              columnId: parsedTask.columnId || '',
-              completed: false,
-              space: currentSpace,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              createReminder: false,
-              recurringPattern: undefined,
-              recurringEndDate: undefined,
-              parentTaskId: undefined,
-              subtasks: []
-            }}
-            onSubmit={(e) => void handleTaskSubmit(e)}
-            mode="create"
-            defaultColumnId={parsedTask.columnId}
-          />
-        </>
+        <TaskDialog
+          open={showTaskDialog}
+          onOpenChange={(isOpen) => {
+            setShowTaskDialog(isOpen);
+            // Clean up when dialog closes
+            if (!isOpen) {
+              setInput('');
+              setParsedTask(null);
+              setIsParsing(false);
+            }
+          }}
+          task={{
+            id: '',
+            title: parsedTask.title,
+            description: parsedTask.description,
+            dueDate: parsedTask.dueDate,
+            priority: parsedTask.priority,
+            labels: parsedTask.labels,
+            columnId: parsedTask.columnId || '',
+            completed: false,
+            space: currentSpace,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createReminder: false,
+            recurringPattern: undefined,
+            recurringEndDate: undefined,
+            parentTaskId: undefined,
+            subtasks: []
+          }}
+          onSubmit={(e) => void handleTaskSubmit(e)}
+          mode="create"
+          defaultColumnId={parsedTask.columnId}
+        />
       )}
     </>
   );
