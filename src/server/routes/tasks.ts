@@ -280,7 +280,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
       }
       if (body.link !== undefined) {
-        updateData.metadata = { ...(currentTask.metadata || {}), link: body.link };
+        updateData.metadata = { ...currentTask.metadata, link: body.link };
       }
 
       // For recurring tasks, track completion per date instead of updating the task

@@ -115,7 +115,7 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
       if (body.color !== undefined) updateData.color = body.color;
       if (body.active !== undefined) updateData.active = body.active;
       if (body.link !== undefined) {
-        updateData.metadata = { ...(currentHabit.metadata || {}), link: body.link };
+        updateData.metadata = { ...currentHabit.metadata, link: body.link };
       }
 
       const [updated] = await db

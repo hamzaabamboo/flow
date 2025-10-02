@@ -5,6 +5,7 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import tseslint from 'typescript-eslint';
 import react from 'eslint-plugin-react';
 import unusedImports from 'eslint-plugin-unused-imports';
+import oxlint from 'eslint-plugin-oxlint';
 import globals from 'globals';
 
 const compat = new FlatCompat({
@@ -165,7 +166,9 @@ const config = tseslint.config(
         }
       ]
     }
-  }
+  },
+  // Disable ESLint rules that are handled by oxlint
+  oxlint.configs['flat/recommended']
 );
 
 export default config;

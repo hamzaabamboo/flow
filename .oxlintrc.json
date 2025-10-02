@@ -1,0 +1,32 @@
+{
+  "$schema": "https://oxc.rs/schemas/oxlint/v1.json",
+  "rules": {
+    "typescript": "warn",
+    "correctness": "warn",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "settings": {
+    "jsx-a11y": {
+      "polymorphicPropName": "as",
+      "components": {
+        "Button": "button",
+        "IconButton": "button",
+        "Input": "input",
+        "Text": "p"
+      }
+    }
+  },
+  "ignores": [
+    "**/scripts/internal/*",
+    "**/styled-system/*",
+    "**/components/ui/styled/**/*",
+    "**/lib/**/*",
+    "*.config.*",
+    "*-setup.js",
+    "**/panda/*.ts",
+    "**/dist/**/*",
+    "**/.vite/**/*",
+    "**/node_modules/**/*"
+  ]
+}

@@ -19,8 +19,17 @@ bun run dev
 # Check types
 bunx tsc --noEmit
 
+# Lint (oxlint + ESLint)
+bun run lint
+
 # Fix linting
 bun run lint:fix
+
+# Run only oxlint (fast)
+bun run lint:oxc
+
+# Run only ESLint (plugins)
+bun run lint:eslint
 
 # Build for production
 bun run build

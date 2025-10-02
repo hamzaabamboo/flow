@@ -2,6 +2,80 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-02 - oxc Linter Integration
+
+### Dual Linter Setup: oxc + ESLint
+
+**Why Both?**
+- **oxc**: Fast Rust-based linter for core correctness checks (~35ms for 214 files)
+- **ESLint**: Plugin ecosystem for framework-specific rules (Panda CSS, React Compiler, etc.)
+
+**Installation**:
+```bash
+bun add -d oxlint eslint-plugin-oxlint
+```
+
+**Configuration** (`.oxlintrc.json`):
+```json
+{
+  "$schema": "https://oxc.rs/schemas/oxlint/v1.json",
+  "rules": {
+    "typescript": "warn",
+    "correctness": "warn",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "settings": {
+    "jsx-a11y": {
+      "polymorphicPropName": "as",
+      "components": {
+        "Button": "button",
+        "IconButton": "button"
+      }
+    }
+  },
+  "ignores": ["**/styled-system/*", "*.config.*"]
+}
+```
+
+**ESLint Integration** (`eslint.config.mjs`):
+```javascript
+import oxlint from 'eslint-plugin-oxlint';
+
+const config = tseslint.config(
+  // ... other configs
+  // Disable ESLint rules that are handled by oxlint
+  oxlint.configs['flat/recommended']
+);
+```
+
+**Script Updates**:
+```json
+{
+  "lint": "oxlint src && eslint src",
+  "lint:fix": "oxlint --fix src && eslint src --fix",
+  "lint:oxc": "oxlint src",
+  "lint:eslint": "eslint src"
+}
+```
+
+**Benefits**:
+- 10-100x faster linting with oxc
+- Keep ESLint plugins for framework-specific rules
+- Run oxc first (fast), then ESLint (comprehensive)
+- Both linters run in sequence - if oxc fails, ESLint won't run
+
+**Issues Found by oxc**:
+- Empty object destructuring: `const {} = useSpace()` → Removed unused destructuring
+- Useless fallback in spread: `...(obj || {})` → `...obj` (spreading falsy values is safe)
+
+### Key Learnings
+1. **Performance**: oxc is significantly faster than ESLint for core checks
+2. **Complementary**: Use both linters for best of both worlds
+3. **Sequential Execution**: `&&` ensures oxc passes before ESLint runs
+4. **Safe Spreads**: JavaScript safely handles spreading `null`/`undefined` in objects
+5. **Plugin Integration**: `eslint-plugin-oxlint` automatically disables ESLint rules that oxc handles, preventing duplicate warnings
+
 ## 2025-10-02 - iCal Feed & Complete Dynamic Styling Elimination
 
 ### iCal Feed Enhancements
