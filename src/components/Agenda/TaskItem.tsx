@@ -8,7 +8,6 @@ import { PriorityBadge } from '../PriorityBadge';
 import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
 import type { CalendarEvent } from '../../shared/types/calendar';
-import { getPriorityColor } from '../../utils/priority';
 import { Box, HStack, VStack } from 'styled-system/jsx';
 
 export function TaskItem({
@@ -24,12 +23,10 @@ export function TaskItem({
   extraBadges?: ReactNode;
   actions?: ReactNode;
 }) {
-  const colorPalette = getPriorityColor(event.priority);
-
   return (
     <Box
+      data-priority={event.priority || 'none'}
       onClick={onToggleComplete}
-      colorPalette={colorPalette}
       cursor="pointer"
       borderColor="border.default"
       borderLeftWidth="4px"

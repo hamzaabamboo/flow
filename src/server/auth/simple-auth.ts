@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { users } from '../../../drizzle/schema';
 import { db } from '../db';
 
@@ -162,8 +162,8 @@ export const simpleAuth = new Elysia()
   })
   // Auto-login for single user (convenience endpoint)
   .post('/api/auth/auto-login', async ({ db, jwt, cookie, set }) => {
-    // Get the single user
-    const [user] = await db.select().from(users).limit(1);
+    // Get the first user (ordered by creation date)
+    const [user] = await db.select().from(users).orderBy(asc(users.createdAt)).limit(1);
 
     if (!user) {
       set.status = 404;

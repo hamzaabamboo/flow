@@ -195,7 +195,7 @@ export default function AllTasksPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} minHeight="calc(100vh - 128px)">
+    <Box data-space={currentSpace} minHeight="calc(100vh - 128px)">
       {/* Header */}
       <Box borderColor="border.default" borderBottomWidth="1px" bg="bg.default">
         <VStack gap="4" p="6">
@@ -204,9 +204,7 @@ export default function AllTasksPage() {
               <Heading size="2xl" color="fg.default">
                 All Tasks
               </Heading>
-              <Badge colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>
-                {filteredTasks.length} tasks
-              </Badge>
+              <Badge data-space={currentSpace}>{filteredTasks.length} tasks</Badge>
             </HStack>
           </HStack>
 

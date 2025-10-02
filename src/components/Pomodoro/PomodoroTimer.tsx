@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { IconButton } from '../ui/icon-button';
 import { Box, HStack } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 
 const TIMERS = {
   work: 25 * 60, // 25 minutes
@@ -138,17 +139,6 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     handleComplete();
   };
 
-  const getSessionColorPalette = () => {
-    switch (session.type) {
-      case 'work':
-        return 'red';
-      case 'short-break':
-        return 'green';
-      case 'long-break':
-        return 'blue';
-    }
-  };
-
   const progress = ((session.duration - timeLeft) / session.duration) * 100;
 
   // If completely hidden, show a small floating button to restore
@@ -160,7 +150,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
           variant="solid"
           size="lg"
           aria-label="Show Pomodoro Timer"
-          colorPalette={getSessionColorPalette()}
+          data-session-type={session.type}
           borderRadius="full"
           shadow="lg"
         >
@@ -190,7 +180,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
             {formatTime(timeLeft)}
           </Text>
 
-          <Badge size="sm" colorPalette={getSessionColorPalette()}>
+          <Badge size="sm" data-session-type={session.type}>
             {session.type.replace('-', ' ')}
           </Badge>
 
@@ -198,7 +188,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
             onClick={toggleTimer}
             variant={isRunning ? 'ghost' : 'solid'}
             size="sm"
-            colorPalette={!isRunning ? getSessionColorPalette() : undefined}
+            data-session-type={!isRunning ? session.type : undefined}
           >
             {isRunning ? 'Pause' : 'Start'}
           </Button>
@@ -295,10 +285,11 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       {/* Progress Bar */}
       <Box borderRadius="xs" height="1" my="4" bg="bg.muted" overflow="hidden">
         <Box
-          style={{ width: `${progress}%` }}
+          className={css({ width: 'var(--progress)', transition: 'width 0.5s ease' })}
+          data-session-type={session.type}
+          style={{ '--progress': `${progress}%` } as React.CSSProperties}
           height="full"
-          bg={`${getSessionColorPalette()}.solid`}
-          transition="width 0.5s ease"
+          bg="colorPalette.solid"
         />
       </Box>
 
@@ -308,7 +299,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
           onClick={toggleTimer}
           variant={isRunning ? 'outline' : 'solid'}
           size="sm"
-          colorPalette={!isRunning ? getSessionColorPalette() : undefined}
+          data-session-type={!isRunning ? session.type : undefined}
         >
           {isRunning ? 'Pause' : 'Start'}
         </Button>

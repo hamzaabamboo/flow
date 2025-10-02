@@ -2,6 +2,178 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-02 - iCal Feed & Complete Dynamic Styling Elimination
+
+### iCal Feed Enhancements
+- **Task Status**: Completed tasks now show as `STATUS:CANCELLED`
+- **Habit Timing**: Use `habit.createdAt` as start date with `reminderTime` for daily occurrence
+- **Metadata Links**: Append `metadata.link` to event descriptions for both tasks and habits
+- **Active Filter**: Only include active habits (`active: true`) in feed
+- **Space Categories**: Added habit space (work/personal) alongside 'habits' category
+- **Color Support**: Attempted but ical-generator doesn't support color property on events
+
+### Dynamic Styling Migration (Panda CSS) - ZERO TOLERANCE
+**Problem**: ESLint warnings about dynamic values - "Remove dynamic value. Prefer static styles"
+
+**Root Cause**: Panda CSS performs static analysis at build time and cannot optimize runtime values.
+
+#### Solution Patterns
+
+**1. Use `colorPalette` Prop for Color Variants**
+```typescript
+// ❌ WRONG - Dynamic bg value
+<Box bg={getPriorityColor(task.priority)} />
+
+// ✅ CORRECT - Use colorPalette + semantic token
+<Box
+  colorPalette={getPriorityColor(task.priority)}
+  bg="colorPalette.solid"
+/>
+```
+
+**2. Data Attributes + Global CSS for Conditional Styles**
+```typescript
+// ❌ WRONG - Ternary in style prop
+<Box
+  borderColor={isDragOver ? 'colorPalette.default' : 'transparent'}
+  bg={isDragOver ? 'colorPalette.subtle' : 'bg.muted'}
+/>
+
+// ✅ CORRECT - Data attribute + CSS
+const dragStyles = css({
+  borderColor: 'transparent',
+  bg: 'bg.muted',
+  '&[data-drag-over=true]': {
+    borderColor: 'colorPalette.default',
+    bg: 'colorPalette.subtle'
+  }
+});
+
+<Box data-drag-over={isDragOver} className={dragStyles} />
+```
+
+**3. CSS Custom Properties for Truly Dynamic Values**
+```typescript
+// ❌ WRONG - Inline style with dynamic value
+<Box style={{ width: `${progress}%` }} />
+
+// ✅ CORRECT - CSS custom property
+<Box
+  style={{ '--progress': `${progress}%` } as React.CSSProperties}
+  className={css({ width: 'var(--progress)' })}
+/>
+```
+
+**4. Global CSS for Space-Based Color Palettes**
+```typescript
+// panda.config.ts globalCss
+globalCss: {
+  '[data-space=work]': { colorPalette: 'blue' },
+  '[data-space=personal]': { colorPalette: 'purple' }
+}
+
+// Usage
+<Box data-space={currentSpace}>{children}</Box>
+```
+
+#### Files Modified (Complete List)
+- **Agenda/TaskItem.tsx** - Priority colors with data-priority attribute
+- **Kanban/TaskCard.tsx** - Priority indicator with data-priority
+- **Pomodoro/PomodoroTimer.tsx** - Session type colors and progress bar with CSS variables
+- **Layout/NotificationDropdown.tsx** - Fixed Lucide icon props by wrapping in Box
+- **settings/+Page.tsx** - Fixed TypeScript type assertions for summarySpaces
+- **index/+Page.tsx** - Comprehensive fixes:
+  - Calendar day boxes: `data-is-today` and `data-is-past` attributes
+  - Habit completion backgrounds: `data-completed` attribute with css()
+  - Task priority colors: `data-priority` attribute
+- **panda.config.ts** - Added global CSS for:
+  - `[data-space]` → colorPalette
+  - `[data-priority]` → colorPalette
+  - `[data-session-type]` → colorPalette
+
+#### Critical Pattern: Completion State Styling
+```typescript
+// ❌ WRONG - Dynamic background based on state
+<Box bg={habit.completedToday ? 'green.subtle' : 'bg.muted'} />
+
+// ✅ CORRECT - Data attribute + CSS with pseudo-selector
+<Box
+  data-completed={habit.completedToday}
+  className={css({
+    bg: 'bg.muted',
+    '&[data-completed=true]': {
+      bg: 'green.subtle'
+    }
+  })}
+/>
+```
+
+#### Critical Pattern: Calendar State Styling
+```typescript
+// ❌ WRONG - Ternary operators for conditional styles
+<Box
+  borderColor={isToday ? 'colorPalette.default' : 'border.default'}
+  bg={isToday ? 'colorPalette.subtle' : 'bg.default'}
+  opacity={isPast ? 0.7 : 1}
+/>
+
+// ✅ CORRECT - Data attributes + css() with pseudo-selectors
+<Box
+  data-is-today={isToday}
+  data-is-past={isPast}
+  className={css({
+    borderColor: 'border.default',
+    bg: 'bg.default',
+    opacity: 1,
+    '&[data-is-today=true]': {
+      borderColor: 'colorPalette.default',
+      bg: 'colorPalette.subtle'
+    },
+    '&[data-is-past=true]': {
+      opacity: 0.7
+    }
+  })}
+/>
+```
+
+#### User Feedback & Enforcement
+- **"dynamic styling warnings are NOT acceptable lah"** - Zero tolerance policy
+- **"you can overcome that by several technique we discussed already"** - Must use data attributes
+- **Final Result**: Zero dynamic styling warnings, all lint and TypeScript errors resolved
+
+### TypeScript Error Fixes
+**Problem**: Lucide icons don't accept Panda CSS props
+
+**Solution**: Wrap in Box when needing Panda styles
+```typescript
+// ❌ WRONG
+<Clock flexShrink="0" width="16" height="16" />
+
+// ✅ CORRECT
+<Box flexShrink="0">
+  <Clock width="16" height="16" />
+</Box>
+```
+
+### Async Handler Fixes
+**Problem**: `Promise-returning function provided to attribute where a void return was expected`
+
+**Solution**: Wrap with void operator
+```typescript
+// ❌ WRONG
+onClick={() => handleDismiss(id)}
+
+// ✅ CORRECT
+onClick={() => { void handleDismiss(id); }}
+```
+
+### Key Learnings
+1. **Panda CSS Philosophy**: Prefer compile-time generation over runtime styling
+2. **Data Attributes**: Powerful pattern for state-based styling without dynamic values
+3. **CSS Custom Properties**: Bridge between dynamic JavaScript values and static CSS
+4. **Global CSS**: Useful for app-wide patterns like space-based theming
+5. **Type Safety**: Lucide icons are SVG components, not Panda components
+
 ## 2025-10-02 - Habit Links & UI Improvements
 
 ### Features Implemented

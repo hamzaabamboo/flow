@@ -127,13 +127,9 @@ export function NotificationDropdown() {
                     _hover={{ bg: 'bg.muted' }}
                   >
                     <HStack gap="2" alignItems="start">
-                      <Clock
-                        flexShrink="0"
-                        width="16"
-                        height="16"
-                        mt="0.5"
-                        color="var(--colors-fg-muted)"
-                      />
+                      <Box flexShrink="0" mt="0.5">
+                        <Clock width="16" height="16" color="fg.muted" />
+                      </Box>
                       <VStack flex="1" gap="1" alignItems="start">
                         <Text fontSize="sm" lineHeight="1.4">
                           {reminder.message}
@@ -146,7 +142,9 @@ export function NotificationDropdown() {
                         variant="ghost"
                         size="xs"
                         aria-label="Dismiss"
-                        onClick={() => handleDismiss(reminder.id)}
+                        onClick={() => {
+                          void handleDismiss(reminder.id);
+                        }}
                         flexShrink="0"
                       >
                         <X width="14" height="14" />

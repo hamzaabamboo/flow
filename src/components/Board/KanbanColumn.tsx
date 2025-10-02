@@ -24,6 +24,7 @@ import * as Menu from '../ui/styled/menu';
 import * as Dialog from '../ui/styled/dialog';
 import type { Task, Column } from '../../shared/types';
 import { Box, VStack, HStack } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 
 export { type Task, type Column } from '../../shared/types';
 
@@ -111,14 +112,24 @@ export function KanbanColumn({
     }
   };
 
+  const columnDragStyles = css({
+    borderColor: 'transparent',
+    boxShadow: 'none',
+    '&[data-dragging=true]': {
+      borderColor: 'colorPalette.default',
+      boxShadow: 'lg'
+    }
+  });
+
   return (
     <>
       <Box
+        className={columnDragStyles}
+        data-dragging={isColumnDragging}
         ref={setRefs}
         style={columnStyle}
         display="flex"
         flexDirection="column"
-        borderColor={isColumnDragging ? 'colorPalette.default' : 'transparent'}
         borderRadius="lg"
         borderWidth="2px"
         minW="320px"
@@ -126,7 +137,6 @@ export function KanbanColumn({
         maxH="calc(100vh - 200px)"
         p="4"
         bg="bg.muted"
-        boxShadow={isColumnDragging ? 'lg' : 'none'}
       >
         <HStack flexShrink={0} justifyContent="space-between" mb="4">
           <HStack gap="2">

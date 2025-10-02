@@ -197,6 +197,36 @@ export default defineConfig({
     '*:focus-visible': {
       outline: '2px solid {colors.accent.default}',
       outlineOffset: '2px'
+    },
+    '[data-space=work]': {
+      colorPalette: 'blue'
+    },
+    '[data-space=personal]': {
+      colorPalette: 'purple'
+    },
+    '[data-priority=urgent]': {
+      colorPalette: 'red'
+    },
+    '[data-priority=high]': {
+      colorPalette: 'orange'
+    },
+    '[data-priority=medium]': {
+      colorPalette: 'yellow'
+    },
+    '[data-priority=low]': {
+      colorPalette: 'gray'
+    },
+    '[data-priority=none]': {
+      colorPalette: 'gray'
+    },
+    '[data-session-type=work]': {
+      colorPalette: 'red'
+    },
+    '[data-session-type=short-break]': {
+      colorPalette: 'green'
+    },
+    '[data-session-type=long-break]': {
+      colorPalette: 'blue'
     }
   },
 

@@ -155,21 +155,6 @@ export default function TasksPage() {
     {} as Record<string, ExtendedTask[]>
   );
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'red';
-      case 'high':
-        return 'orange';
-      case 'medium':
-        return 'yellow';
-      case 'low':
-        return 'green';
-      default:
-        return 'gray';
-    }
-  };
-
   const handleTaskSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     if (!editingTask) return;
@@ -197,7 +182,7 @@ export default function TasksPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p={{ base: '2', md: '4' }}>
+    <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
       {/* Header */}
       <VStack gap="6" justifyContent="flex-start" alignItems="stretch" w="full">
         <VStack gap="1" alignItems="start">

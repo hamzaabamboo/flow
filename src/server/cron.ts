@@ -162,7 +162,7 @@ export const cronJobs = new Elysia()
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const result = await db
+        await db
           .delete(reminders)
           .where(and(eq(reminders.sent, true), lte(reminders.reminderTime, thirtyDaysAgo)));
 

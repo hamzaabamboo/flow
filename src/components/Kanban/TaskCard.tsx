@@ -13,21 +13,6 @@ interface TaskCardProps {
 export function TaskCard({ task, onDragStart }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'red.solid';
-      case 'high':
-        return 'orange.solid';
-      case 'medium':
-        return 'blue.solid';
-      case 'low':
-        return 'green.solid';
-      default:
-        return 'gray.solid';
-    }
-  };
-
   const formatDueDate = (date?: string) => {
     if (!date) return null;
     const dueDate = new Date(date);
@@ -68,11 +53,12 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
       <HStack gap="2" alignItems="flex-start">
         {task.priority && (
           <Box
+            data-priority={task.priority}
             borderRadius="xs"
             width="1"
             height="full"
             minHeight="20px"
-            bg={getPriorityColor(task.priority)}
+            bg="colorPalette.solid"
           />
         )}
 

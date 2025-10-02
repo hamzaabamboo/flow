@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import { cookie } from '@elysiajs/cookie';
 import { jwt } from '@elysiajs/jwt';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { users } from '../../../drizzle/schema';
 import { db } from '../db';
 import { logger } from '../logger';
@@ -31,8 +31,8 @@ export const withAuth = () =>
       if (!token && process.env.NODE_ENV !== 'production') {
         logger.info('No auth token found - auto-logging in as first user (development mode)');
 
-        // Get the first user from database
-        const [firstUser] = await db.select().from(users).limit(1);
+        // Get the first user from database (ordered by creation date)
+        const [firstUser] = await db.select().from(users).orderBy(asc(users.createdAt)).limit(1);
 
         if (firstUser) {
           // Create JWT token for this user

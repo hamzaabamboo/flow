@@ -6,6 +6,7 @@ import { Home, RefreshCw, ChevronLeft, Search, ServerCrash, ShieldOff } from 'lu
 import { Button } from '../../components/ui/button';
 import { Text } from '../../components/ui/text';
 import { Box, VStack, HStack, Center } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 
 function Page() {
   const pageContext = usePageContext();
@@ -21,15 +22,13 @@ function Page() {
     subtitle: string;
     message: string;
     icon: React.ReactNode;
-    color: string;
   } => {
     if (is404) {
       return {
         title: '404',
         subtitle: 'Page Not Found',
         message: 'Oops! Looks like this page took a wrong turn at the kanban board.',
-        icon: <Search width="64" height="64" />,
-        color: 'blue'
+        icon: <Search width="64" height="64" />
       };
     }
 
@@ -38,8 +37,7 @@ function Page() {
         title: '403',
         subtitle: 'Access Denied',
         message: "You don't have permission to access this resource.",
-        icon: <ShieldOff width="64" height="64" />,
-        color: 'orange'
+        icon: <ShieldOff width="64" height="64" />
       };
     }
 
@@ -48,8 +46,7 @@ function Page() {
         title: '401',
         subtitle: 'Authentication Required',
         message: 'Please log in to access this page.',
-        icon: <ShieldOff width="64" height="64" />,
-        color: 'yellow'
+        icon: <ShieldOff width="64" height="64" />
       };
     }
 
@@ -61,12 +58,11 @@ function Page() {
         typeof errorReason === 'string'
           ? errorReason
           : 'Our servers are having a moment. Please try again later.',
-      icon: <ServerCrash width="64" height="64" />,
-      color: 'red'
+      icon: <ServerCrash width="64" height="64" />
     };
   };
 
-  const { title, subtitle, message, icon, color } = getErrorContent();
+  const { title, subtitle, message, icon } = getErrorContent();
 
   const handleGoBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -88,13 +84,22 @@ function Page() {
     }
   };
 
+  const errorIconStyles = css({
+    '&[data-error-type="404"]': { colorPalette: 'blue' },
+    '&[data-error-type="403"]': { colorPalette: 'orange' },
+    '&[data-error-type="500"]': { colorPalette: 'red' }
+  });
+
+  const errorType = is404 ? '404' : statusCode === 403 ? '403' : '500';
+
   return (
     <Center minH="100vh" p="6" bg="bg.subtle">
       <VStack gap="8" maxW="md" textAlign="center">
         <Box
-          colorPalette={color}
+          data-error-type={errorType}
           color="colorPalette.default"
           animation="pulse 2s ease-in-out infinite"
+          className={errorIconStyles}
           opacity="0.8"
         >
           {icon}

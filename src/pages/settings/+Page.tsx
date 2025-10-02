@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Moon, Keyboard, Download, Upload, Sunrise, Sunset } from 'lucide-react';
+import { Bell, Moon, Keyboard, Download, Upload, Sunrise, Sunset, Calendar } from 'lucide-react';
 import { Box, VStack, HStack, Center } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import * as Fieldset from '../../components/ui/styled/fieldset';
@@ -10,6 +10,7 @@ import { Switch } from '../../components/ui/switch';
 import { Spinner } from '../../components/ui/spinner';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useToaster } from '../../contexts/ToasterContext';
+import { Input } from '../../components/ui/input';
 
 interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
@@ -67,6 +68,16 @@ export default function SettingsPage() {
     }
   });
 
+  // Fetch iCal feed URL
+  const { data: calendarFeed } = useQuery<{ url: string; instructions: string }>({
+    queryKey: ['calendar-feed'],
+    queryFn: async () => {
+      const response = await fetch('/api/calendar/feed-url');
+      if (!response.ok) throw new Error('Failed to fetch calendar feed URL');
+      return response.json();
+    }
+  });
+
   // Test HamBot integration (actually sends via HamBot)
   const testSummary = useMutation({
     mutationFn: async ({ type }: { type: 'morning' | 'evening' }) => {
@@ -98,6 +109,22 @@ export default function SettingsPage() {
     }
   });
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast?.('Calendar URL copied to clipboard', {
+        title: 'Copied!',
+        type: 'success',
+        duration: 3000
+      });
+    } catch {
+      toast?.('Failed to copy to clipboard', {
+        title: 'Error',
+        type: 'error'
+      });
+    }
+  };
+
   const handleToggle = (path: string[], value: boolean | ('work' | 'personal')[]) => {
     if (!settings) return;
 
@@ -125,7 +152,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} minH="full">
+    <Box data-space={currentSpace} minH="full">
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <Box>
@@ -200,7 +227,7 @@ export default function SettingsPage() {
                   <HStack justifyContent="space-between">
                     <VStack gap="1" alignItems="start">
                       <HStack gap="2">
-                        <Sunrise width="16" height="16" color="var(--colors-fg-muted)" />
+                        <Sunrise width="16" height="16" color="fg.muted" />
                         <Text fontWeight="medium">Morning summary</Text>
                       </HStack>
                       <Text color="fg.muted" fontSize="sm">
@@ -218,7 +245,7 @@ export default function SettingsPage() {
                   <HStack justifyContent="space-between">
                     <VStack gap="1" alignItems="start">
                       <HStack gap="2">
-                        <Sunset width="16" height="16" color="var(--colors-fg-muted)" />
+                        <Sunset width="16" height="16" color="fg.muted" />
                         <Text fontWeight="medium">Evening summary</Text>
                       </HStack>
                       <Text color="fg.muted" fontSize="sm">
@@ -253,7 +280,10 @@ export default function SettingsPage() {
                             ? settings.notifications.summarySpaces.filter((s) => s !== 'work')
                             : [...settings.notifications.summarySpaces, 'work'];
                           if (newSpaces.length > 0) {
-                            handleToggle(['notifications', 'summarySpaces'], newSpaces);
+                            handleToggle(
+                              ['notifications', 'summarySpaces'],
+                              newSpaces as ('work' | 'personal')[]
+                            );
                           }
                         }}
                       >
@@ -273,7 +303,10 @@ export default function SettingsPage() {
                             ? settings.notifications.summarySpaces.filter((s) => s !== 'personal')
                             : [...settings.notifications.summarySpaces, 'personal'];
                           if (newSpaces.length > 0) {
-                            handleToggle(['notifications', 'summarySpaces'], newSpaces);
+                            handleToggle(
+                              ['notifications', 'summarySpaces'],
+                              newSpaces as ('work' | 'personal')[]
+                            );
                           }
                         }}
                       >
@@ -312,6 +345,74 @@ export default function SettingsPage() {
                       </Button>
                     </HStack>
                   </HStack>
+                </VStack>
+              </Fieldset.Root>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+
+        {/* Calendar Integration Section */}
+        <Card.Root>
+          <Card.Header>
+            <HStack gap="2">
+              <Calendar width="20" height="20" />
+              <Heading size="lg">Calendar Integration</Heading>
+            </HStack>
+          </Card.Header>
+          <Card.Body>
+            <VStack gap="4" alignItems="stretch">
+              <Fieldset.Root>
+                <Fieldset.Legend>iCal Subscription</Fieldset.Legend>
+                <VStack gap="4" alignItems="stretch" mt="4">
+                  <Fieldset.HelperText>
+                    Subscribe to your HamFlow tasks in any calendar app (Google Calendar, Apple
+                    Calendar, Outlook, etc.)
+                  </Fieldset.HelperText>
+
+                  {calendarFeed && (
+                    <>
+                      <VStack gap="2" alignItems="stretch">
+                        <Text fontSize="sm" fontWeight="medium">
+                          Your Calendar Feed URL:
+                        </Text>
+                        <HStack gap="2">
+                          <Input
+                            value={calendarFeed.url}
+                            readOnly
+                            onClick={(e) => e.currentTarget.select()}
+                            fontFamily="mono"
+                            fontSize="sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              void copyToClipboard(calendarFeed.url);
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </HStack>
+                      </VStack>
+
+                      <VStack gap="2" alignItems="start">
+                        <Text fontSize="sm" fontWeight="medium">
+                          How to use:
+                        </Text>
+                        <VStack gap="1" alignItems="start" color="fg.muted" fontSize="sm">
+                          <Text>• Copy the URL above</Text>
+                          <Text>
+                            • In your calendar app, find &quot;Add calendar by URL&quot; or
+                            &quot;Subscribe to calendar&quot;
+                          </Text>
+                          <Text>• Paste the URL and save</Text>
+                          <Text>
+                            • Your tasks will sync automatically (updates may take a few minutes)
+                          </Text>
+                        </VStack>
+                      </VStack>
+                    </>
+                  )}
                 </VStack>
               </Fieldset.Root>
             </VStack>

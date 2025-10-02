@@ -92,7 +92,7 @@ export default function InboxPage() {
   }
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+    <Box data-space={currentSpace} p="6">
       <VStack gap="6" alignItems="stretch">
         <HStack justifyContent="space-between" alignItems="center">
           <VStack gap="1" alignItems="start">

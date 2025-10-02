@@ -4,6 +4,7 @@ import { format, startOfWeek, endOfWeek, addDays, isSameDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, ExternalLink } from 'lucide-react';
 import { navigate } from 'vike/client/router';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
+import { css } from '../../../styled-system/css';
 import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -347,7 +348,7 @@ export default function AgendaPage() {
   }, [events, viewMode, selectedDate]);
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p={{ base: '2', md: '4' }}>
+    <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <VStack gap="4" alignItems="stretch" width="100%">
@@ -465,20 +466,37 @@ export default function AgendaPage() {
 
                   return (
                     <Box
+                      className={css({
+                        borderColor: 'border.default',
+                        bg: 'bg.default',
+                        opacity: 1,
+                        '&[data-is-today=true]': {
+                          borderColor: 'colorPalette.default',
+                          bg: 'colorPalette.subtle'
+                        },
+                        '&[data-is-past=true]': {
+                          opacity: 0.7
+                        }
+                      })}
                       key={date.toISOString()}
-                      borderColor={isToday ? 'colorPalette.default' : 'border.default'}
+                      data-is-today={isToday}
+                      data-is-past={isPast}
                       borderRadius="lg"
                       borderWidth="1px"
-                      bg={isToday ? 'colorPalette.subtle' : 'bg.default'}
-                      opacity={isPast ? 0.7 : 1}
                       overflow="hidden"
                     >
                       {/* Day Header */}
                       <Box
+                        className={css({
+                          bg: 'bg.subtle',
+                          '&[data-is-today=true]': {
+                            bg: 'colorPalette.subtle'
+                          }
+                        })}
+                        data-is-today={isToday}
                         borderBottomWidth="1px"
                         borderBottomColor="border.default"
                         p="2"
-                        bg={isToday ? 'colorPalette.subtle' : 'bg.subtle'}
                       >
                         <VStack gap="0.5" alignItems="center">
                           <Text
@@ -545,6 +563,12 @@ export default function AgendaPage() {
                                 const habit = item.item;
                                 return (
                                   <Box
+                                    className={css({
+                                      bg: 'bg.muted',
+                                      '&[data-completed=true]': {
+                                        bg: 'green.subtle'
+                                      }
+                                    })}
                                     key={`habit-${habit.id}-${dateKey}`}
                                     onClick={() =>
                                       toggleHabitMutation.mutate({
@@ -553,12 +577,12 @@ export default function AgendaPage() {
                                         completed: !habit.completedToday
                                       })
                                     }
+                                    data-completed={habit.completedToday}
                                     cursor="pointer"
                                     borderLeftWidth="3px"
                                     borderLeftColor="colorPalette.default"
                                     borderRadius="sm"
                                     p="1.5"
-                                    bg={habit.completedToday ? 'green.subtle' : 'bg.muted'}
                                     transition="all 0.2s"
                                     _hover={{ bg: 'bg.subtle' }}
                                   >
@@ -617,19 +641,11 @@ export default function AgendaPage() {
                                 );
                               } else {
                                 const event = item.item;
-                                const colorPalette =
-                                  event.priority === 'urgent'
-                                    ? 'red'
-                                    : event.priority === 'high'
-                                      ? 'orange'
-                                      : event.priority === 'medium'
-                                        ? 'yellow'
-                                        : 'gray';
                                 return (
                                   <Box
                                     key={`${event.id}-${event.instanceDate}`}
                                     onClick={() => handleTaskClick(event)}
-                                    colorPalette={colorPalette}
+                                    data-priority={event.priority || 'none'}
                                     cursor="pointer"
                                     borderLeftWidth="3px"
                                     borderLeftColor="colorPalette.default"
@@ -812,6 +828,12 @@ export default function AgendaPage() {
                     <VStack gap="1.5" alignItems="stretch">
                       {habits?.map((habit) => (
                         <HStack
+                          className={css({
+                            bg: 'bg.subtle',
+                            '&[data-completed=true]': {
+                              bg: 'green.subtle'
+                            }
+                          })}
                           key={habit.id}
                           onClick={() =>
                             toggleHabitMutation.mutate({
@@ -820,11 +842,11 @@ export default function AgendaPage() {
                               completed: !habit.completedToday
                             })
                           }
+                          data-completed={habit.completedToday}
                           cursor="pointer"
                           justifyContent="space-between"
                           borderRadius="md"
                           p="1.5"
-                          bg={habit.completedToday ? 'green.subtle' : 'bg.subtle'}
                           transition="all 0.2s"
                           _hover={{ bg: 'bg.emphasized' }}
                         >
@@ -918,7 +940,7 @@ export default function AgendaPage() {
             }
           }}
           mode={editingTask ? 'edit' : 'create'}
-          task={editingTask || undefined}
+          task={editingTask ? (editingTask as Task) : undefined}
           onSubmit={handleDialogSubmit}
         />
       </VStack>

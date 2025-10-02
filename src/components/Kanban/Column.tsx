@@ -7,6 +7,7 @@ import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
 import { TaskCard } from './TaskCard';
 import { VStack, HStack, Box } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 
 interface ColumnProps {
   column: {
@@ -69,22 +70,33 @@ export function Column({ column, onDragStart, onDrop, boardId }: ColumnProps) {
     }
   };
 
+  const dragOverStyles = css({
+    borderColor: 'transparent',
+    borderWidth: '1px',
+    bg: 'bg.muted',
+    borderStyle: 'solid',
+    '&[data-drag-over=true]': {
+      borderColor: 'colorPalette.default',
+      borderWidth: '2px',
+      bg: 'colorPalette.subtle',
+      borderStyle: 'dashed'
+    }
+  });
+
   return (
     <Box
+      className={dragOverStyles}
+      data-drag-over={isDragOver}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       display="flex"
       flexDirection="column"
-      borderColor={isDragOver ? 'colorPalette.default' : undefined}
       borderRadius="lg"
-      borderWidth={isDragOver ? '2px' : undefined}
       minWidth="320px"
       maxHeight="100%"
       p="4"
-      bg={isDragOver ? 'colorPalette.subtle' : 'bg.muted'}
       transition="all 0.2s"
-      borderStyle={isDragOver ? 'dashed' : undefined}
     >
       <HStack justifyContent="space-between" alignItems="center" mb="4">
         <Text fontSize="md" fontWeight="semibold">

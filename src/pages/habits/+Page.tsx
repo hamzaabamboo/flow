@@ -181,7 +181,7 @@ export default function HabitsPage() {
   const filteredHabits = habits?.filter((h) => h.space === currentSpace) || [];
 
   return (
-    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p="6">
+    <Box data-space={currentSpace} p="6">
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <HStack justifyContent="space-between">

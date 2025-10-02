@@ -1,43 +1,12 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { and, eq, gte, lte, isNotNull, inArray, between } from 'drizzle-orm';
+import { and, eq, isNotNull, inArray, gte, lte } from 'drizzle-orm';
+import ical, { ICalEventStatus, ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
 import { db } from '../db';
-import {
-  tasks,
-  boards,
-  reminders,
-  pomodoroSessions,
-  taskCompletions,
-  habits,
-  habitLogs,
-  columns,
-  subtasks
-} from '../../../drizzle/schema';
+import { tasks, boards, taskCompletions, habits, columns, subtasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
-
-// Helper function to format date for iCal
-function formatICalDate(date: Date): string {
-  return date
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\.\d{3}/, '');
-}
-
-// Helper function to escape text for iCal
-function escapeICalText(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n');
-}
-
-// Generate a unique ID for iCal events
-function generateEventId(id: string, domain: string = 'hamflow.local'): string {
-  return `${id}@${domain}`;
-}
 
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .use(withAuth())
@@ -58,7 +27,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
     };
   })
 
-  // Generate iCal feed for tasks and reminders
+  // Generate iCal feed for tasks and habits only
   .get(
     '/ical/:userId/:token',
     async ({ params, db, set }) => {
@@ -74,6 +43,17 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         return 'Unauthorized';
       }
 
+      // Create calendar
+      const calendar = ical({
+        name: 'HamFlow Tasks & Habits',
+        description: 'Your tasks and habits from HamFlow',
+        timezone: 'UTC',
+        prodId: {
+          company: 'HamFlow',
+          product: 'Tasks Calendar'
+        }
+      });
+
       // Fetch user's tasks with due dates
       const userTasks = await db
         .select({
@@ -85,6 +65,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           completed: tasks.completed,
           recurringPattern: tasks.recurringPattern,
           recurringEndDate: tasks.recurringEndDate,
+          metadata: tasks.metadata,
           boardId: boards.id,
           boardName: boards.name,
           space: boards.space
@@ -94,77 +75,40 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         .leftJoin(boards, eq(columns.boardId, boards.id))
         .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
 
-      // Fetch reminders
-      const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
-
-      // Fetch habits for recurring events
-      const allUserHabits = await db.select().from(habits).where(eq(habits.userId, userId));
-
-      const endDate = new Date();
-      endDate.setFullYear(endDate.getFullYear() + 1);
-
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-
-      // Fetch habit logs for the date range
-      const _logs = await db
-        .select()
-        .from(habitLogs)
-        .where(
-          and(
-            inArray(
-              habitLogs.habitId,
-              allUserHabits.map((h) => h.id)
-            ),
-            between(habitLogs.date, startDate, endDate)
-          )
-        );
-
-      // Fetch recent pomodoro sessions
-      const recentPomodoros = await db
-        .select()
-        .from(pomodoroSessions)
-        .where(
-          and(
-            eq(pomodoroSessions.userId, userId),
-            gte(pomodoroSessions.startTime, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) // Last 30 days
-          )
-        );
-
-      // Build iCal content
-      const ical = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//HamFlow//Tasks Calendar//EN',
-        'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH',
-        'X-WR-CALNAME:HamFlow Tasks',
-        'X-WR-TIMEZONE:UTC',
-        'X-WR-CALDESC:Tasks and reminders from HamFlow'
-      ];
-
       // Add tasks as events
       for (const task of userTasks) {
         if (!task.dueDate) continue;
 
-        const eventId = generateEventId(task.id);
-        const now = new Date();
         const dueDate = new Date(task.dueDate);
+        const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-        // Set event duration (1 hour default for tasks)
-        const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        const taskUrl = task.boardId
+          ? `${baseUrl}/board/${task.boardId}`
+          : `${baseUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
 
-        ical.push('BEGIN:VEVENT');
-        ical.push(`UID:${eventId}`);
-        ical.push(`DTSTAMP:${formatICalDate(now)}`);
-        ical.push(`DTSTART:${formatICalDate(dueDate)}`);
-        ical.push(`DTEND:${formatICalDate(endDate)}`);
-        ical.push(`SUMMARY:${escapeICalText(`[${task.space || 'work'}] ${task.title}`)}`);
-
-        if (task.description) {
-          ical.push(`DESCRIPTION:${escapeICalText(task.description)}`);
+        // Build description with metadata link if available
+        let eventDescription = task.description || '';
+        if (task.metadata?.link) {
+          eventDescription = eventDescription
+            ? `${eventDescription}\n\nLink: ${task.metadata.link}`
+            : `Link: ${task.metadata.link}`;
         }
 
+        const event = calendar.createEvent({
+          id: task.id,
+          start: dueDate,
+          end: endDate,
+          summary: `[${task.space || 'work'}] ${task.title}`,
+          description: eventDescription || undefined,
+          categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
+          url: taskUrl
+        });
+
+        // Set status - CANCELLED if completed, otherwise CONFIRMED
+        event.status(task.completed ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
+
+        // Set priority
         if (task.priority) {
           const priorityMap: Record<string, number> = {
             urgent: 1,
@@ -172,139 +116,100 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             medium: 5,
             low: 7
           };
-          ical.push(`PRIORITY:${priorityMap[task.priority] || 5}`);
-        }
-
-        if (task.completed) {
-          ical.push('STATUS:COMPLETED');
-        } else {
-          ical.push('STATUS:CONFIRMED');
+          event.priority(priorityMap[task.priority] || 5);
         }
 
         // Add RRULE for recurring tasks
         if (task.recurringPattern) {
           const pattern = task.recurringPattern.toLowerCase();
-          let rrule = '';
+
+          let freq: ICalEventRepeatingFreq | undefined;
           if (pattern === 'daily') {
-            rrule = 'RRULE:FREQ=DAILY';
+            freq = ICalEventRepeatingFreq.DAILY;
           } else if (pattern === 'weekly') {
-            rrule = 'RRULE:FREQ=WEEKLY';
+            freq = ICalEventRepeatingFreq.WEEKLY;
           } else if (pattern === 'monthly') {
-            rrule = 'RRULE:FREQ=MONTHLY';
+            freq = ICalEventRepeatingFreq.MONTHLY;
           } else if (pattern === 'yearly') {
-            rrule = 'RRULE:FREQ=YEARLY';
+            freq = ICalEventRepeatingFreq.YEARLY;
           }
 
-          // Add UNTIL parameter if recurring end date is set
-          if (rrule && task.recurringEndDate) {
-            const endDate = new Date(task.recurringEndDate);
-            rrule += `;UNTIL=${formatICalDate(endDate)}`;
-          }
-
-          if (rrule) {
-            ical.push(rrule);
+          if (freq) {
+            event.repeating({
+              freq,
+              until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
+            });
           }
         }
-
-        ical.push(`CATEGORIES:${task.space || 'work'},${task.boardName || 'tasks'}`);
-        ical.push('END:VEVENT');
       }
 
-      // Add reminders as events
-      for (const reminder of userReminders) {
-        const eventId = generateEventId(`reminder-${reminder.id}`);
-        const now = new Date();
-        const reminderDate = new Date(reminder.reminderTime);
-        const endDate = new Date(reminderDate.getTime() + 15 * 60 * 1000); // 15 min duration
+      // Fetch habits for recurring events (only active habits)
+      const allUserHabits = await db
+        .select()
+        .from(habits)
+        .where(and(eq(habits.userId, userId), eq(habits.active, true)));
 
-        ical.push('BEGIN:VEVENT');
-        ical.push(`UID:${eventId}`);
-        ical.push(`DTSTAMP:${formatICalDate(now)}`);
-        ical.push(`DTSTART:${formatICalDate(reminderDate)}`);
-        ical.push(`DTEND:${formatICalDate(endDate)}`);
-        ical.push(`SUMMARY:${escapeICalText(`[Reminder] ${reminder.message}`)}`);
-        ical.push('STATUS:CONFIRMED');
-        ical.push('CATEGORIES:reminders');
-
-        // Add alarm 5 minutes before
-        ical.push('BEGIN:VALARM');
-        ical.push('TRIGGER:-PT5M');
-        ical.push('ACTION:DISPLAY');
-        ical.push(`DESCRIPTION:${escapeICalText(reminder.message)}`);
-        ical.push('END:VALARM');
-
-        ical.push('END:VEVENT');
-      }
-
-      // Add completed pomodoro sessions
-      for (const session of recentPomodoros) {
-        if (!session.endTime) continue;
-
-        const eventId = generateEventId(`pomodoro-${session.id}`);
-        const now = new Date();
-
-        ical.push('BEGIN:VEVENT');
-        ical.push(`UID:${eventId}`);
-        ical.push(`DTSTAMP:${formatICalDate(now)}`);
-        ical.push(`DTSTART:${formatICalDate(new Date(session.startTime))}`);
-        ical.push(`DTEND:${formatICalDate(new Date(session.endTime))}`);
-        ical.push(`SUMMARY:${escapeICalText(`🍅 Pomodoro: ${session.type}`)}`);
-        ical.push('STATUS:COMPLETED');
-        ical.push('CATEGORIES:pomodoro');
-        ical.push('END:VEVENT');
-      }
-
-      // Add habits as recurring daily events
+      // Add habits as recurring events
       for (const habit of allUserHabits) {
-        const eventId = generateEventId(`habit-${habit.id}`);
-        const now = new Date();
+        // Parse reminder time or default to 9 AM
+        const [hours = 9, minutes = 0] = habit.reminderTime
+          ? habit.reminderTime.split(':').map(Number)
+          : [9, 0];
 
-        // Set start time to 9 AM today
-        const startDate = new Date();
-        startDate.setHours(9, 0, 0, 0);
+        // Use habit creation date as the start date
+        const startDate = new Date(habit.createdAt);
+        startDate.setUTCHours(hours, minutes, 0, 0);
         const endDate = new Date(startDate);
-        endDate.setMinutes(30); // 30 minute duration for habits
+        endDate.setUTCMinutes(minutes + 30); // 30 minute duration for habits
 
-        ical.push('BEGIN:VEVENT');
-        ical.push(`UID:${eventId}`);
-        ical.push(`DTSTAMP:${formatICalDate(now)}`);
-        ical.push(`DTSTART:${formatICalDate(startDate)}`);
-        ical.push(`DTEND:${formatICalDate(endDate)}`);
-        ical.push(`SUMMARY:${escapeICalText(`[Habit] ${habit.name}`)}`);
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        const habitUrl = `${baseUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
 
-        if (habit.description) {
-          ical.push(`DESCRIPTION:${escapeICalText(habit.description)}`);
+        // Build description with metadata link if available
+        let habitDescription = habit.description || '';
+        if (habit.metadata?.link) {
+          habitDescription = habitDescription
+            ? `${habitDescription}\n\nLink: ${habit.metadata.link}`
+            : `Link: ${habit.metadata.link}`;
         }
+
+        const event = calendar.createEvent({
+          id: `habit-${habit.id}`,
+          start: startDate,
+          end: endDate,
+          summary: habit.name,
+          description: habitDescription || undefined,
+          categories: [{ name: habit.space || 'personal' }, { name: 'habits' }],
+          allDay: false,
+          url: habitUrl
+        });
+
+        event.status(ICalEventStatus.CONFIRMED);
+        event.priority(5); // Default priority for habits
 
         // Add recurrence rule based on frequency
         if (habit.frequency === 'daily') {
-          ical.push('RRULE:FREQ=DAILY');
+          event.repeating({ freq: ICalEventRepeatingFreq.DAILY });
         } else if (habit.frequency === 'weekly') {
           // For weekly habits, specify which days
           const targetDays = habit.targetDays || [];
-          const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-          const byDay = targetDays.map((d) => dayNames[d]).join(',');
-          if (byDay) {
-            ical.push(`RRULE:FREQ=WEEKLY;BYDAY=${byDay}`);
-          } else {
-            ical.push('RRULE:FREQ=WEEKLY');
-          }
+          const dayNames: ICalWeekday[] = [
+            ICalWeekday.SU,
+            ICalWeekday.MO,
+            ICalWeekday.TU,
+            ICalWeekday.WE,
+            ICalWeekday.TH,
+            ICalWeekday.FR,
+            ICalWeekday.SA
+          ];
+          const byDay = targetDays.map((d) => dayNames[d]);
+
+          event.repeating({
+            freq: ICalEventRepeatingFreq.WEEKLY,
+            byDay: byDay.length > 0 ? byDay : undefined
+          });
         }
-
-        ical.push('STATUS:CONFIRMED');
-        ical.push('CATEGORIES:habits');
-
-        // Add a reminder 15 minutes before
-        ical.push('BEGIN:VALARM');
-        ical.push('TRIGGER:-PT15M');
-        ical.push('ACTION:DISPLAY');
-        ical.push(`DESCRIPTION:${escapeICalText(`Time for: ${habit.name}`)}`);
-        ical.push('END:VALARM');
-
-        ical.push('END:VEVENT');
       }
-
-      ical.push('END:VCALENDAR');
 
       // Set response headers for iCal
       set.headers = {
@@ -312,7 +217,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         'Content-Disposition': 'attachment; filename="hamflow.ics"'
       };
 
-      return ical.join('\r\n');
+      return calendar.toString();
     },
     {
       params: t.Object({
@@ -452,57 +357,6 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         start: t.String(),
         end: t.String(),
         space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')]))
-      })
-    }
-  )
-
-  // Create a calendar event from a task
-  .post(
-    '/create-from-task',
-    async ({ body, db, user }) => {
-      const { taskId } = body;
-
-      // Get task details
-      const [task] = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
-        .limit(1);
-
-      if (!task) {
-        return { error: 'Task not found' };
-      }
-
-      // Return iCal format for this specific task
-      const now = new Date();
-      const dueDate = task.dueDate || new Date();
-      const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
-
-      const ical = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//HamFlow//Task Event//EN',
-        'BEGIN:VEVENT',
-        `UID:${generateEventId(task.id)}`,
-        `DTSTAMP:${formatICalDate(now)}`,
-        `DTSTART:${formatICalDate(dueDate)}`,
-        `DTEND:${formatICalDate(endDate)}`,
-        `SUMMARY:${escapeICalText(task.title)}`,
-        task.description ? `DESCRIPTION:${escapeICalText(task.description)}` : '',
-        'END:VEVENT',
-        'END:VCALENDAR'
-      ]
-        .filter((line) => line)
-        .join('\r\n');
-
-      return {
-        ical,
-        downloadUrl: `/api/calendar/download-task/${taskId}`
-      };
-    },
-    {
-      body: t.Object({
-        taskId: t.String()
       })
     }
   );
