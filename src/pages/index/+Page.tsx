@@ -347,12 +347,7 @@ export default function AgendaPage() {
   }, [events, viewMode, selectedDate]);
 
   return (
-    <Box
-      colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}
-      maxH="100vh"
-      p={{ base: '2', md: '4' }}
-      overflow="auto"
-    >
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p={{ base: '2', md: '4' }}>
       <VStack gap="6" alignItems="stretch">
         {/* Header */}
         <VStack gap="4" alignItems="stretch" width="100%">

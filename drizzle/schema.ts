@@ -20,6 +20,11 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }),
+  settings: jsonb('settings').$type<{
+    eveningSummaryEnabled?: boolean;
+    morningSummaryEnabled?: boolean;
+    summarySpaces?: ('work' | 'personal')[];
+  }>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -33,6 +38,11 @@ export const boards = pgTable('boards', {
   name: varchar('name', { length: 255 }).notNull(),
   space: spaceEnum('space').notNull(), // 'work' or 'personal'
   columnOrder: jsonb('column_order').notNull().default([]),
+  settings: jsonb('settings').$type<{
+    reminderMinutesBefore?: number;
+    enableAutoReminders?: boolean;
+    dailySummaryEnabled?: boolean;
+  }>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -72,6 +82,7 @@ export const tasks = pgTable('tasks', {
   parentTaskId: uuid('parent_task_id').references((): AnyPgColumn => tasks.id, {
     onDelete: 'cascade'
   }),
+  reminderMinutesBefore: integer('reminder_minutes_before'), // Task-level override (NULL = use board default)
   metadata: jsonb('metadata').$type<{
     link?: string;
     attachments?: string[];

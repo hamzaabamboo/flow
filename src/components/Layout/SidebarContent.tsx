@@ -9,7 +9,8 @@ import {
   Command,
   Timer,
   LogOut,
-  CheckSquare
+  CheckSquare,
+  Settings
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type { InboxItem, Task, Habit } from '../../shared/types';
@@ -193,6 +194,22 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           <Timer style={{ marginRight: '12px' }} width="20" height="20" />
           Timer
         </Button>
+
+        <Link href="/settings" onClick={onNavigate} style={{ width: '100%' }}>
+          <Button
+            variant="ghost"
+            size="md"
+            data-active={isActiveRoute('/settings', currentPath) ? 'true' : undefined}
+            justifyContent="flex-start"
+            w="full"
+            color="fg.muted"
+            _active={{ bg: 'bg.emphasized' }}
+            _hover={{ bg: 'bg.emphasized' }}
+          >
+            <Settings style={{ marginRight: '12px' }} width="20" height="20" />
+            Settings
+          </Button>
+        </Link>
       </VStack>
 
       <Divider />

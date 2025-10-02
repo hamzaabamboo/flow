@@ -23,6 +23,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!response.ok) {
           if (response.status === 401) {
+            // Clear any stale cookies by attempting logout
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include'
+              });
+            } catch {
+              // Ignore logout errors
+            }
+            // Clear all cookies manually as fallback
+            document.cookie.split(';').forEach((c) => {
+              document.cookie = c
+                .replace(/^ +/, '')
+                .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+            });
             return null;
           }
           throw new Error('Failed to fetch user');

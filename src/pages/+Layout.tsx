@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Menu, Search, Bell, Sparkles } from 'lucide-react';
+import { Menu, Search, Sparkles } from 'lucide-react';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { SpaceProvider, useSpace } from '../contexts/SpaceContext';
 import { ColorModeProvider } from '../contexts/ColorModeContext';
+import { ToasterProvider } from '../contexts/ToasterProvider';
 import { Sidebar } from '../components/Layout/Sidebar';
 import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
 import { CommandBar } from '../components/CommandBar/CommandBar';
 import { PomodoroTimer } from '../components/Pomodoro/PomodoroTimer';
+import { NotificationDropdown } from '../components/Layout/NotificationDropdown';
 import { useWebSocket } from '../hooks/useWebSocket';
 import ErrorBoundary from '../components/utils/ErrorBoundary';
 import { Text } from '../components/ui/text';
@@ -114,26 +116,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <HStack gap="2">
             <ColorModeToggle />
 
-            <IconButton
-              variant="ghost"
-              size="md"
-              aria-label="Notifications"
-              position="relative"
-              color="fg.muted"
-              _hover={{ bg: 'bg.subtle' }}
-            >
-              <Bell width="20" height="20" />
-              <Box
-                colorPalette="red"
-                position="absolute"
-                top="2"
-                right="2"
-                borderRadius="full"
-                w="2"
-                h="2"
-                bg="colorPalette.default"
-              />
-            </IconButton>
+            <NotificationDropdown />
 
             <Button
               variant="solid"
@@ -220,7 +203,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return (
-      <Box minHeight="100vh" bg="bg.subtle">
+      <Box colorPalette="blue" minHeight="100vh" bg="bg.subtle">
         {children}
       </Box>
     );
@@ -259,13 +242,22 @@ function AppContent({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <Box
         as="main"
-        minHeight="calc(100vh - 64px)"
+        position="relative"
+        h="100vh"
         ml={{ base: 0, lg: '280px' }}
-        mt="64px"
+        pt="64px"
         bg="bg.subtle"
+        overflowX="auto"
         transition="all 0.3s"
       >
-        <Box maxW="1600px" mx="auto" p={{ base: '4', md: '6', lg: '8' }}>
+        <Box
+          position="absolute"
+          w="full"
+          maxW="1600px"
+          minH="calc(100vh - 64px)"
+          mx="auto"
+          p={{ base: '4', md: '6', lg: '8' }}
+        >
           {children}
         </Box>
       </Box>
@@ -323,7 +315,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
         bg="bg.subtle"
         transition="all 0.3s"
       >
-        <Box maxW="1600px" mx="auto" p={{ base: '4', md: '6', lg: '8' }}>
+        <Box
+          maxW="1600px"
+          mx="auto"
+          p={{ base: '4', md: '6', lg: '8' }}
+          pb={{ base: '20', md: '8' }}
+        >
           {children}
         </Box>
       </Box>
@@ -342,35 +339,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <ColorModeProvider>
         <AuthProvider>
           <SpaceProvider>
-            <Box id="app">
-              <style>{`
-                @keyframes spin {
-                  from { transform: rotate(0deg); }
-                  to { transform: rotate(360deg); }
-                }
-                @keyframes slideDown {
-                  from {
-                    opacity: 0;
-                    transform: translateY(-20px);
+            <ToasterProvider>
+              <Box id="app">
+                <style>{`
+                  @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                   }
-                  to {
-                    opacity: 1;
-                    transform: translateY(0);
+                  @keyframes slideDown {
+                    from {
+                      opacity: 0;
+                      transform: translateY(-20px);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateY(0);
+                    }
                   }
-                }
-                @keyframes slideIn {
-                  from {
-                    transform: translateX(-100%);
+                  @keyframes slideIn {
+                    from {
+                      transform: translateX(-100%);
+                    }
+                    to {
+                      transform: translateX(0);
+                    }
                   }
-                  to {
-                    transform: translateX(0);
-                  }
-                }
-              `}</style>
-              <ErrorBoundary>
-                <AppContent>{children}</AppContent>
-              </ErrorBoundary>
-            </Box>
+                `}</style>
+                <ErrorBoundary>
+                  <AppContent>{children}</AppContent>
+                </ErrorBoundary>
+              </Box>
+            </ToasterProvider>
           </SpaceProvider>
         </AuthProvider>
       </ColorModeProvider>

@@ -1,15 +1,9 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, or, sql, ilike, desc, asc } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
-import {
-  boards,
-  columns,
-  tasks,
-  subtasks,
-  reminders,
-  taskCompletions
-} from '../../../drizzle/schema';
+import { boards, columns, tasks, subtasks, taskCompletions } from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
+import { ReminderSyncService } from '../services/reminder-sync';
 
 export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   .use(withAuth())
@@ -140,10 +134,49 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     async ({ body, db, user }) => {
       const metadata = body.link ? { link: body.link } : {};
 
+      // If no columnId provided, find or create a default column
+      let columnId = body.columnId;
+      if (!columnId) {
+        // Find user's first board in the current space (assuming we have space in body or use default)
+        const userBoards = await db
+          .select()
+          .from(boards)
+          .where(eq(boards.userId, user.id))
+          .limit(1);
+
+        if (userBoards.length === 0) {
+          throw new Error('No boards found. Please create a board first.');
+        }
+
+        // Find or create a "To Do" column in the first board
+        const [defaultColumn] = await db
+          .select()
+          .from(columns)
+          .where(and(eq(columns.boardId, userBoards[0].id), eq(columns.name, 'To Do')))
+          .limit(1);
+
+        if (!defaultColumn) {
+          // Create a default "To Do" column
+          const [newColumn] = await db
+            .insert(columns)
+            .values({
+              boardId: userBoards[0].id,
+              name: 'To Do',
+              position: 0,
+              taskOrder: []
+            })
+            .returning();
+          columnId = newColumn.id;
+        } else {
+          columnId = defaultColumn.id;
+        }
+      }
+
       const [newTask] = await db
         .insert(tasks)
         .values({
           ...body,
+          columnId,
           userId: user.id,
           priority: body.priority as 'low' | 'medium' | 'high' | 'urgent',
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
@@ -151,29 +184,22 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           recurringPattern: body.recurringPattern,
           recurringEndDate: body.recurringEndDate ? new Date(body.recurringEndDate) : null,
           parentTaskId: body.parentTaskId,
+          reminderMinutesBefore: body.reminderMinutesBefore,
           metadata
         })
         .returning();
 
-      // Create reminder if due date is set
-      if (body.dueDate && body.createReminder) {
-        const reminderTime = new Date(body.dueDate);
-        reminderTime.setHours(reminderTime.getHours() - 1);
-
-        await db.insert(reminders).values({
-          userId: user.id,
-          taskId: String(newTask.id),
-          reminderTime,
-          message: `Task "${String(newTask.title)}" is due soon`,
-          platform: 'discord'
-        });
-      }
-
-      // Handle recurring task creation
-      if (body.recurringPattern && body.dueDate) {
-        // This would be handled by a cron job that checks for recurring tasks
-        // and creates new instances when needed
-      }
+      // Auto-create reminder using sync service
+      const reminderSync = new ReminderSyncService(db);
+      await reminderSync.syncReminders({
+        userId: user.id,
+        taskId: newTask.id,
+        taskTitle: newTask.title,
+        columnId: newTask.columnId,
+        dueDate: newTask.dueDate,
+        completed: newTask.completed || false,
+        reminderOverride: body.reminderMinutesBefore
+      });
 
       // Broadcast task creation
       wsManager.broadcastTaskUpdate(newTask.id, newTask.columnId, 'created');
@@ -185,7 +211,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     },
     {
       body: t.Object({
-        columnId: t.String(),
+        columnId: t.Optional(t.String()),
         title: t.String(),
         description: t.Optional(t.String()),
         dueDate: t.Optional(t.String()),
@@ -196,7 +222,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         recurringPattern: t.Optional(t.Union([t.String(), t.Null()])),
         recurringEndDate: t.Optional(t.Union([t.String(), t.Null()])),
         parentTaskId: t.Optional(t.String()),
-        createReminder: t.Optional(t.Boolean()),
+        reminderMinutesBefore: t.Optional(t.Number()),
         link: t.Optional(t.String())
       })
     }
@@ -318,25 +344,17 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         }
       }
 
-      // Update reminder if due date changed
-      if (body.dueDate !== undefined && body.updateReminder) {
-        // Delete existing reminder
-        await db.delete(reminders).where(eq(reminders.taskId, params.id));
-
-        // Create new reminder if due date is set
-        if (body.dueDate) {
-          const reminderTime = new Date(body.dueDate);
-          reminderTime.setHours(reminderTime.getHours() - 1);
-
-          await db.insert(reminders).values({
-            userId: user.id,
-            taskId: params.id,
-            reminderTime,
-            message: `Task "${String(updated.title)}" is due soon`,
-            platform: 'discord'
-          });
-        }
-      }
+      // Sync reminders when task changes
+      const reminderSync = new ReminderSyncService(db);
+      await reminderSync.syncReminders({
+        userId: user.id,
+        taskId: updated.id,
+        taskTitle: updated.title,
+        columnId: updated.columnId,
+        dueDate: updated.dueDate,
+        completed: updated.completed || false,
+        reminderOverride: body.reminderMinutesBefore ?? updated.reminderMinutesBefore
+      });
 
       // Broadcast task update
       wsManager.broadcastTaskUpdate(updated.id, updated.columnId, 'updated');
@@ -359,7 +377,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         subtasks: t.Optional(t.Any()),
         recurringPattern: t.Optional(t.String()),
         recurringEndDate: t.Optional(t.String()),
-        updateReminder: t.Optional(t.Boolean()),
+        reminderMinutesBefore: t.Optional(t.Number()),
         instanceDate: t.Optional(t.String()),
         link: t.Optional(t.String())
       })

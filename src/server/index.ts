@@ -23,8 +23,9 @@ import { habitsRoutes } from './routes/habits';
 import { commandRoutes } from './routes/command';
 import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
+import { remindersRoutes } from './routes/reminders';
 import { oidcAuth } from './auth/oidc';
-import { reminderCron } from './cron';
+import { cronJobs } from './cron';
 import { wsManager } from './websocket';
 import { users } from 'drizzle/schema';
 
@@ -74,7 +75,7 @@ app
   // Public webhook endpoints
   .use(webhookRoutes)
   // Cron jobs
-  .use(reminderCron)
+  .use(cronJobs)
   // Protected API Routes
   .group('/api', (api) =>
     api
@@ -89,6 +90,7 @@ app
       .use(searchRoutes)
       .use(settingsRoutes)
       .use(calendarRoutes)
+      .use(remindersRoutes)
   )
   // WebSocket for real-time updates
   .ws('/ws', {

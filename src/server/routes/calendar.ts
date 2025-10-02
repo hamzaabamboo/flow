@@ -434,31 +434,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         completionMap
       );
 
-      // Fetch reminders in range
-      const remindersData = await db
-        .select({
-          id: reminders.id,
-          message: reminders.message,
-          reminderTime: reminders.reminderTime
-        })
-        .from(reminders)
-        .where(
-          and(
-            eq(reminders.userId, user.id),
-            gte(reminders.reminderTime, startDate),
-            lte(reminders.reminderTime, endDate)
-          )
-        );
-
-      const reminderEvents = remindersData.map((reminder) => ({
-        id: reminder.id,
-        title: reminder.message,
-        dueDate: reminder.reminderTime,
-        type: 'reminder' as const
-      }));
-
       // Combine and sort by date
-      const allEvents = [...taskEvents, ...reminderEvents].sort((a, b) => {
+      const allEvents = [...taskEvents].sort((a, b) => {
         const aDate = a.dueDate;
         const bDate = b.dueDate;
         if (!aDate || !bDate) return 0;

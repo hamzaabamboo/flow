@@ -186,8 +186,7 @@ export default defineConfig({
       MozOsxFontSmoothing: 'grayscale',
       bg: 'bg.canvas',
       color: 'fg.default',
-      height: '100%',
-      overflow: 'hidden'
+      height: '100%'
     },
     '*': {
       boxSizing: 'border-box',

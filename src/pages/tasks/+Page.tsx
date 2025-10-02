@@ -197,12 +197,7 @@ export default function TasksPage() {
   }
 
   return (
-    <Box
-      colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}
-      maxH="100vh"
-      p={{ base: '2', md: '4' }}
-      overflow="auto"
-    >
+    <Box colorPalette={currentSpace === 'work' ? 'blue' : 'purple'} p={{ base: '2', md: '4' }}>
       {/* Header */}
       <VStack gap="6" justifyContent="flex-start" alignItems="stretch" w="full">
         <VStack gap="1" alignItems="start">

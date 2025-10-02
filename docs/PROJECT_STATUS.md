@@ -10,6 +10,36 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ### ✅ Completed This Session
 
+- **HamBot Daily Summaries** - Opt-in notification system with customization
+  - Added user settings for morning/evening summary preferences
+  - Settings stored in `users.settings` jsonb field (morningSummaryEnabled, eveningSummaryEnabled, summarySpaces)
+  - Cron jobs filter opted-in users at database level (10:00 AM and 10:00 PM JST)
+  - Users can choose to receive summaries for work/personal or both spaces combined
+  - Morning summary: Tasks due today, upcoming tasks (7 days), with greetings and instance link
+  - Evening summary: Completed count, unfinished tasks, incomplete habits, with greetings
+  - Tasks/habits show space indicators (💼 work, 🏠 personal)
+  - Test functionality in settings page sends actual HamBot messages
+  - Shared logic between cron and test endpoint via `sendDailySummary()` function
+
+- **Settings Page UI** - User preferences management
+  - Created comprehensive settings page with Park UI Fieldset components
+  - Morning/Evening summary toggles (functional)
+  - Summary space selector buttons (Work/Personal)
+  - Test summary buttons for both morning/evening
+  - Disabled unimplemented features with "(Coming soon)" labels
+  - Integrated toast notifications using ToasterContext/ToasterProvider
+
+- **Toast System** - Proper notification feedback
+  - Created ToasterContext and ToasterProvider based on sample project
+  - Created ToastContent component for rendering messages
+  - Wrapped app with ToasterProvider in Layout
+  - Uses `useToaster()` hook for showing success/error messages
+
+- **Layout Fixes** - Improved scrolling and spacing
+  - Fixed page scrolling by removing problematic `minHeight` constraint
+  - Simplified layout padding to just `pb="24"`
+  - Removed excessive responsive padding combinations
+
 - **Auto-Move Tasks on Completion** - Smart column management
   - When a task is marked complete from Tasks/Agenda pages, it automatically moves to "Done" column
   - When unchecked, task moves back to "To Do" column
@@ -100,7 +130,7 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| HamBot Integration | ⏳ | High - Notification system |
+| HamBot Daily Summaries | ✅ | High - Opt-in morning/evening summaries |
 | AI Command Parser | ⏳ | High - Natural language processing |
 | Productivity Analytics | ⏳ | Medium - Charts and insights |
 | Focus Mode | ⏳ | Medium - Distraction-free UI |
@@ -160,5 +190,5 @@ All core tables implemented:
 
 ---
 
-**Last Updated**: 2025-10-01
-**Next Review**: Before starting Phase 4 features
+**Last Updated**: 2025-10-02
+**Next Review**: Before starting AI Command Parser feature

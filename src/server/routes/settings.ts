@@ -1,4 +1,6 @@
 import { Elysia, t } from 'elysia';
+import { eq } from 'drizzle-orm';
+import { users } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 
 // User preferences/settings
@@ -6,9 +8,17 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
   .use(withAuth())
 
   // Get user settings
-  .get('/', ({ db: _db, user: _user }) => {
-    // For now, return default settings
-    // In the future, this would fetch from a user_settings table
+  .get('/', async ({ db, user }) => {
+    const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
+    const userSettings =
+      (dbUser?.settings as {
+        eveningSummaryEnabled?: boolean;
+        morningSummaryEnabled?: boolean;
+        summarySpaces?: ('work' | 'personal')[];
+      } | null) || {};
+
+    // TODO: Store other settings (theme, defaultSpace, pomodoro, integrations) in users.settings
+    // Currently only morningSummary, eveningSummary, and summarySpaces are persisted
     return {
       theme: 'light',
       defaultSpace: 'work',
@@ -22,7 +32,10 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
         enabled: true,
         reminders: true,
         pomodoroComplete: true,
-        taskDue: true
+        taskDue: true,
+        morningSummary: userSettings.morningSummaryEnabled ?? false,
+        eveningSummary: userSettings.eveningSummaryEnabled ?? false,
+        summarySpaces: userSettings.summarySpaces ?? ['work', 'personal']
       },
       integrations: {
         hambot: false,
@@ -42,9 +55,33 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
   // Update user settings
   .patch(
     '/',
-    ({ body, db: _db, user: _user }) => {
-      // For now, just return the updated settings
-      // In the future, this would update a user_settings table
+    async ({ body, db, user }) => {
+      // Update user settings in database
+      if (body.notifications) {
+        const [currentUser] = await db.select().from(users).where(eq(users.id, user.id));
+        const existingSettings =
+          (currentUser?.settings as {
+            eveningSummaryEnabled?: boolean;
+            morningSummaryEnabled?: boolean;
+            summarySpaces?: ('work' | 'personal')[];
+          } | null) || {};
+
+        const newSettings = {
+          ...existingSettings,
+          ...(body.notifications.morningSummary !== undefined && {
+            morningSummaryEnabled: body.notifications.morningSummary
+          }),
+          ...(body.notifications.eveningSummary !== undefined && {
+            eveningSummaryEnabled: body.notifications.eveningSummary
+          }),
+          ...(body.notifications.summarySpaces !== undefined && {
+            summarySpaces: body.notifications.summarySpaces
+          })
+        };
+
+        await db.update(users).set({ settings: newSettings }).where(eq(users.id, user.id));
+      }
+
       return {
         success: true,
         settings: body
@@ -67,7 +104,10 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
             enabled: t.Boolean(),
             reminders: t.Boolean(),
             pomodoroComplete: t.Boolean(),
-            taskDue: t.Boolean()
+            taskDue: t.Boolean(),
+            morningSummary: t.Optional(t.Boolean()),
+            eveningSummary: t.Optional(t.Boolean()),
+            summarySpaces: t.Optional(t.Array(t.Union([t.Literal('work'), t.Literal('personal')])))
           })
         ),
         integrations: t.Optional(
@@ -161,6 +201,32 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
           inboxItems: t.Optional(t.Array(t.Any())),
           reminders: t.Optional(t.Array(t.Any()))
         })
+      })
+    }
+  )
+
+  // Test HamBot integration (sends via HamBot)
+  .post(
+    '/test-summary',
+    async ({ body, db, user }) => {
+      const { sendDailySummary } = await import('../cron');
+
+      const result = await sendDailySummary(user.id, body.type, body.spaces, db);
+
+      if (!result.sent) {
+        throw new Error('HamBot is not configured. Set HAMBOT_API_KEY environment variable.');
+      }
+
+      return {
+        success: true,
+        message: 'Test summary sent via HamBot',
+        summary: result.summary
+      };
+    },
+    {
+      body: t.Object({
+        type: t.Union([t.Literal('morning'), t.Literal('evening')]),
+        spaces: t.Array(t.Union([t.Literal('work'), t.Literal('personal')]))
       })
     }
   );

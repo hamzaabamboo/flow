@@ -10,42 +10,49 @@ interface HamBotMessage {
 }
 
 export class HamBotIntegration {
-  private apiUrl: string;
+  private webhookUrl: string;
   private apiKey: string;
+  private channel: string;
   private db: Database;
 
   constructor(db: Database) {
-    this.apiUrl = process.env.HAMBOT_API_URL || '';
+    this.webhookUrl =
+      process.env.HAMBOT_WEBHOOK_URL || 'https://hambot.ham-san.net/webhook/hambot-push';
     this.apiKey = process.env.HAMBOT_API_KEY || '';
+    this.channel = process.env.HAMBOT_CHANNEL || 'hamflow';
     this.db = db;
 
-    if (!this.apiUrl || !this.apiKey) {
-      console.warn('HamBot integration not configured. Set HAMBOT_API_URL and HAMBOT_API_KEY.');
+    if (!this.apiKey) {
+      console.warn('HamBot integration not configured. Set HAMBOT_API_KEY environment variable.');
     }
   }
 
   isConfigured(): boolean {
-    return !!(this.apiUrl && this.apiKey);
+    return !!this.apiKey;
   }
 
-  // Send a message via HamBot
-  async sendMessage(recipient: string, message: string): Promise<boolean> {
+  /**
+   * Send a message via HamBot webhook
+   * Matches the HamBot API schema exactly
+   */
+  async send(message: string, channel?: string): Promise<boolean> {
     if (!this.isConfigured()) {
       console.warn('HamBot not configured, skipping message send');
       return false;
     }
 
     try {
-      const response = await fetch(`${this.apiUrl}/send`, {
+      const response = await fetch(this.webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`
+          'x-hambot-key': this.apiKey
         },
         body: JSON.stringify({
-          recipient,
-          message,
-          timestamp: new Date().toISOString()
+          data: {
+            message
+          },
+          channel: channel || this.channel
         })
       });
 
@@ -58,6 +65,11 @@ export class HamBotIntegration {
       console.error('Failed to send HamBot message:', error);
       return false;
     }
+  }
+
+  // Legacy method for backwards compatibility
+  async sendMessage(recipient: string, message: string): Promise<boolean> {
+    return this.send(message);
   }
 
   // Receive messages from HamBot webhook
@@ -83,52 +95,11 @@ export class HamBotIntegration {
 
   // Send reminder via HamBot
   async sendReminder(userId: string, reminderMessage: string): Promise<boolean> {
-    // In a real implementation, you would map userId to HamBot recipient
-    const recipient = `user_${userId}`; // This would be mapped to actual contact info
-
-    return this.sendMessage(recipient, `[REMINDER] ${reminderMessage}`);
+    return this.send(`⏰ ${reminderMessage}`);
   }
 
-  // Send task notification
-  async sendTaskNotification(
-    userId: string,
-    taskTitle: string,
-    action: 'created' | 'completed' | 'due'
-  ): Promise<boolean> {
-    const recipient = `user_${userId}`;
-
-    let message = '';
-    switch (action) {
-      case 'created':
-        message = `[TASK] New task created: ${taskTitle}`;
-        break;
-      case 'completed':
-        message = `[COMPLETED] Task completed: ${taskTitle}`;
-        break;
-      case 'due':
-        message = `[DUE SOON] Task due soon: ${taskTitle}`;
-        break;
-    }
-
-    return this.sendMessage(recipient, message);
-  }
-
-  // Batch send messages (for daily summaries, etc.)
-  async sendBatchMessages(
-    messages: Array<{ userId: string; message: string }>
-  ): Promise<{ success: number; failed: number }> {
-    let success = 0;
-    let failed = 0;
-
-    for (const { userId, message } of messages) {
-      const sent = await this.sendMessage(`user_${userId}`, message);
-      if (sent) {
-        success++;
-      } else {
-        failed++;
-      }
-    }
-
-    return { success, failed };
+  // Send daily summary
+  async sendSummary(userId: string, summaryMessage: string): Promise<boolean> {
+    return this.send(summaryMessage);
   }
 }

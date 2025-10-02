@@ -31,10 +31,11 @@ bun test
 
 ### Database
 ```bash
-# Generate migrations
+# ⚠️ NEVER RUN THESE AUTOMATICALLY - ALWAYS ASK USER FIRST
+# Generate migrations (USER MUST RUN THIS)
 bun run db:generate
 
-# Apply migrations
+# Apply migrations (USER MUST RUN THIS)
 bun run db:migrate
 
 # Open database studio
@@ -43,6 +44,8 @@ bun run db:studio
 # Reset database (caution!)
 bun run db:reset
 ```
+
+**IMPORTANT**: Claude Code should NEVER run `db:generate` or `db:migrate` commands automatically. Always inform the user to run these commands manually after schema changes.
 
 ### Debugging
 ```bash
@@ -77,6 +80,37 @@ hamflow/
 - **Local Dev**: http://localhost:3000
 - **Database Studio**: http://localhost:4983
 - **API Docs**: http://localhost:3000/swagger
+
+## 🔔 HamBot Integration
+
+### Environment Variables
+```bash
+# Required for HamBot daily summaries
+HAMBOT_API_KEY=your_api_key_here
+INSTANCE_URL=https://your-hamflow-instance.com  # Default: http://localhost:3000
+```
+
+### Summary Schedule (JST/Asia/Tokyo)
+- **Morning Summary**: 10:00 AM (01:00 UTC)
+- **Evening Summary**: 10:00 PM (13:00 UTC)
+
+### User Settings
+Users can configure in Settings page:
+- Enable/disable morning/evening summaries
+- Choose spaces (work/personal/both)
+- Test summaries via actual HamBot send
+
+### Summary Content
+**Morning** (10:00 AM JST):
+- Tasks due today
+- Upcoming tasks (next 7 days)
+- Link to HamFlow instance
+
+**Evening** (10:00 PM JST):
+- Completed tasks/habits count
+- Unfinished tasks
+- Incomplete habits
+- Link to HamFlow instance
 
 ## ⚡ Common Gotchas
 
