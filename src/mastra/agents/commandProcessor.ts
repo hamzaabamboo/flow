@@ -18,6 +18,10 @@ export const CommandIntentSchema = z.object({
     ])
     .describe('The action the user wants to perform'),
   title: z.string().optional().describe('Task or item title'),
+  description: z.string().optional().describe('Task description or details'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().describe('Task priority level'),
+  deadline: z.string().optional().describe('Task deadline in YYYY-MM-DD format'),
+  labels: z.array(z.string()).optional().describe('Task labels or tags'),
   message: z.string().optional().describe('Reminder message'),
   content: z.string().optional().describe('Note or inbox item content'),
   taskRef: z.string().optional().describe('Reference to existing task'),
@@ -52,10 +56,13 @@ ${JSON.stringify(z.toJSONSchema(CommandIntentSchema), null, 2)}
 ## Examples
 
 Input: "Add task deploy staging server"
-Output: { "action": "create_task", "title": "deploy staging server" }
+Output: { "action": "create_task", "title": "deploy staging server", "priority": "medium", "deadline": "2025-10-04" }
 
 Input: "Add task deploy staging to Engineering board"
-Output: { "action": "create_task", "title": "deploy staging", "boardId": "<board-id>", "columnId": "<to-do-column-id>", "directToBoard": true }
+Output: { "action": "create_task", "title": "deploy staging", "boardId": "<board-id>", "columnId": "<to-do-column-id>", "directToBoard": true, "priority": "medium", "deadline": "2025-10-04" }
+
+Input: "urgent deploy to production tomorrow"
+Output: { "action": "create_task", "title": "deploy to production", "priority": "urgent", "deadline": "2025-10-03" }
 
 Input: "Remind me to call dentist in 30 minutes"
 Output: { "action": "create_reminder", "message": "call dentist", "reminderTime": "2025-10-03T15:30:00.000Z" }
@@ -76,21 +83,33 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
 
 1. Extract the action enum that best matches user intent
 2. Extract relevant fields based on the action:
-   - create_task: title, optionally boardId/columnId/directToBoard if board/column mentioned
+   - create_task: title, description, priority, deadline, labels, optionally boardId/columnId/directToBoard
    - create_inbox_item: content
    - create_reminder: message, reminderTime (ISO 8601)
    - complete_task: taskRef
    - move_task: taskRef, destination
    - list_tasks: filter
-3. For task creation with board/column context:
-   - If user mentions a board or column name, look it up in the provided context
-   - Set directToBoard: true, boardId, and columnId accordingly
-   - Default to "To Do" column if only board is mentioned
-   - If no board mentioned, leave these fields unset (task goes to inbox)
+3. **Smart Defaults for Task Creation**:
+   - **Priority**: Always suggest a priority based on context. If not explicitly mentioned:
+     * Use "urgent" for keywords like: urgent, asap, critical, emergency
+     * Use "high" for keywords like: important, high priority, soon
+     * Use "medium" for regular tasks (DEFAULT)
+     * Use "low" for keywords like: low priority, whenever, someday
+   - **Deadline**: Always suggest a deadline in YYYY-MM-DD format:
+     * Parse explicit dates: "tomorrow", "next Monday", "Oct 5th"
+     * For urgent tasks without date: tomorrow
+     * For regular tasks without date: tomorrow (next day)
+     * Current time: ${new Date().toISOString()}
+   - **Board/Column**: If user mentions a board or column name:
+     * Look it up in the provided board context
+     * Set directToBoard: true, boardId, and columnId
+     * Default to "To Do" column if only board is mentioned
+     * If no board mentioned, leave unset (goes to inbox)
+   - **Description**: Extract additional context from the input as description
+   - **Labels**: Extract any obvious tags or categories (e.g., "bug", "feature", "docs")
 4. For reminders with time expressions:
    - Parse relative times ("in 30 minutes", "tomorrow", "next Friday")
    - Calculate the actual ISO 8601 datetime
-   - Current time: ${new Date().toISOString()}
 5. If intent is unclear, use action: "unknown"
 6. **IMPORTANT**: Output ONLY the JSON object, no explanations before or after
 

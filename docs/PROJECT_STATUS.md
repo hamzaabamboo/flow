@@ -10,6 +10,16 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ### ✅ Completed This Session
 
+- **Quick Add Feature** - AI-powered cheatcode for TaskDialog
+  - Quick Add button in top bar with sparkle icon (✨)
+  - Keyboard shortcut: Ctrl+N (works on all platforms)
+  - Flow: type quick input → AI parses → opens TaskDialog with pre-filled fields
+  - AI extracts: title, description, dueDate, priority, labels, board/column
+  - Opens full TaskDialog where user can review/edit all fields before creating
+  - Reuses existing `/api/command` endpoint for parsing
+  - Graceful fallback: opens TaskDialog with raw input as title if AI fails
+  - Built with QuickAddDialog component wrapping TaskDialog
+
 - **AI Command Parser (Phase 3) - Enhanced with Board Awareness** - Natural language command processing
   - Integrated Mastra agent with Google Gemini 2.5 Flash Lite model
   - Structured output using Zod schema validation for reliable parsing

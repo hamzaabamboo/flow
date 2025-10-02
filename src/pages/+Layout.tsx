@@ -9,6 +9,7 @@ import { Sidebar } from '../components/Layout/Sidebar';
 import { SidebarContent } from '../components/Layout/SidebarContent';
 import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
 import { CommandBar } from '../components/CommandBar/CommandBar';
+import { QuickAddDialog } from '../components/QuickAdd/QuickAddDialog';
 import { PomodoroTimer } from '../components/Pomodoro/PomodoroTimer';
 import { NotificationDropdown } from '../components/Layout/NotificationDropdown';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -17,6 +18,7 @@ import { Text } from '../components/ui/text';
 import { Button } from '../components/ui/button';
 import { IconButton } from '../components/ui/icon-button';
 import { Drawer } from '../components/ui/drawer';
+import { Kbd } from '../components/ui/kbd';
 import { Box, Center, HStack } from 'styled-system/jsx';
 import '../index.css';
 
@@ -32,17 +34,28 @@ const queryClient = new QueryClient({
 function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { currentSpace } = useSpace();
   const [showCommandBar, setShowCommandBar] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Command bar: Cmd/Ctrl+K
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        e.stopPropagation();
         setShowCommandBar(true);
+        return;
+      }
+      // Quick Add: Ctrl+N only (to avoid Mac Cmd+N new window conflict)
+      if (e.ctrlKey && !e.metaKey && e.key === 'n') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowQuickAdd(true);
+        return;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, []);
 
   return (
@@ -98,19 +111,10 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             >
               <Search width="16" height="16" />
               <Text display={{ base: 'none', sm: 'inline' }}>Search or type a command...</Text>
-              <Box
-                display={{ base: 'none', md: 'flex' }}
-                borderRadius="md"
-                ml="auto"
-                py="0.5"
-                px="2"
-                color="fg.muted"
-                fontSize="xs"
-                fontWeight="medium"
-                bg="bg.subtle"
-              >
-                ⌘K
-              </Box>
+              <HStack display={{ base: 'none', md: 'flex' }} gap="1" ml="auto">
+                <Kbd>⌘</Kbd>
+                <Kbd>K</Kbd>
+              </HStack>
             </Button>
           </HStack>
 
@@ -123,7 +127,9 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             <Button
               variant="solid"
               size="sm"
+              onClick={() => setShowQuickAdd(true)}
               gap="2"
+              justifyContent="space-between"
               borderRadius="lg"
               transition="all 0.2s"
               _hover={{
@@ -131,8 +137,14 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
                 boxShadow: 'lg'
               }}
             >
-              <Sparkles width="16" height="16" />
-              <Text display={{ base: 'none', sm: 'inline' }}>Quick Add</Text>
+              <HStack gap="2">
+                <Sparkles width="16" height="16" />
+                <Text display={{ base: 'none', sm: 'inline' }}>Quick Add</Text>
+              </HStack>
+              <HStack display={{ base: 'none', md: 'flex' }} gap="1">
+                <Kbd>Ctrl</Kbd>
+                <Kbd>N</Kbd>
+              </HStack>
             </Button>
           </HStack>
         </HStack>
@@ -140,6 +152,9 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
 
       {/* Command Bar Dialog */}
       <CommandBar open={showCommandBar} onOpenChange={setShowCommandBar} />
+
+      {/* Quick Add Dialog */}
+      <QuickAddDialog open={showQuickAdd} onOpenChange={setShowQuickAdd} />
     </>
   );
 }

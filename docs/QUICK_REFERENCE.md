@@ -92,6 +92,30 @@ hamflow/
 - **Database Studio**: http://localhost:4983
 - **API Docs**: http://localhost:3000/swagger
 
+## ✨ Quick Add
+
+### Usage
+- **Keyboard**: `Ctrl + N` to open Quick Add
+- **Button**: Click "Quick Add" button in top bar (sparkle icon ✨)
+- **Flow**: Type quick input → AI parses → TaskDialog opens with pre-filled fields
+
+### How It Works
+1. Type something quick like "deploy staging tomorrow high priority"
+2. AI parses and extracts: title, description, dueDate, priority, labels, board/column
+3. TaskDialog opens with all fields pre-filled
+4. Review, edit any field, add subtasks, set reminders, etc.
+5. Create task normally through TaskDialog
+
+### Examples
+```
+"deploy staging tomorrow high priority"       → Opens TaskDialog: title="deploy staging", dueDate=tomorrow, priority=high
+"fix login bug on engineering board"          → Opens TaskDialog on Engineering board, To Do column
+"meeting notes for Q4 planning"               → Opens TaskDialog: title="meeting notes for Q4 planning"
+"urgent: update docs asap"                    → Opens TaskDialog: priority=urgent
+```
+
+**Note**: This is a "cheatcode" to quickly open TaskDialog with AI-parsed fields. You still use the full TaskDialog to finalize the task.
+
 ## 🤖 AI Command Parser
 
 ### Usage
