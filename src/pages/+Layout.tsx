@@ -6,6 +6,7 @@ import { SpaceProvider, useSpace } from '../contexts/SpaceContext';
 import { ColorModeProvider } from '../contexts/ColorModeContext';
 import { ToasterProvider } from '../contexts/ToasterProvider';
 import { Sidebar } from '../components/Layout/Sidebar';
+import { SidebarContent } from '../components/Layout/SidebarContent';
 import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
 import { CommandBar } from '../components/CommandBar/CommandBar';
 import { PomodoroTimer } from '../components/Pomodoro/PomodoroTimer';
@@ -15,6 +16,7 @@ import ErrorBoundary from '../components/utils/ErrorBoundary';
 import { Text } from '../components/ui/text';
 import { Button } from '../components/ui/button';
 import { IconButton } from '../components/ui/icon-button';
+import { Drawer } from '../components/ui/drawer';
 import { Box, Center, HStack } from 'styled-system/jsx';
 import '../index.css';
 
@@ -136,37 +138,8 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         </HStack>
       </Box>
 
-      {/* Command Bar Modal */}
-      {showCommandBar && (
-        <Box
-          onClick={() => setShowCommandBar(false)}
-          display="flex"
-          zIndex="100"
-          position="fixed"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          justifyContent="center"
-          alignItems="flex-start"
-          pt="20"
-          bg="bg.canvas"
-          backdropFilter="blur(4px)"
-        >
-          <Box
-            borderRadius="xl"
-            w="full"
-            maxW="600px"
-            bg="bg.default"
-            boxShadow="xl"
-            overflow="hidden"
-            animation="slideDown 0.2s"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CommandBar />
-          </Box>
-        </Box>
-      )}
+      {/* Command Bar Dialog */}
+      <CommandBar open={showCommandBar} onOpenChange={setShowCommandBar} />
     </>
   );
 }
@@ -216,25 +189,23 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <Sidebar />
       </Box>
 
-      {/* Mobile Sidebar Overlay */}
-      {mobileSidebarOpen && (
-        <Box
-          onClick={() => setMobileSidebarOpen(false)}
-          display={{ base: 'block', lg: 'none' }}
-          zIndex="45"
-          position="fixed"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          bg="bg.canvas"
-          backdropFilter="blur(4px)"
+      {/* Mobile Sidebar Drawer */}
+      <Box display={{ base: 'block', lg: 'none' }}>
+        <Drawer.Root
+          variant="left"
+          open={mobileSidebarOpen}
+          onOpenChange={(details) => setMobileSidebarOpen(details.open)}
         >
-          <Box animation="slideIn 0.3s" onClick={(e) => e.stopPropagation()}>
-            <Sidebar />
-          </Box>
-        </Box>
-      )}
+          <Drawer.Backdrop />
+          <Drawer.Positioner>
+            <Drawer.Content>
+              <Drawer.Body>
+                <SidebarContent />
+              </Drawer.Body>
+            </Drawer.Content>
+          </Drawer.Positioner>
+        </Drawer.Root>
+      </Box>
 
       {/* Top Bar */}
       <TopBar onMenuClick={() => setMobileSidebarOpen(true)} />
@@ -274,34 +245,23 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <Sidebar />
       </Box>
 
-      {/* Mobile Sidebar Overlay */}
-      {mobileSidebarOpen && (
-        <Box
-          onClick={() => setMobileSidebarOpen(false)}
-          display={{ base: 'block', lg: 'none' }}
-          zIndex="30"
-          position="fixed"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          bg="bg.canvas/80"
+      {/* Mobile Sidebar Drawer */}
+      <Box display={{ base: 'block', lg: 'none' }}>
+        <Drawer.Root
+          open={mobileSidebarOpen}
+          variant="left"
+          onOpenChange={(details) => setMobileSidebarOpen(details.open)}
         >
-          <Box
-            onClick={(e) => e.stopPropagation()}
-            position="fixed"
-            top="0"
-            left="0"
-            borderColor="border.default"
-            borderRightWidth="1px"
-            w="280px"
-            h="100vh"
-            bg="bg.default"
-          >
-            <Sidebar />
-          </Box>
-        </Box>
-      )}
+          <Drawer.Backdrop />
+          <Drawer.Positioner>
+            <Drawer.Content>
+              <Drawer.Body>
+                <SidebarContent />
+              </Drawer.Body>
+            </Drawer.Content>
+          </Drawer.Positioner>
+        </Drawer.Root>
+      </Box>
 
       {/* Top Bar */}
       <TopBar onMenuClick={() => setMobileSidebarOpen(true)} />

@@ -8,6 +8,8 @@
 4. **Use Styled Components**: Import from `ui/styled/` not `ui/` for complex components
 5. **Global Auth Context**: Use `{ as: 'global' }` in derive for auth propagation
 6. **Logger Error First**: `logger.error(error, 'message')` not the reverse
+7. **Invalidate Queries**: Always `queryClient.invalidateQueries()` after mutations
+8. **Mastra Structured Output**: Use `generateVNext` with `structuredOutputs: true`
 
 ## 🚀 Common Commands
 
@@ -90,14 +92,65 @@ hamflow/
 - **Database Studio**: http://localhost:4983
 - **API Docs**: http://localhost:3000/swagger
 
+## 🤖 AI Command Parser
+
+### Usage
+- **Keyboard**: `Cmd/Ctrl + K` to open command bar
+- **Voice**: Click mic button (toggle to cancel)
+- **Actions**: create_task, create_inbox_item, create_reminder, complete_task, move_task, list_tasks, start_pomodoro, stop_pomodoro
+
+### Examples
+```
+"Add task deploy staging server"           → Goes to inbox
+"Add task deploy to Engineering board"     → Goes to Engineering → To Do
+"Add fix bug to Done column"               → Goes to first board → Done
+"Remind me to call dentist in 30 minutes"  → Creates reminder
+"Note: meeting ideas for Q4"               → Goes to inbox
+"Complete task review PR"                  → Marks task complete
+```
+
+### Environment Variables
+```bash
+# Required for AI command processing
+GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
+```
+
+### Implementation Notes
+- Uses Mastra agent with Gemini 2.5 Flash Lite
+- Structured output via Zod schema validation
+- Two-stage flow: parse → confirm → execute
+- Auto-invalidates React Query cache after execution
+- **Board-aware**: AI knows your boards/columns and can add tasks directly to them
+- Command history: Navigate with ↑↓ arrows, stored in localStorage (last 20)
+- Quick suggestions: Clickable example commands when bar is empty
+
+## 📥 Inbox System
+
+### Workflow
+1. Items arrive via command bar, HamBot, or API
+2. Click arrow button → modal opens
+3. Select destination board/column (2-column grid)
+4. Item converts to task, navigates to board
+
+### Batch Operations
+- Select multiple items with checkboxes
+- "Move to Board" button → modal for destination
+- "Delete" button → bulk delete with confirmation
+
 ## 🔔 HamBot Integration
 
 ### Environment Variables
 ```bash
 # Required for HamBot daily summaries
 HAMBOT_API_KEY=your_api_key_here
-INSTANCE_URL=https://your-hamflow-instance.com  # Default: http://localhost:3000
+HAMBOT_API_URL=https://hambot.ham-san.net/webhook/hambot-push
 ```
+
+### Reminders
+- Cron checks every minute for due reminders
+- Sends via WebSocket → toast notification (⏰ icon)
+- Also tries browser notification if permission granted
+- `requireInteraction: true` - stays until dismissed
 
 ### Summary Schedule (JST/Asia/Tokyo)
 - **Morning Summary**: 10:00 AM (01:00 UTC)

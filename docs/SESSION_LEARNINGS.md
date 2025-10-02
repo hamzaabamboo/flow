@@ -2,6 +2,180 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-03 - AI Command Parser & Inbox Revamp (Enhanced)
+
+### Board-Aware AI Command Processing
+
+**Problem**: AI has no context about user's boards/columns, sends all tasks to inbox
+
+**Solution**: Fetch and inject board/column context into AI prompts:
+```typescript
+// Fetch user's boards and columns
+const userBoards = await db
+  .select({ id: boards.id, name: boards.name })
+  .from(boards)
+  .where(and(eq(boards.userId, user.id), eq(boards.space, space)));
+
+const allColumns = await db
+  .select({ id: columns.id, name: columns.name, boardId: columns.boardId })
+  .from(columns)
+  .where(inArray(columns.boardId, boardIds));
+
+// Build context string and append to user message
+const boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf user mentions board/column, map to ID and set directToBoard: true`;
+
+const result = await agent.generateVNext([
+  { role: 'user', content: command + boardContext }
+], { providerOptions: { google: { structuredOutputs: true } } });
+```
+
+**Key Points**:
+- Add optional `boardId`, `columnId`, `directToBoard` fields to Zod schema
+- AI maps natural language ("Engineering board", "Done column") to actual IDs
+- Tasks with board/column specified bypass inbox, go directly to board
+- Falls back to inbox if no board/column mentioned
+- Update execute endpoint to handle both direct and inbox insertion
+- Return `boardId` in response for proper navigation
+
+**Example Usage**:
+- "Add task deploy staging" → Inbox (no board mentioned)
+- "Add task deploy to Engineering board" → Engineering → To Do
+- "Add fix bug to Done column" → First board → Done
+
+### Mastra Agent Structured Output
+
+**Problem**: AI responses wrapped in markdown code blocks or inconsistent JSON format
+
+**Solution**: Use `generateVNext` with structured output:
+```typescript
+const result = await agent.generateVNext(
+  [{ role: 'user', content: command }],
+  {
+    providerOptions: {
+      google: {
+        structuredOutputs: true
+      }
+    }
+  }
+);
+```
+
+**Key Points**:
+- Use Zod schemas to define output structure
+- Add defensive JSON parsing to strip markdown:
+  ```typescript
+  const cleanedText = result.text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/, '')
+    .replace(/```\s*$/, '')
+    .trim();
+  ```
+- Explicitly tell AI in prompt: "DO NOT wrap in \`\`\`json blocks"
+
+### React Query Cache Invalidation Pattern
+
+**Problem**: CommandBar creates items but UI doesn't update until manual refresh
+
+**Solution**: Invalidate relevant queries after mutations:
+```typescript
+// After successful command execution
+switch (action) {
+  case 'create_task':
+  case 'create_inbox_item':
+    queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
+    queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
+    break;
+  case 'create_reminder':
+    queryClient.invalidateQueries({ queryKey: ['reminders'] });
+    break;
+}
+```
+
+**Best Practice**: Always invalidate queries after mutations, even if using WebSocket updates (redundancy is good)
+
+### WebSocket Toast Notifications
+
+**Problem**: Browser notifications require permission and might be missed
+
+**Solution**: Use global toast function with WebSocket:
+```typescript
+// In hook
+let globalToast: ((message: string, options?) => void) | null = null;
+export function setGlobalToast(toast) { globalToast = toast; }
+
+// In ToasterProvider
+setGlobalToast((message, options) => {
+  toaster.create({ description: message, ...options });
+});
+
+// In WebSocket handler
+case 'reminder':
+  if (globalToast && data?.message) {
+    globalToast(`⏰ ${data.message}`, { type: 'info' });
+  }
+  break;
+```
+
+**Key Points**:
+- Toast notifications always visible (no permission needed)
+- Browser notifications as backup if permitted
+- Longer duration for important messages (8000ms for reminders)
+
+### Voice Input Cancellation
+
+**Problem**: Voice recognition couldn't be stopped once started
+
+**Solution**: Store recognition in ref and toggle on button click:
+```typescript
+const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+const handleVoiceInput = () => {
+  // If already listening, stop it
+  if (isListening && recognitionRef.current) {
+    recognitionRef.current.stop();
+    setIsListening(false);
+    return;
+  }
+  // Start new recognition...
+  recognitionRef.current = recognition;
+};
+```
+
+**Key Points**:
+- Clean up ref on completion/error: `recognitionRef.current = null`
+- Stop on dialog close to prevent leaks
+- Same button toggles start/stop (good UX)
+
+### Inbox Item Styling Consistency
+
+**Problem**: Heavy Card components felt different from rest of app
+
+**Solution**: Use lightweight HStack with border:
+```typescript
+<HStack
+  p="4"
+  borderRadius="lg"
+  borderWidth="1px"
+  cursor="pointer"
+  transition="all 0.15s"
+  _hover={{ bg: 'bg.muted' }}
+>
+  <Checkbox />
+  <Icon />
+  <VStack flex="1">
+    <Text fontSize="sm" fontWeight="medium">{title}</Text>
+    <Text fontSize="xs" color="fg.muted">{description}</Text>
+  </VStack>
+  <IconButton />
+</HStack>
+```
+
+**Key Points**:
+- Flatter design = easier to scan
+- Smaller gaps (gap="2" instead of "3")
+- No nested Card.Header/Body components
+- Consistent with task/habit list patterns
+
 ## 2025-10-02 - oxc Linter Integration
 
 ### Dual Linter Setup: oxc + ESLint

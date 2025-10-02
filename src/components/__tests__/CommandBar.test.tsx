@@ -12,17 +12,26 @@ vi.mock('../../contexts/SpaceContext', () => ({
   }))
 }));
 
+// Mock the ToasterContext
+vi.mock('../../contexts/ToasterContext', () => ({
+  useToaster: () => ({
+    toast: vi.fn()
+  })
+}));
+
 // Mock fetch with proper typing
 global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('CommandBar', () => {
+  const mockOnOpenChange = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockReset();
   });
 
   it('should render the command input', () => {
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
     expect(input).toBeTruthy();
@@ -30,7 +39,7 @@ describe('CommandBar', () => {
 
   it('should handle text input', async () => {
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 
@@ -41,9 +50,9 @@ describe('CommandBar', () => {
 
   it('should submit command on Enter key', async () => {
     const mockResponse = {
-      success: true,
       action: 'task_created',
-      data: { id: 'task-1', title: 'Buy groceries' }
+      data: { title: 'Buy groceries' },
+      description: 'Task will be added to inbox'
     };
 
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -52,7 +61,7 @@ describe('CommandBar', () => {
     });
 
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 
@@ -69,14 +78,11 @@ describe('CommandBar', () => {
         })
       });
     });
-
-    // Input should be cleared after successful submission
-    expect(input).toHaveValue('');
   });
 
   it('should not submit empty commands', async () => {
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const _input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 
@@ -93,7 +99,7 @@ describe('CommandBar', () => {
             () =>
               resolve({
                 ok: true,
-                json: () => Promise.resolve({ success: true })
+                json: () => Promise.resolve({ action: 'task_created', data: { title: 'test' } })
               }),
             100
           )
@@ -101,7 +107,7 @@ describe('CommandBar', () => {
     );
 
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 
@@ -109,7 +115,7 @@ describe('CommandBar', () => {
     await user.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('Processing...')).toBeTruthy();
+      expect(screen.getByText('Processing your command...')).toBeTruthy();
     });
   });
 
@@ -122,7 +128,7 @@ describe('CommandBar', () => {
     (window as unknown as { SpeechRecognition: typeof mockSpeechRecognition }).SpeechRecognition =
       mockSpeechRecognition;
 
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const voiceButton = screen.getByRole('button', { name: /voice input/i });
 
@@ -139,7 +145,7 @@ describe('CommandBar', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 
@@ -161,7 +167,7 @@ describe('CommandBar', () => {
             () =>
               resolve({
                 ok: true,
-                json: () => Promise.resolve({ success: true })
+                json: () => Promise.resolve({ action: 'task_created', data: { title: 'test' } })
               }),
             100
           )
@@ -169,7 +175,7 @@ describe('CommandBar', () => {
     );
 
     const user = userEvent.setup();
-    render(<CommandBar />);
+    render(<CommandBar open={true} onOpenChange={mockOnOpenChange} />);
 
     const input = screen.getByPlaceholderText(/Type a command or click the mic/i);
 

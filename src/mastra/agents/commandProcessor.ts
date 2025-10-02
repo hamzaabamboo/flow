@@ -1,217 +1,107 @@
-import { Agent, createTool } from '@mastra/core';
+import { Agent } from '@mastra/core';
 import { z } from 'zod';
 import { google } from '@ai-sdk/google';
 
-// Helper function to get the next occurrence of a specific day of the week
-function getNextDayOfWeek(dayOfWeek: number, fromDate: Date): Date {
-  const result = new Date(fromDate);
-  const currentDay = result.getDay();
-  const daysUntilNext = (dayOfWeek - currentDay + 7) % 7 || 7; // If it's the same day, get next week's
-  result.setDate(result.getDate() + daysUntilNext);
-  result.setHours(9, 0, 0, 0); // Default to 9 AM
-  return result;
-}
-
-// Tools for the command processor
-const parseTaskCommand = createTool({
-  id: 'parse-task-command',
-  description: 'Parse natural language commands for task management',
-  inputSchema: z.object({
-    command: z.string()
-  }),
-  // eslint-disable-next-line @typescript-eslint/require-await
-  execute: async ({ context }) => {
-    const command = context?.command;
-    const lowerCommand = command.toLowerCase();
-
-    // Task creation patterns
-    if (
-      lowerCommand.includes('add task') ||
-      lowerCommand.includes('create task') ||
-      lowerCommand.includes('new task')
-    ) {
-      const title = command
-        .replace(/add task|create task|new task/i, '')
-        .replace(/to (work|personal)/i, '')
-        .trim();
-      const space = lowerCommand.includes('personal') ? 'personal' : 'work';
-      return {
-        action: 'create_task',
-        data: { title, space }
-      };
-    }
-
-    // Note/inbox creation
-    if (
-      lowerCommand.includes('add note') ||
-      lowerCommand.includes('quick note') ||
-      lowerCommand.includes('inbox')
-    ) {
-      const content = command.replace(/add note|quick note|inbox/i, '').trim();
-      return {
-        action: 'create_inbox_item',
-        data: { content }
-      };
-    }
-
-    // Reminder patterns
-    if (lowerCommand.includes('remind me')) {
-      const message = command.replace(/remind me/i, '').trim();
-      return {
-        action: 'create_reminder',
-        data: { message }
-      };
-    }
-
-    // Task completion
-    if (lowerCommand.includes('complete') || lowerCommand.includes('done')) {
-      const taskRef = command.replace(/complete|done|task/gi, '').trim();
-      return {
-        action: 'complete_task',
-        data: { taskRef }
-      };
-    }
-
-    // Move task
-    if (lowerCommand.includes('move') && lowerCommand.includes('to')) {
-      const matches = command.match(/move (.+) to (.+)/i);
-      if (matches) {
-        return {
-          action: 'move_task',
-          data: { taskRef: matches[1].trim(), destination: matches[2].trim() }
-        };
-      }
-    }
-
-    // List/show tasks
-    if (lowerCommand.includes('show') || lowerCommand.includes('list')) {
-      if (lowerCommand.includes('today')) {
-        return {
-          action: 'list_tasks',
-          data: { filter: 'today' }
-        };
-      }
-      if (lowerCommand.includes('tomorrow')) {
-        return {
-          action: 'list_tasks',
-          data: { filter: 'tomorrow' }
-        };
-      }
-      return {
-        action: 'list_tasks',
-        data: { filter: 'all' }
-      };
-    }
-
-    // Pomodoro timer
-    if (lowerCommand.includes('pomodoro') || lowerCommand.includes('timer')) {
-      if (lowerCommand.includes('start')) {
-        return {
-          action: 'start_pomodoro',
-          data: {}
-        };
-      }
-      if (lowerCommand.includes('stop') || lowerCommand.includes('pause')) {
-        return {
-          action: 'stop_pomodoro',
-          data: {}
-        };
-      }
-    }
-
-    return {
-      action: 'unknown',
-      data: { originalCommand: command }
-    };
-  }
-});
-
-const parseDateTime = createTool({
-  id: 'parse-datetime',
-  description: 'Parse date and time from natural language',
-  inputSchema: z.object({
-    text: z.string()
-  }),
-  outputSchema: z.string(),
-  // eslint-disable-next-line @typescript-eslint/require-await
-  execute: async ({ context }) => {
-    const now = new Date();
-    const lowerText = context.text.toLowerCase();
-
-    // Time-based patterns
-    if (lowerText.includes('tomorrow')) {
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(9, 0, 0, 0); // Default to 9 AM
-      return tomorrow.toISOString();
-    }
-
-    if (lowerText.includes('today')) {
-      const today = new Date(now);
-      if (now.getHours() >= 17) {
-        today.setHours(20, 0, 0, 0); // If after 5 PM, set to 8 PM
-      } else {
-        today.setHours(now.getHours() + 2, 0, 0, 0); // 2 hours from now
-      }
-      return today.toISOString();
-    }
-
-    // Relative time patterns
-    const minuteMatch = lowerText.match(/in (\d+) minute/);
-    if (minuteMatch) {
-      const minutes = parseInt(minuteMatch[1]);
-      now.setMinutes(now.getMinutes() + minutes);
-      return now.toISOString();
-    }
-
-    const hourMatch = lowerText.match(/in (\d+) hour/);
-    if (hourMatch) {
-      const hours = parseInt(hourMatch[1]);
-      now.setHours(now.getHours() + hours);
-      return now.toISOString();
-    }
-
-    // Day-based patterns
-    if (lowerText.includes('monday')) {
-      const monday = getNextDayOfWeek(1, now);
-      return monday.toISOString();
-    }
-    if (lowerText.includes('friday')) {
-      const friday = getNextDayOfWeek(5, now);
-      return friday.toISOString();
-    }
-
-    // Week-based patterns
-    if (lowerText.includes('next week')) {
-      const nextWeek = new Date(now);
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      nextWeek.setHours(9, 0, 0, 0);
-      return nextWeek.toISOString();
-    }
-
-    // Default: 2 hours from now
-    now.setHours(now.getHours() + 2);
-    return now.toISOString();
-  }
+// Zod schema for AI output
+export const CommandIntentSchema = z.object({
+  action: z
+    .enum([
+      'create_task',
+      'create_inbox_item',
+      'create_reminder',
+      'complete_task',
+      'move_task',
+      'list_tasks',
+      'start_pomodoro',
+      'stop_pomodoro',
+      'unknown'
+    ])
+    .describe('The action the user wants to perform'),
+  title: z.string().optional().describe('Task or item title'),
+  message: z.string().optional().describe('Reminder message'),
+  content: z.string().optional().describe('Note or inbox item content'),
+  taskRef: z.string().optional().describe('Reference to existing task'),
+  destination: z.string().optional().describe('Destination board or column'),
+  filter: z.enum(['today', 'tomorrow', 'all']).optional().describe('Task filter for listing'),
+  reminderTime: z.string().optional().describe('ISO 8601 datetime string for reminder'),
+  boardId: z.string().optional().describe('ID of the board to add task to'),
+  columnId: z.string().optional().describe('ID of the column to add task to'),
+  directToBoard: z
+    .boolean()
+    .optional()
+    .describe('Whether to add task directly to board (true) or inbox (false)')
 });
 
 export const commandProcessor = new Agent({
   id: 'command-processor',
   name: 'HamFlow Command Processor',
-  description: 'Processes natural language commands for task management',
-  model: google('gemini-1.5-flash'),
-  tools: {
-    parseTaskCommand,
-    parseDateTime
-  },
-  instructions: `You are an AI assistant for HamFlow, a productivity hub.
-    Parse user commands to understand their intent and extract relevant information.
-    Common commands include:
-    - Creating tasks with titles and due dates
-    - Setting reminders
-    - Moving tasks between boards
-    - Creating notes
-    - Checking schedules
+  description: 'Extracts user intent and actions from natural language commands',
+  model: google('gemini-2.5-flash-lite'),
+  instructions: `You are a command parser for HamFlow, a productivity app.
 
-    Always be helpful and extract as much relevant information as possible from the command.`
+Given user input, extract the intent and commands the user wants to execute.
+
+## Output Schema
+
+You MUST respond with ONLY a JSON object matching this exact schema:
+
+\`\`\`json
+${JSON.stringify(z.toJSONSchema(CommandIntentSchema), null, 2)}
+\`\`\`
+
+## Examples
+
+Input: "Add task deploy staging server"
+Output: { "action": "create_task", "title": "deploy staging server" }
+
+Input: "Add task deploy staging to Engineering board"
+Output: { "action": "create_task", "title": "deploy staging", "boardId": "<board-id>", "columnId": "<to-do-column-id>", "directToBoard": true }
+
+Input: "Remind me to call dentist in 30 minutes"
+Output: { "action": "create_reminder", "message": "call dentist", "reminderTime": "2025-10-03T15:30:00.000Z" }
+
+Input: "Note: meeting ideas for Q4"
+Output: { "action": "create_inbox_item", "content": "meeting ideas for Q4" }
+
+Input: "Show my tasks for tomorrow"
+Output: { "action": "list_tasks", "filter": "tomorrow" }
+
+Input: "Start pomodoro"
+Output: { "action": "start_pomodoro" }
+
+Input: "Add fix bug to Done column"
+Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column-id>", "boardId": "<board-id>", "directToBoard": true }
+
+## Rules
+
+1. Extract the action enum that best matches user intent
+2. Extract relevant fields based on the action:
+   - create_task: title, optionally boardId/columnId/directToBoard if board/column mentioned
+   - create_inbox_item: content
+   - create_reminder: message, reminderTime (ISO 8601)
+   - complete_task: taskRef
+   - move_task: taskRef, destination
+   - list_tasks: filter
+3. For task creation with board/column context:
+   - If user mentions a board or column name, look it up in the provided context
+   - Set directToBoard: true, boardId, and columnId accordingly
+   - Default to "To Do" column if only board is mentioned
+   - If no board mentioned, leave these fields unset (task goes to inbox)
+4. For reminders with time expressions:
+   - Parse relative times ("in 30 minutes", "tomorrow", "next Friday")
+   - Calculate the actual ISO 8601 datetime
+   - Current time: ${new Date().toISOString()}
+5. If intent is unclear, use action: "unknown"
+6. **IMPORTANT**: Output ONLY the JSON object, no explanations before or after
+
+## JSON Validation
+
+- Ensure all brackets are properly matched
+- Ensure all strings are properly escaped
+- No trailing commas
+- Valid ISO 8601 format for reminderTime
+- **CRITICAL**: Output ONLY the raw JSON object, with NO markdown code blocks, NO backticks, NO explanatory text before or after
+- DO NOT wrap the JSON in \`\`\`json or \`\`\` blocks
+- The output should start with { and end with }
+- Return valid, parseable JSON only`
 });

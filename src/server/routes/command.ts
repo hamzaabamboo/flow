@@ -1,69 +1,209 @@
 import { Elysia, t } from 'elysia';
+import type { z } from 'zod';
+import { eq, and, inArray } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
-import { inboxItems, reminders } from '../../../drizzle/schema';
+import { inboxItems, reminders, boards, columns, tasks } from '../../../drizzle/schema';
+import type { CommandIntentSchema } from '../../mastra/agents/commandProcessor';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
   .use(withAuth())
-  // Process a natural language command
+  // Process a natural language command and return suggestion
   .post(
     '/',
     async ({ body, db, user }) => {
       const { command, space } = body;
 
       try {
-        const result = await commandProcessor.generate([
-          {
-            role: 'user',
-            content: command
-          }
-        ]);
+        // Fetch user's boards and columns for context
+        const userBoards = await db
+          .select({
+            id: boards.id,
+            name: boards.name,
+            space: boards.space
+          })
+          .from(boards)
+          .where(and(eq(boards.userId, user.id), eq(boards.space, space as 'work' | 'personal')));
 
-        const toolCalls = result.toolCalls || [];
-        let parsedCommandResult: { action: string; data: Record<string, unknown> } | undefined;
-        let parseDateTimeResult: string | undefined;
+        let boardContext = '';
+        if (userBoards.length > 0) {
+          const boardIds = userBoards.map((b) => b.id);
+          const allColumns = await db
+            .select({
+              id: columns.id,
+              name: columns.name,
+              boardId: columns.boardId
+            })
+            .from(columns)
+            .where(inArray(columns.boardId, boardIds));
 
-        for (const toolCall of toolCalls) {
-          if (toolCall.toolName === 'parse-task-command') {
-            if (commandProcessor.tools.parseTaskCommand?.execute) {
-              parsedCommandResult = (await commandProcessor.tools.parseTaskCommand.execute(
-                toolCall.args
-              )) as { action: string; data: Record<string, unknown> };
-            }
-          } else if (toolCall.toolName === 'parse-datetime') {
-            if (commandProcessor.tools.parseDateTime?.execute) {
-              parseDateTimeResult = await commandProcessor.tools.parseDateTime.execute(
-                toolCall.args
-              );
-            }
-          }
+          // Build context string
+          const boardsWithColumns = userBoards.map((board) => {
+            const boardColumns = allColumns.filter((col) => col.boardId === board.id);
+            return {
+              id: board.id,
+              name: board.name,
+              columns: boardColumns.map((col) => ({ id: col.id, name: col.name }))
+            };
+          });
+
+          boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf the user specifies a board or column name, map it to the corresponding ID. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", and "columnId": "<column-id>". Otherwise, tasks will go to the inbox for manual processing.`;
         }
 
-        if (!parsedCommandResult) {
-          // If no clear action, add to inbox for manual processing
-          const [inboxItem] = await db
-            .insert(inboxItems)
-            .values({
-              title: command,
-              space: space as 'work' | 'personal',
-              source: 'command',
-              userId: user.id
-            })
-            .returning();
+        const result = await commandProcessor.generateVNext(
+          [
+            {
+              role: 'user',
+              content: command + boardContext
+            }
+          ],
+          {
+            providerOptions: {
+              google: {
+                structuredOutputs: true
+              }
+            }
+          }
+        );
 
+        // AI returns structured output via Zod schema
+        let intent: z.infer<typeof CommandIntentSchema> | null = null;
+        if (result.text) {
+          // Strip markdown code blocks if present (defensive)
+          const cleanedText = result.text
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/, '')
+            .replace(/```\s*$/, '')
+            .trim();
+          intent = JSON.parse(cleanedText) as z.infer<typeof CommandIntentSchema>;
+        }
+
+        if (!intent || intent.action === 'unknown') {
           return {
-            success: true,
-            action: 'added_to_inbox',
-            data: inboxItem
+            action: 'create_inbox_item',
+            data: { title: command },
+            description:
+              'Could not understand command. Will be added to inbox for manual processing.'
           };
         }
 
-        const { action, data } = parsedCommandResult;
+        // Build response based on action
+        switch (intent.action) {
+          case 'create_task':
+            // Check if AI wants to add directly to board
+            if (intent.directToBoard && intent.boardId && intent.columnId) {
+              // Find board and column names for better UX
+              const [targetBoard] = await db
+                .select({ name: boards.name })
+                .from(boards)
+                .where(eq(boards.id, intent.boardId));
+              const [targetColumn] = await db
+                .select({ name: columns.name })
+                .from(columns)
+                .where(eq(columns.id, intent.columnId));
 
+              return {
+                action: 'create_task',
+                data: {
+                  title: intent.title || command,
+                  boardId: intent.boardId,
+                  columnId: intent.columnId,
+                  directToBoard: true
+                },
+                description: `Task "${intent.title || command}" will be added to ${targetBoard?.name || 'board'} → ${targetColumn?.name || 'column'}`
+              };
+            }
+
+            return {
+              action: 'create_task',
+              data: { title: intent.title || command },
+              description: `Task "${intent.title || command}" will be added to your inbox`
+            };
+
+          case 'create_inbox_item':
+            return {
+              action: 'create_inbox_item',
+              data: { title: intent.content || command },
+              description: `Note will be added to inbox: "${intent.content || command}"`
+            };
+
+          case 'create_reminder':
+            const reminderTime =
+              intent.reminderTime || new Date(Date.now() + 30 * 60 * 1000).toISOString();
+            const reminderDate = new Date(reminderTime);
+
+            return {
+              action: 'create_reminder',
+              data: {
+                message: intent.message || command,
+                reminderTime
+              },
+              description: `Reminder "${intent.message}" will be sent at ${reminderDate.toLocaleString()}`
+            };
+
+          case 'complete_task':
+          case 'move_task':
+          case 'list_tasks':
+          case 'start_pomodoro':
+          case 'stop_pomodoro':
+            return {
+              action: intent.action,
+              data: intent,
+              description: `Action: ${intent.action}`
+            };
+
+          default:
+            return {
+              action: 'create_inbox_item',
+              data: { title: command },
+              description: 'Will be added to inbox for processing'
+            };
+        }
+      } catch (error) {
+        console.error('Command processing error:', error);
+        return {
+          action: 'create_inbox_item',
+          data: { title: command },
+          description: 'Failed to parse command. Will be added to inbox.'
+        };
+      }
+    },
+    {
+      body: t.Object({
+        command: t.String(),
+        space: t.String()
+      })
+    }
+  )
+  // Execute the confirmed action
+  .post(
+    '/execute',
+    async ({ body, db, user }) => {
+      const { action, data, space } = body;
+
+      try {
         switch (action) {
           case 'create_task':
-            // Add to inbox for user to organize
-            const [taskItem] = await db
+            // Check if task should go directly to board
+            if (data.directToBoard && data.boardId && data.columnId) {
+              const [task] = await db
+                .insert(tasks)
+                .values({
+                  columnId: data.columnId as string,
+                  title: data.title as string,
+                  userId: user.id
+                })
+                .returning();
+
+              return {
+                success: true,
+                data: task,
+                boardId: data.boardId
+              };
+            }
+
+            // Otherwise add to inbox
+            const [taskInbox] = await db
               .insert(inboxItems)
               .values({
                 title: data.title as string,
@@ -75,38 +215,14 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
 
             return {
               success: true,
-              action: 'task_created',
-              data: taskItem
+              data: taskInbox
             };
 
-          case 'create_reminder':
-            // Parse time from command
-            const reminderTime = parseDateTimeResult
-              ? new Date(parseDateTimeResult)
-              : new Date(Date.now() + 30 * 60 * 1000); // Default to 30 minutes
-
-            const [reminder] = await db
-              .insert(reminders)
-              .values({
-                message: data.message as string,
-                reminderTime,
-                userId: user.id,
-                sent: false
-              })
-              .returning();
-
-            return {
-              success: true,
-              action: 'reminder_created',
-              data: reminder
-            };
-
-          default:
-            // Unknown command, add to inbox
-            const [unknownItem] = await db
+          case 'create_inbox_item':
+            const [inboxItem] = await db
               .insert(inboxItems)
               .values({
-                title: command,
+                title: data.title as string,
                 space: space as 'work' | 'personal',
                 source: 'command',
                 userId: user.id
@@ -115,34 +231,37 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
 
             return {
               success: true,
-              action: 'added_to_inbox',
-              data: unknownItem
+              data: inboxItem
             };
+
+          case 'create_reminder':
+            const [reminder] = await db
+              .insert(reminders)
+              .values({
+                message: data.message as string,
+                reminderTime: new Date(data.reminderTime as string),
+                userId: user.id,
+                sent: false
+              })
+              .returning();
+
+            return {
+              success: true,
+              data: reminder
+            };
+
+          default:
+            throw new Error('Unknown action');
         }
       } catch (error) {
-        console.error('Command processing error:', error);
-
-        // On error, add to inbox as fallback
-        const [fallbackItem] = await db
-          .insert(inboxItems)
-          .values({
-            title: command,
-            space: space as 'work' | 'personal',
-            source: 'command',
-            userId: user.id
-          })
-          .returning();
-
-        return {
-          success: true,
-          action: 'added_to_inbox',
-          data: fallbackItem
-        };
+        console.error('Command execution error:', error);
+        throw error;
       }
     },
     {
       body: t.Object({
-        command: t.String(),
+        action: t.String(),
+        data: t.Record(t.String(), t.Any()),
         space: t.String()
       })
     }

@@ -1,6 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+// Global toast callback - will be set by ToasterProvider
+let globalToast:
+  | ((message: string, options?: { type?: 'success' | 'error' | 'info' }) => void)
+  | null = null;
+
+export function setGlobalToast(
+  toast: (message: string, options?: { type?: 'success' | 'error' | 'info' }) => void
+) {
+  globalToast = toast;
+}
+
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
@@ -137,12 +148,24 @@ export function useWebSocket() {
       case 'reminder': {
         // Show notification
         const data = message.data as { message?: string };
+
+        // Always show toast notification in-app
+        if (globalToast && data?.message) {
+          globalToast(`⏰ ${data.message}`, { type: 'info' });
+        }
+
+        // Also try browser notification if permitted
         if ('Notification' in window && Notification.permission === 'granted' && data?.message) {
-          new Notification('HamFlow Reminder', {
+          new Notification('⏰ HamFlow Reminder', {
             body: data.message,
-            icon: '/favicon.ico'
+            icon: '/favicon.ico',
+            tag: 'reminder',
+            requireInteraction: true
           });
         }
+
+        // Invalidate reminders list
+        queryClient.invalidateQueries({ queryKey: ['reminders'] });
         break;
       }
       case 'server-shutdown':
