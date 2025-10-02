@@ -49,6 +49,7 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
 
         return {
           ...habit,
+          link: habit.metadata?.link,
           completedToday: log?.completed || false,
           currentStreak: 0
         };
@@ -60,6 +61,8 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
   .post(
     '/',
     async ({ body, db, user }) => {
+      const metadata = body.link ? { link: body.link } : {};
+
       const [newHabit] = await db
         .insert(habits)
         .values({
@@ -70,10 +73,14 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
           frequency: body.frequency as 'daily' | 'weekly',
           targetDays: body.targetDays || [],
           reminderTime: body.reminderTime || null,
-          color: body.color || '#3b82f6'
+          color: body.color || '#3b82f6',
+          metadata
         })
         .returning();
-      return newHabit;
+      return {
+        ...newHabit,
+        link: newHabit.metadata?.link
+      };
     },
     {
       body: t.Object({
@@ -83,13 +90,19 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
         space: t.Optional(t.String()),
         targetDays: t.Optional(t.Array(t.Number())),
         reminderTime: t.Optional(t.String()),
-        color: t.Optional(t.String())
+        color: t.Optional(t.String()),
+        link: t.Optional(t.String())
       })
     }
   )
   .patch(
     '/:id',
     async ({ params, body, db, user }) => {
+      // First, get the current habit to preserve existing metadata
+      const [currentHabit] = await db.select().from(habits).where(eq(habits.id, params.id));
+
+      if (!currentHabit) throw new Error('Habit not found');
+
       const updateData: Record<string, unknown> = {
         updatedAt: new Date()
       };
@@ -101,13 +114,19 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
       if (body.reminderTime !== undefined) updateData.reminderTime = body.reminderTime;
       if (body.color !== undefined) updateData.color = body.color;
       if (body.active !== undefined) updateData.active = body.active;
+      if (body.link !== undefined) {
+        updateData.metadata = { ...(currentHabit.metadata || {}), link: body.link };
+      }
 
       const [updated] = await db
         .update(habits)
         .set(updateData)
         .where(and(eq(habits.id, params.id), eq(habits.userId, user.id)))
         .returning();
-      return updated;
+      return {
+        ...updated,
+        link: updated.metadata?.link
+      };
     },
     {
       params: t.Object({ id: t.String() }),
@@ -118,7 +137,8 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
         targetDays: t.Optional(t.Array(t.Number())),
         reminderTime: t.Optional(t.String()),
         color: t.Optional(t.String()),
-        active: t.Optional(t.Boolean())
+        active: t.Optional(t.Boolean()),
+        link: t.Optional(t.String())
       })
     }
   )

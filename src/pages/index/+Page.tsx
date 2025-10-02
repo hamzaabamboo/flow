@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, ExternalLink } from 'lucide-react';
 import { navigate } from 'vike/client/router';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
@@ -567,33 +567,56 @@ export default function AgendaPage() {
                                     transition="all 0.2s"
                                     _hover={{ bg: 'bg.subtle' }}
                                   >
-                                    <HStack gap="1.5" alignItems="center">
-                                      <Checkbox checked={habit.completedToday} size="sm" readOnly />
-                                      <VStack flex="1" gap="0.5" alignItems="start">
-                                        <Text
-                                          textDecoration={
-                                            habit.completedToday ? 'line-through' : 'none'
-                                          }
-                                          fontSize="xs"
-                                          fontWeight="medium"
-                                          lineHeight="1.2"
-                                        >
-                                          {habit.name}
-                                        </Text>
-                                        {habit.reminderTime && (
-                                          <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                            {format(
-                                              new Date(`2000-01-01T${habit.reminderTime}`),
-                                              'h:mm a'
-                                            )}
+                                    <HStack
+                                      gap="1.5"
+                                      justifyContent="space-between"
+                                      alignItems="center"
+                                    >
+                                      <Checkbox
+                                        checked={habit.completedToday}
+                                        size="sm"
+                                        readOnly
+                                        flex="1"
+                                      >
+                                        <VStack gap="0.5" alignItems="start">
+                                          <Text
+                                            textDecoration={
+                                              habit.completedToday ? 'line-through' : 'none'
+                                            }
+                                            fontSize="xs"
+                                            fontWeight="medium"
+                                            lineHeight="1.2"
+                                          >
+                                            {habit.name}
+                                          </Text>
+                                          {habit.reminderTime && (
+                                            <Text color="fg.muted" fontSize="2xs" lineHeight="1">
+                                              {format(
+                                                new Date(`2000-01-01T${habit.reminderTime}`),
+                                                'h:mm a'
+                                              )}
+                                            </Text>
+                                          )}
+                                        </VStack>
+                                      </Checkbox>
+                                      <HStack gap="1" alignItems="center">
+                                        {habit.link && (
+                                          <a
+                                            href={habit.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ display: 'flex', alignItems: 'center' }}
+                                          >
+                                            <ExternalLink width="12" height="12" />
+                                          </a>
+                                        )}
+                                        {(habit.currentStreak ?? 0) > 0 && (
+                                          <Text fontSize="xs" fontWeight="bold">
+                                            🔥{habit.currentStreak}
                                           </Text>
                                         )}
-                                      </VStack>
-                                      {(habit.currentStreak ?? 0) > 0 && (
-                                        <Text fontSize="xs" fontWeight="bold">
-                                          🔥{habit.currentStreak}
-                                        </Text>
-                                      )}
+                                      </HStack>
                                     </HStack>
                                   </Box>
                                 );
@@ -795,35 +818,48 @@ export default function AgendaPage() {
                       {habits?.map((habit) => (
                         <HStack
                           key={habit.id}
+                          onClick={() =>
+                            toggleHabitMutation.mutate({
+                              habitId: habit.id,
+                              date: selectedDate,
+                              completed: !habit.completedToday
+                            })
+                          }
+                          cursor="pointer"
+                          justifyContent="space-between"
                           borderRadius="md"
                           p="1.5"
                           bg={habit.completedToday ? 'green.subtle' : 'bg.subtle'}
                           transition="all 0.2s"
+                          _hover={{ bg: 'bg.emphasized' }}
                         >
-                          <Checkbox
-                            checked={habit.completedToday}
-                            onCheckedChange={({ checked }) =>
-                              toggleHabitMutation.mutate({
-                                habitId: habit.id,
-                                date: selectedDate,
-                                completed: !!checked
-                              })
-                            }
-                            size="sm"
-                          />
-                          <Text
-                            flex="1"
-                            textDecoration={habit.completedToday ? 'line-through' : 'none'}
-                            fontSize="xs"
-                            fontWeight="medium"
-                          >
-                            {habit.name}
-                          </Text>
-                          {(habit.currentStreak ?? 0) > 0 && (
-                            <Badge variant="subtle" size="xs">
-                              🔥{habit.currentStreak}
-                            </Badge>
-                          )}
+                          <Checkbox checked={habit.completedToday} size="sm" readOnly flex="1">
+                            <Text
+                              textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                              fontSize="xs"
+                              fontWeight="medium"
+                            >
+                              {habit.name}
+                            </Text>
+                          </Checkbox>
+                          <HStack gap="1" alignItems="center">
+                            {habit.link && (
+                              <a
+                                href={habit.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ display: 'flex', alignItems: 'center' }}
+                              >
+                                <ExternalLink width="12" height="12" />
+                              </a>
+                            )}
+                            {(habit.currentStreak ?? 0) > 0 && (
+                              <Badge variant="subtle" size="sm">
+                                🔥{habit.currentStreak}
+                              </Badge>
+                            )}
+                          </HStack>
                         </HStack>
                       ))}
                       {(!habits || habits.length === 0) && (
@@ -882,7 +918,8 @@ export default function AgendaPage() {
           onOpenChange={(isOpen) => {
             setIsTaskDialogOpen(isOpen);
             if (!isOpen) {
-              setEditingTask(null);
+              // Delay reset until after dialog animation completes
+              setTimeout(() => setEditingTask(null), 200);
             }
           }}
           mode={editingTask ? 'edit' : 'create'}

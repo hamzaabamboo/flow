@@ -140,6 +140,10 @@ export const habits = pgTable('habits', {
   space: varchar('space', { length: 20 }).notNull(), // 'work' or 'personal'
   color: text('color'),
   active: boolean('active').default(true).notNull(),
+  metadata: jsonb('metadata').$type<{
+    link?: string;
+    customFields?: Record<string, unknown>;
+  }>().default({}), // Flexible metadata including links
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });

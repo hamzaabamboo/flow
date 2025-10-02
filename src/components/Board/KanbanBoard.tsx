@@ -489,7 +489,15 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
 
       <TaskDialog
         open={isTaskDialogOpen}
-        onOpenChange={setIsTaskDialogOpen}
+        onOpenChange={(isOpen) => {
+          setIsTaskDialogOpen(isOpen);
+          if (!isOpen) {
+            setTimeout(() => {
+              setEditingTask(null);
+              setNewTaskColumnId(null);
+            }, 200);
+          }
+        }}
         task={editingTask}
         onSubmit={handleTaskSubmit}
         mode={editingTask ? 'edit' : 'create'}

@@ -107,7 +107,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       startDate.setFullYear(startDate.getFullYear() - 1);
 
       // Fetch habit logs for the date range
-      const logs = await db
+      const _logs = await db
         .select()
         .from(habitLogs)
         .where(

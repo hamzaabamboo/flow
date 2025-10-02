@@ -90,7 +90,7 @@ export default function TasksPage() {
   });
 
   // Priority weights for sorting
-  const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
+  const priorityWeight: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
 
   // Filter and sort tasks
   const filteredTasks = allTasks
@@ -109,6 +109,11 @@ export default function TasksPage() {
       return true;
     })
     .sort((a, b) => {
+      // Completed tasks go to bottom
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+
       // Sort by deadline first (tasks with no deadline go to the end)
       const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
       const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
@@ -513,7 +518,12 @@ export default function TasksPage() {
       {/* Reusable Task Dialog */}
       <TaskDialog
         open={isTaskDialogOpen}
-        onOpenChange={setIsTaskDialogOpen}
+        onOpenChange={(isOpen) => {
+          setIsTaskDialogOpen(isOpen);
+          if (!isOpen) {
+            setTimeout(() => setEditingTask(null), 200);
+          }
+        }}
         task={editingTask as Task | null}
         onSubmit={handleTaskSubmit}
         mode="edit"

@@ -9,7 +9,8 @@ import {
   Calendar,
   Clock,
   Award,
-  Power
+  Power,
+  ExternalLink
 } from 'lucide-react';
 import { Box, VStack, HStack } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
@@ -45,7 +46,8 @@ export default function HabitsPage() {
     frequency: 'daily' as 'daily' | 'weekly',
     targetDays: [] as number[],
     reminderTime: '',
-    color: '#3b82f6'
+    color: '#3b82f6',
+    link: ''
   });
 
   // Fetch habits
@@ -141,7 +143,8 @@ export default function HabitsPage() {
       frequency: 'daily',
       targetDays: [],
       reminderTime: '',
-      color: '#3b82f6'
+      color: '#3b82f6',
+      link: ''
     });
   };
 
@@ -161,7 +164,8 @@ export default function HabitsPage() {
       frequency: habit.frequency === 'custom' ? 'weekly' : habit.frequency,
       targetDays: habit.targetDays || [],
       reminderTime: habit.reminderTime || '',
-      color: habit.color || '#3b82f6'
+      color: habit.color || '#3b82f6',
+      link: habit.link || ''
     });
   };
 
@@ -346,6 +350,22 @@ export default function HabitsPage() {
                         <Clock width="14" height="14" />
                         <Text>Reminder at {habit.reminderTime}</Text>
                       </HStack>
+                    )}
+
+                    {/* Link */}
+                    {habit.link && (
+                      <a
+                        href={habit.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <HStack gap="1.5" color="blue.default" fontSize="sm">
+                          <ExternalLink width="14" height="14" />
+                          <Text>Open Link</Text>
+                        </HStack>
+                      </a>
                     )}
 
                     {/* Stats Row */}
@@ -544,6 +564,30 @@ export default function HabitsPage() {
                     />
                     <Text mt="1" color="fg.muted" fontSize="xs">
                       Get a notification at this time each day
+                    </Text>
+                  </Box>
+
+                  <Box width="100%">
+                    <label
+                      htmlFor="habit-link"
+                      style={{
+                        display: 'block',
+                        marginBottom: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Link (optional)
+                    </label>
+                    <Input
+                      id="habit-link"
+                      type="url"
+                      value={formData.link}
+                      onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                      placeholder="https://example.com"
+                    />
+                    <Text mt="1" color="fg.muted" fontSize="xs">
+                      Add a related link or resource
                     </Text>
                   </Box>
                 </VStack>

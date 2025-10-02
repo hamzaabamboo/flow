@@ -2,6 +2,28 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-02 - Habit Links & UI Improvements
+
+### Features Implemented
+- **Habit Links**: Added link support to habits (similar to tasks)
+  - Database: Added `metadata` JSONB field to habits table
+  - API: Updated all habit endpoints (GET, POST, PATCH) to handle links
+  - UI: Added link input in habit form, display with ExternalLink icon in cards/agenda
+
+### UX Improvements
+- **Dialog Animations**: Fixed TaskDialog flash on close by delaying state reset (200ms)
+  - Applied to agenda, tasks, kanban board, and all boards pages
+- **Countdown Timer**: Hide countdown for completed tasks or tasks in "Done" column
+  - Applied to KanbanColumn and TaskItem components
+- **Task Sorting**: Completed tasks now move to bottom in tasks page
+- **Habit Checkboxes**: Use Checkbox component's built-in label support for accessibility
+- **Clickable Habits**: Made entire habit card clickable in agenda day view sidebar
+
+### Technical Notes
+- Checkbox component accepts children for labels - no need for separate label elements
+- Dialog animation delay prevents flash of reset state when closing dialogs
+- Always check `column.name.toLowerCase() === 'done'` when hiding UI for done tasks
+
 ## 2025-10-02 - Timezone Handling Fix
 
 ### The Problem: Timezone Inconsistency

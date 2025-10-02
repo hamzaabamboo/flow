@@ -418,7 +418,12 @@ export default function AllTasksPage() {
       {/* Reusable Task Dialog */}
       <TaskDialog
         open={isTaskDialogOpen}
-        onOpenChange={setIsTaskDialogOpen}
+        onOpenChange={(isOpen) => {
+          setIsTaskDialogOpen(isOpen);
+          if (!isOpen) {
+            setTimeout(() => setEditingTask(null), 200);
+          }
+        }}
         task={editingTask}
         onSubmit={handleTaskSubmit}
         mode="edit"

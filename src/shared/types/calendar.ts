@@ -61,6 +61,7 @@ export interface Habit {
   completedToday?: boolean;
   currentStreak?: number;
   space?: 'work' | 'personal';
+  link?: string;
 }
 
 export interface CalendarFeedResponse {

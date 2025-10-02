@@ -15,6 +15,13 @@
       "when": 1759324755215,
       "tag": "0001_chemical_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759371083577,
+      "tag": "0002_bouncy_white_queen",
+      "breakpoints": true
     }
   ]
 }

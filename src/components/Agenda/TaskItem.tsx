@@ -6,6 +6,7 @@ import { Text } from '../ui/text';
 import { IconButton } from '../ui/icon-button';
 import { PriorityBadge } from '../PriorityBadge';
 import { LinkifiedText } from '../ui/linkified-text';
+import { Countdown } from '../ui/countdown';
 import type { CalendarEvent } from '../../shared/types/calendar';
 import { getPriorityColor } from '../../utils/priority';
 import { Box, HStack, VStack } from 'styled-system/jsx';
@@ -77,18 +78,10 @@ export function TaskItem({
               {event.priority && <PriorityBadge priority={event.priority} size="sm" />}
               {extraBadges}
             </HStack>
-            {event.dueDate && (
-              <Text color="fg.muted" fontSize="xs">
-                {new Intl.DateTimeFormat(undefined, {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit'
-                }).format(new Date(event.dueDate))}
-              </Text>
-            )}
             <HStack gap="2" flexWrap="wrap">
+              {event.dueDate && !event.completed && (
+                <Countdown targetDate={event.dueDate} size="sm" />
+              )}
               {event.labels && event.labels.length > 0 && (
                 <>
                   {event.labels.slice(0, 2).map((label) => (

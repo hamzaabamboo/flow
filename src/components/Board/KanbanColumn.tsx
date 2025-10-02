@@ -70,7 +70,7 @@ export function KanbanColumn({
     }
   });
 
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+  const { setNodeRef: setDroppableRef, isOver: _isOver } = useDroppable({
     id: column.id
   });
 
@@ -189,6 +189,7 @@ export function KanbanColumn({
                 <TaskCard
                   key={task.id}
                   task={task}
+                  column={column}
                   onEdit={onEditTask}
                   onDelete={onDeleteTask}
                   getPriorityColor={getPriorityColor}
@@ -261,12 +262,14 @@ export function KanbanColumn({
 
 interface TaskCardProps {
   task: Task;
+  column: Column;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   getPriorityColor?: (priority?: string) => string;
 }
 
-function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
+function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
+  console.log(column);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id
   });
@@ -327,6 +330,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
               textOverflow="ellipsis"
               overflow="hidden"
               css={{
+                //@ts-expect-error custom type
                 WebkitBoxOrient: 'vertical' as const,
                 display: '-webkit-box',
                 WebkitLineClamp: '2'
@@ -337,7 +341,9 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           )}
 
           <HStack gap="2" flexWrap="wrap">
-            {task.dueDate && <Countdown targetDate={task.dueDate} size="sm" />}
+            {task.dueDate && !(task.completed || column?.name.toLowerCase() === 'done') && (
+              <Countdown targetDate={task.dueDate} size="sm" />
+            )}
           </HStack>
         </VStack>
         <VStack gap="0" flexShrink={0}>
