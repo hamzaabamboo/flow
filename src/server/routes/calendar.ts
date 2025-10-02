@@ -18,10 +18,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
       .digest('hex');
 
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
     return {
-      url: `${baseUrl}/api/calendar/ical/${user.id}/${token}`,
+      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
       instructions:
         'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
     };
@@ -82,10 +82,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         const dueDate = new Date(task.dueDate);
         const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const taskUrl = task.boardId
-          ? `${baseUrl}/board/${task.boardId}`
-          : `${baseUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
+          ? `${frontendUrl}/board/${task.boardId}`
+          : `${frontendUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
 
         // Build description with metadata link if available
         let eventDescription = task.description || '';
@@ -162,8 +162,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         const endDate = new Date(startDate);
         endDate.setUTCMinutes(minutes + 30); // 30 minute duration for habits
 
-        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-        const habitUrl = `${baseUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
 
         // Build description with metadata link if available
         let habitDescription = habit.description || '';

@@ -12,7 +12,7 @@ import { logger } from '../logger';
 export class SummaryService {
   constructor(
     private db: Database,
-    private instanceUrl: string = process.env.INSTANCE_URL || 'http://localhost:3000'
+    private instanceUrl: string = process.env.FRONTEND_URL || 'http://localhost:3000'
   ) {}
 
   /**
