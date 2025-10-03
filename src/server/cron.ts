@@ -67,10 +67,16 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
 
     // Query users who opted in for this summary type
     const settingKey = type === 'evening' ? 'eveningSummaryEnabled' : 'morningSummaryEnabled';
-    const optedInUsers = await db
-      .select()
-      .from(users)
-      .where(eq(users.settings, { [settingKey]: true }));
+
+    // Fetch all users and filter in memory (JSONB queries in Drizzle are tricky)
+    const allUsers = await db.select().from(users);
+    const optedInUsers = allUsers.filter((user) => {
+      const settings = user.settings as {
+        morningSummaryEnabled?: boolean;
+        eveningSummaryEnabled?: boolean;
+      } | null;
+      return settings?.[settingKey] === true;
+    });
 
     logger.info(`Sending ${type} summaries to ${optedInUsers.length} opted-in users`);
 

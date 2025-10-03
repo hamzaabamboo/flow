@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Speed lines (work blue 300 - lighter) -->
+  <rect x="45" y="180" width="130" height="20" rx="10" fill="#93c5fd"/>
+  <rect x="25" y="230" width="150" height="20" rx="10" fill="#93c5fd"/>
+  <rect x="45" y="280" width="130" height="20" rx="10" fill="#93c5fd"/>
+  <rect x="35" y="330" width="140" height="20" rx="10" fill="#93c5fd"/>
+
+  <!-- H letter (work blue 600 - darker) -->
+  <rect x="196" y="106" width="60" height="300" rx="8" fill="#2563eb"/>
+  <rect x="336" y="106" width="60" height="150" rx="8" fill="#2563eb"/>
+  <rect x="196" y="206" width="200" height="60" rx="8" fill="#2563eb"/>
+
+  <!-- Checkmark (personal purple 600 - darker) -->
+  <path d="M276 296L336 356L460 232" stroke="#9333ea" stroke-width="45" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

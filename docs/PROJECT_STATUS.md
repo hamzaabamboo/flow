@@ -8,7 +8,116 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 ## Latest Updates (2025-10-03)
 
-### ✅ Completed This Session
+### ✅ Completed This Session - Part 3 (PWA & UI Polish)
+
+- **PWA Support** - Progressive Web App setup
+  - Installed and configured Vite PWA plugin
+  - Created app icons and favicon with transparent backgrounds
+  - Generated PWA assets (64x64, 192x192, 512x512, maskable icon, apple-touch-icon)
+  - Updated logo design with darker colors for better visibility
+  - Configured web manifest with app metadata and theme colors
+  - Added service worker for offline support
+  - Icons use updated logo design: darker H letter (blue 600), lighter speed lines (blue 300), purple checkmark (purple 600)
+
+- **Sidebar Logo & Close Button** - Enhanced mobile navigation
+  - Added HamFlow logo to sidebar header (all views)
+  - Logo displays at top of sidebar with app name
+  - Close button always rendered, visible only in mobile drawer
+  - Fixed missing onNavigate prop in personal space mobile drawer
+  - Removed unused MobileSidebar component
+  - Consistent header layout across work and personal spaces
+
+### ✅ Completed This Session - Part 2 (Quick Wins + Medium Tasks)
+
+#### Quick Wins (< 2 hours each)
+
+- **Sidebar Close Button** - Mobile UX improvement
+  - Added X close button to mobile drawer sidebar
+  - Uses IconButton with X icon from lucide-react
+  - Only shown in mobile view (when `onNavigate` callback is provided)
+  - Properly closes drawer when clicked
+
+- **"Send to Inbox" Button for Commands** - Alternative task routing
+  - Added "Send to Inbox" button in CommandBar suggestion dialog
+  - Only shows for `create_task` actions
+  - Forces task to go to inbox instead of board
+  - Uses `create_inbox_item` action for execution
+  - Navigates to inbox after creation
+
+- **CreateBoardDialog Component** - Reusable board creation
+  - Clean dialog component with name and description fields
+  - Auto-focus on board name input when opened
+  - Integrated into Boards page (`/boards`)
+  - Supports optional board description for AI context
+  - Success callback navigates to newly created board
+
+- **Time Support in AI Commands** - Enhanced deadline parsing
+  - Updated `CommandIntentSchema` to support ISO 8601 format with time
+  - AI now parses commands like "tomorrow at 3pm" correctly
+  - Backend stores full datetime in `dueDate` field
+  - Updated AI instructions to extract and format times
+
+- **Commands Data Refresh Fix** - Proper query invalidation
+  - Added `await` to all `invalidateQueries` calls
+  - Added calendar query invalidation for task operations
+  - Ensures UI updates immediately after command execution
+
+- **Destination Picker in Commands** - User control over task placement
+  - Added board/column select dropdowns in CommandBar suggestion
+  - Pre-selects AI-suggested board/column
+  - Users can override AI suggestion before confirming
+  - Auto-selects first column when changing boards
+  - Updates task data with user selection
+
+- **Duplicate Task Feature** - Quick task copying
+  - Added Copy button in Tasks page actions (blue icon)
+  - Creates duplicate with "(Copy)" suffix
+  - Copies all metadata: description, priority, due date, labels
+  - Resets subtasks to incomplete state
+  - Proper query invalidation after duplication
+
+#### Medium Tasks (2-4 hours each)
+
+- **BI-weekly and End of Month Recurring Tasks** - Enhanced recurrence patterns
+  - Added "Bi-weekly" option to TaskDialog recurring selector
+  - Added "End of Month" option to TaskDialog recurring selector
+  - Implemented bi-weekly logic: every 2 weeks on same day of week
+  - Implemented end-of-month logic: last day of each month
+  - Updated `recurring.ts` utility with proper date calculations
+  - Maintains time from original due date
+
+- **Board Description Field + AI Integration** - Intelligent task routing
+  - Added `description` text field to boards schema
+  - Generated and ran database migration (`0005_fuzzy_selene.sql`)
+  - Updated CreateBoardDialog to support description input
+  - Command processor fetches board descriptions with board data
+  - AI receives board descriptions in context JSON
+  - Enhanced AI instructions to use descriptions for smart routing
+  - Example: "deploy task" → routes to Engineering board based on description
+
+- **Summary Doesn't Fire Fix** - Cron job debugging
+  - Fixed incorrect JSONB query in `sendDailySummaries()`
+  - Changed from `eq(users.settings, {...})` to in-memory filtering
+  - Fetches all users, filters by `morningSummaryEnabled`/`eveningSummaryEnabled`
+  - Properly checks settings object structure
+  - Cron jobs now fire correctly at scheduled times
+
+- **Move Tasks Across Boards** - Full task relocation
+  - Added "Move to Board" button in Tasks page (purple MoveRight icon)
+  - Created Move Task Dialog with board and column selectors
+  - Implemented `moveTaskMutation` that updates task's `columnId`
+  - Auto-selects current board/column when dialog opens
+  - Auto-selects first column when changing target board
+  - Proper query invalidation after move operation
+  - Dialog shows task title in description
+
+- **Quick Add Bug Fixes** - State management improvements
+  - Split useEffect into two separate hooks (focus + cleanup)
+  - Reset state only when both dialogs are closed
+  - Prevents premature state cleanup when transitioning dialogs
+  - More reliable dialog flow and state management
+
+### ✅ Completed This Session - Part 1
 
 - **Quick Add Feature** - AI-powered cheatcode for TaskDialog
   - Quick Add button in top bar with sparkle icon (✨)
@@ -165,7 +274,7 @@ Moving towards Phase 4 - Advanced Features & Integrations
 | Route Guards | ✅ | Vike server-side guards |
 | Kanban Boards | ✅ | Full CRUD with drag-drop |
 | Task Management | ✅ | Labels, priorities, subtasks |
-| Recurring Tasks | ✅ | Daily/Weekly/Monthly patterns |
+| Recurring Tasks | ✅ | Daily/Weekly/Bi-weekly/Monthly/End-of-Month/Yearly patterns |
 | Task Completions | ✅ | Per-instance tracking for recurring |
 | Habit Tracking | ✅ | Streaks, timezone-aware completion |
 | Calendar Integration | ✅ | iCal feeds with RRULE support |
@@ -190,13 +299,16 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 All core tables implemented:
 - `users` - Authentication and profiles
-- `boards`, `columns`, `tasks` - Kanban system
+- `boards` (with description field), `columns`, `tasks` - Kanban system
 - `subtasks` - Task breakdown
 - `task_completions` - Recurring task tracking
 - `reminders` - Time-based notifications
 - `inbox_items` - Quick capture
 - `habits`, `habit_logs` - Habit tracking
 - `pomodoro_sessions` - Time tracking
+- `calendar_integrations` - iCal feed support
+
+**Latest Migration**: `0005_fuzzy_selene.sql` - Added board description field
 
 ## Known Issues
 

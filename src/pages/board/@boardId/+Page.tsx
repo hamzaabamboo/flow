@@ -70,24 +70,32 @@ export default function BoardPage() {
   }
 
   return (
-    <Box display="flex" flexDirection="column" height="calc(100vh - 128px)">
+    <Box
+      display="flex"
+      flexDirection="column"
+      height={{ base: 'auto', md: 'calc(100vh - 128px)' }}
+      minH={{ base: 'calc(100vh - 64px)', md: 'auto' }}
+    >
       {/* Header */}
       <HStack
+        gap="2"
         justifyContent="space-between"
         alignItems="center"
         borderColor="border.default"
         borderBottomWidth="1px"
-        p="6"
+        p={{ base: '3', md: '6' }}
+        flexWrap="wrap"
       >
-        <HStack gap="4">
+        <HStack gap={{ base: '2', md: '4' }} flexWrap="wrap">
           <IconButton
             variant="ghost"
             onClick={() => void navigate('/')}
             aria-label="Back to boards"
+            size={{ base: 'sm', md: 'md' }}
           >
             <ArrowLeft />
           </IconButton>
-          <Heading size="2xl">{board.name}</Heading>
+          <Heading size={{ base: 'xl', md: '2xl' }}>{board.name}</Heading>
           <Badge colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>{board.space}</Badge>
         </HStack>
       </HStack>

@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react';
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Circle, Check, X, Inbox, CalendarClock } from 'lucide-react';
 import { navigate } from 'vike/client/router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useToaster } from '../../contexts/ToasterContext';
 import { Input } from '../ui/input';
@@ -11,6 +11,8 @@ import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Spinner } from '../ui/spinner';
 import { Dialog } from '../ui/dialog';
+import { Select, createListCollection } from '../ui/select';
+import type { Column } from '../../shared/types';
 import { HStack, VStack, Box } from 'styled-system/jsx';
 
 interface CommandBarProps {
@@ -31,11 +33,26 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>('');
+  const [selectedColumnId, setSelectedColumnId] = useState<string>('');
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { toast } = useToaster();
+
+  // Fetch boards for destination picker
+  const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
+    queryKey: ['boards', currentSpace],
+    queryFn: async () => {
+      const response = await fetch(`/api/boards?space=${currentSpace}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: open
+  });
 
   // Load command history from localStorage
   useEffect(() => {
@@ -59,6 +76,8 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       setSuggestion(null);
       setIsProcessing(false);
       setHistoryIndex(-1);
+      setSelectedBoardId('');
+      setSelectedColumnId('');
       // Stop voice recognition if active
       if (isListening && recognitionRef.current) {
         recognitionRef.current.stop();
@@ -66,6 +85,16 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       }
     }
   }, [open, isListening]);
+
+  // Initialize board/column selection when suggestion arrives
+  useEffect(() => {
+    if (suggestion && suggestion.action === 'create_task') {
+      const boardId = (suggestion.data.boardId as string) || '';
+      const columnId = (suggestion.data.columnId as string) || '';
+      setSelectedBoardId(boardId);
+      setSelectedColumnId(columnId);
+    }
+  }, [suggestion]);
 
   const handleVoiceInput = () => {
     // If already listening, stop it (cancel)
@@ -165,16 +194,56 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
     }
   };
 
+  const handleSendToInbox = async () => {
+    if (!suggestion) return;
+
+    try {
+      // Force create as inbox item
+      const response = await fetch('/api/command/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_inbox_item',
+          data: suggestion.data,
+          space: currentSpace
+        })
+      });
+
+      if (response.ok) {
+        toast?.('Sent to inbox', { type: 'success' });
+        queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
+        onOpenChange(false);
+        await navigate('/inbox');
+      } else {
+        toast?.('Failed to send to inbox. Please try again', { type: 'error' });
+      }
+    } catch (error) {
+      console.error('Failed to send to inbox:', error);
+      toast?.('Failed to send to inbox. Please try again', { type: 'error' });
+    }
+  };
+
   const handleAccept = async () => {
     if (!suggestion) return;
 
     try {
+      // Override board/column with user selection if changed
+      let finalData = { ...suggestion.data };
+      if (suggestion.action === 'create_task' && selectedBoardId && selectedColumnId) {
+        finalData = {
+          ...finalData,
+          boardId: selectedBoardId,
+          columnId: selectedColumnId,
+          directToBoard: true
+        };
+      }
+
       const response = await fetch('/api/command/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: suggestion.action,
-          data: suggestion.data,
+          data: finalData,
           space: currentSpace
         })
       });
@@ -187,17 +256,19 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         switch (suggestion.action) {
           case 'create_task':
           case 'create_inbox_item':
-            queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
-            queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
-            queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['calendar'] });
             break;
           case 'create_reminder':
-            queryClient.invalidateQueries({ queryKey: ['reminders'] });
+            await queryClient.invalidateQueries({ queryKey: ['reminders'] });
             break;
           case 'complete_task':
           case 'move_task':
-            queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
-            queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            await queryClient.invalidateQueries({ queryKey: ['calendar'] });
             break;
         }
 
@@ -386,17 +457,96 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                       {suggestion.description}
                     </Text>
                   )}
+
+                  {/* Destination Picker for create_task */}
+                  {suggestion.action === 'create_task' && boards.length > 0 && (
+                    <VStack gap="2" alignItems="stretch" mt="2">
+                      <Text fontSize="sm" fontWeight="medium">
+                        Destination
+                      </Text>
+                      <HStack gap="2">
+                        <Select.Root
+                          collection={createListCollection({
+                            items: boards.map((b) => ({ label: b.name, value: b.id }))
+                          })}
+                          value={selectedBoardId ? [selectedBoardId] : []}
+                          onValueChange={(details) => {
+                            const newBoardId = details.value[0];
+                            setSelectedBoardId(newBoardId);
+                            // Auto-select first column of new board
+                            const board = boards.find((b) => b.id === newBoardId);
+                            if (board && board.columns.length > 0) {
+                              setSelectedColumnId(board.columns[0].id);
+                            }
+                          }}
+                          size="sm"
+                        >
+                          <Select.Trigger>
+                            <Select.ValueText placeholder="Select board" />
+                          </Select.Trigger>
+                          <Select.Content>
+                            {boards.map((board) => (
+                              <Select.Item
+                                key={board.id}
+                                item={{ label: board.name, value: board.id }}
+                              >
+                                {board.name}
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+
+                        {selectedBoardId && (
+                          <Select.Root
+                            collection={createListCollection({
+                              items:
+                                boards
+                                  .find((b) => b.id === selectedBoardId)
+                                  ?.columns.map((c) => ({ label: c.name, value: c.id })) || []
+                            })}
+                            value={selectedColumnId ? [selectedColumnId] : []}
+                            onValueChange={(details) => setSelectedColumnId(details.value[0])}
+                            size="sm"
+                          >
+                            <Select.Trigger>
+                              <Select.ValueText placeholder="Select column" />
+                            </Select.Trigger>
+                            <Select.Content>
+                              {boards
+                                .find((b) => b.id === selectedBoardId)
+                                ?.columns.map((column) => (
+                                  <Select.Item
+                                    key={column.id}
+                                    item={{ label: column.name, value: column.id }}
+                                  >
+                                    {column.name}
+                                  </Select.Item>
+                                ))}
+                            </Select.Content>
+                          </Select.Root>
+                        )}
+                      </HStack>
+                    </VStack>
+                  )}
                 </VStack>
 
-                <HStack gap="2" justify="flex-end">
+                <HStack gap="2" justify="space-between">
                   <Button variant="outline" onClick={handleReject}>
                     <X width="16" height="16" />
                     Cancel
                   </Button>
-                  <Button variant="solid" onClick={() => void handleAccept()}>
-                    <Check width="16" height="16" />
-                    Confirm
-                  </Button>
+                  <HStack gap="2">
+                    {suggestion.action === 'create_task' && (
+                      <Button variant="outline" onClick={() => void handleSendToInbox()}>
+                        <Inbox width="16" height="16" />
+                        Send to Inbox
+                      </Button>
+                    )}
+                    <Button variant="solid" onClick={() => void handleAccept()}>
+                      <Check width="16" height="16" />
+                      Confirm
+                    </Button>
+                  </HStack>
                 </HStack>
               </VStack>
             )}

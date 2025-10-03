@@ -4,11 +4,12 @@ import vike from 'vike/plugin';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
+import { pwaPlugin } from './src/pwa-config';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), react(), vike()],
+  plugins: [tsconfigPaths(), react(), vike(), pwaPlugin],
   resolve: {
     alias: {
       '~': new URL('./src/', import.meta.url).pathname,

@@ -36,6 +36,7 @@ export const boards = pgTable('boards', {
     .references(() => users.id)
     .notNull(),
   name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
   space: spaceEnum('space').notNull(), // 'work' or 'personal'
   columnOrder: jsonb('column_order').notNull().default([]),
   settings: jsonb('settings').$type<{

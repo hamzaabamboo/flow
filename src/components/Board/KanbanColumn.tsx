@@ -132,10 +132,10 @@ export function KanbanColumn({
         flexDirection="column"
         borderRadius="lg"
         borderWidth="2px"
-        minW="320px"
-        maxW="320px"
-        maxH="calc(100vh - 200px)"
-        p="4"
+        minW={{ base: '280px', md: '320px' }}
+        maxW={{ base: '280px', md: '320px' }}
+        maxH={{ base: 'none', md: 'calc(100vh - 200px)' }}
+        p={{ base: '3', md: '4' }}
         bg="bg.muted"
       >
         <HStack flexShrink={0} justifyContent="space-between" mb="4">

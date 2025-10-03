@@ -85,6 +85,31 @@ export function expandRecurringTasks(
         }
         current.setDate(current.getDate() + 1);
       }
+    } else if (pattern === 'biweekly') {
+      const current = new Date(Math.max(taskDueDate.getTime(), startDate.getTime()));
+      current.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+      while (current <= effectiveEndDate) {
+        if (current >= startDate && current.getDay() === taskDueDate.getDay()) {
+          const weeksDiff = Math.floor(
+            (current.getTime() - taskDueDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+          );
+
+          // Only include if it's an even number of weeks from the start
+          if (weeksDiff % 2 === 0) {
+            const dateStr = current.toISOString().split('T')[0];
+            const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
+
+            events.push({
+              ...formattedTask,
+              dueDate: new Date(current),
+              completed: isCompleted,
+              instanceDate: dateStr
+            });
+          }
+        }
+        current.setDate(current.getDate() + 1);
+      }
     } else if (pattern === 'monthly') {
       const current = new Date(taskDueDate);
       current.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
@@ -100,6 +125,30 @@ export function expandRecurringTasks(
             completed: isCompleted,
             instanceDate: dateStr
           });
+        }
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else if (pattern === 'end_of_month') {
+      const current = new Date(taskDueDate);
+      current.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+      while (current <= effectiveEndDate) {
+        if (current >= startDate) {
+          // Set to last day of the month
+          const lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+          lastDay.setHours(taskDueDate.getHours(), taskDueDate.getMinutes(), 0, 0);
+
+          if (lastDay >= startDate && lastDay <= effectiveEndDate) {
+            const dateStr = lastDay.toISOString().split('T')[0];
+            const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
+
+            events.push({
+              ...formattedTask,
+              dueDate: new Date(lastDay),
+              completed: isCompleted,
+              instanceDate: dateStr
+            });
+          }
         }
         current.setMonth(current.getMonth() + 1);
       }

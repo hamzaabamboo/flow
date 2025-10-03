@@ -41,13 +41,15 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
-      // Reset state when closing - but only if task dialog is not open
-      if (!showTaskDialog) {
-        setInput('');
-        setParsedTask(null);
-        setIsParsing(false);
-      }
+    }
+  }, [open]);
+
+  // Reset state when both dialogs are closed
+  useEffect(() => {
+    if (!open && !showTaskDialog) {
+      setInput('');
+      setParsedTask(null);
+      setIsParsing(false);
     }
   }, [open, showTaskDialog]);
 

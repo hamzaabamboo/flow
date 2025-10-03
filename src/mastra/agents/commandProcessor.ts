@@ -20,7 +20,12 @@ export const CommandIntentSchema = z.object({
   title: z.string().optional().describe('Task or item title'),
   description: z.string().optional().describe('Task description or details'),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().describe('Task priority level'),
-  deadline: z.string().optional().describe('Task deadline in YYYY-MM-DD format'),
+  deadline: z
+    .string()
+    .optional()
+    .describe(
+      'Task deadline in ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ) or YYYY-MM-DD if no time specified'
+    ),
   labels: z.array(z.string()).optional().describe('Task labels or tags'),
   message: z.string().optional().describe('Reminder message'),
   content: z.string().optional().describe('Note or inbox item content'),
@@ -95,8 +100,10 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * Use "high" for keywords like: important, high priority, soon
      * Use "medium" for regular tasks (DEFAULT)
      * Use "low" for keywords like: low priority, whenever, someday
-   - **Deadline**: Always suggest a deadline in YYYY-MM-DD format:
-     * Parse explicit dates: "tomorrow", "next Monday", "Oct 5th"
+   - **Deadline**: Always suggest a deadline:
+     * Parse explicit dates and times: "tomorrow at 3pm", "next Monday 10am", "Oct 5th at 2:30pm"
+     * If time is specified, use full ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)
+     * If only date specified, use YYYY-MM-DD format
      * For urgent tasks without date: tomorrow
      * For regular tasks without date: tomorrow (next day)
      * Current time: ${new Date().toISOString()}

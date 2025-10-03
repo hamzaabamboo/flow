@@ -10,7 +10,8 @@ import {
   Timer,
   LogOut,
   CheckSquare,
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type { InboxItem, Task, Habit } from '../../shared/types';
@@ -111,8 +112,25 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
 
   return (
     <VStack gap="0" h="full">
+      {/* Logo & Close Button */}
+      <Box w="full" p="4" pb="2">
+        <HStack justifyContent="space-between" alignItems="center">
+          <HStack gap="3" alignItems="center">
+            <Box w="10" h="10">
+              <img src="/logo-no-bg.svg" alt="HamFlow" style={{ width: '100%', height: '100%' }} />
+            </Box>
+            <Text color="fg.default" fontSize="xl" fontWeight="bold">
+              HamFlow
+            </Text>
+          </HStack>
+          <IconButton variant="ghost" size="sm" onClick={onNavigate} aria-label="Close sidebar">
+            <X />
+          </IconButton>
+        </HStack>
+      </Box>
+
       {/* Space Switcher */}
-      <Box w="full" p="4">
+      <Box w="full" p="4" pt="2">
         <Button
           onClick={toggleSpace}
           variant="solid"

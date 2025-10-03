@@ -8,6 +8,8 @@ import {
   type DragStartEvent,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
+  MouseSensor,
   useSensor,
   useSensors,
   rectIntersection
@@ -38,6 +40,17 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
   const [newColumnName, setNewColumnName] = useState('');
 
   const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5
+      }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5
+      }
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 5
@@ -394,8 +407,12 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
 
   return (
     <>
-      <Box flex="1" maxH="calc(100vh - 120px)" overflow="auto">
-        <Box p="6">
+      <Box
+        flex="1"
+        maxH={{ base: 'none', md: 'calc(100vh - 120px)' }}
+        overflow={{ base: 'visible', md: 'auto' }}
+      >
+        <Box p={{ base: '3', md: '6' }}>
           <DndContext
             sensors={sensors}
             collisionDetection={rectIntersection}
@@ -407,7 +424,13 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
               items={sortedColumns.map((c) => c.id)}
               strategy={horizontalListSortingStrategy}
             >
-              <HStack gap="4" alignItems="stretch" minH="full" flexWrap="nowrap">
+              <HStack
+                gap={{ base: '3', md: '4' }}
+                alignItems="stretch"
+                minH="full"
+                overflowX={{ base: 'auto', md: 'visible' }}
+                flexWrap={{ base: 'nowrap', md: 'nowrap' }}
+              >
                 {sortedColumns.map((column) => (
                   <KanbanColumn
                     key={column.id}

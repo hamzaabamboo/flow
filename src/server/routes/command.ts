@@ -20,6 +20,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           .select({
             id: boards.id,
             name: boards.name,
+            description: boards.description,
             space: boards.space
           })
           .from(boards)
@@ -43,11 +44,12 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             return {
               id: board.id,
               name: board.name,
+              description: board.description,
               columns: boardColumns.map((col) => ({ id: col.id, name: col.name }))
             };
           });
 
-          boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf the user specifies a board or column name, map it to the corresponding ID. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", and "columnId": "<column-id>". Otherwise, tasks will go to the inbox for manual processing.`;
+          boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf the user specifies a board or column name, map it to the corresponding ID. Use board descriptions to understand what each board is for and intelligently route tasks. For example, if a user says "add deploy task" and the Engineering board has description "Software development and deployments", route it there. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", and "columnId": "<column-id>". Otherwise, tasks will go to the inbox for manual processing.`;
         }
 
         const result = await commandProcessor.generateVNext(
@@ -106,6 +108,10 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
                 action: 'create_task',
                 data: {
                   title: intent.title || command,
+                  description: intent.description,
+                  priority: intent.priority,
+                  deadline: intent.deadline,
+                  labels: intent.labels,
                   boardId: intent.boardId,
                   columnId: intent.columnId,
                   directToBoard: true
@@ -116,7 +122,13 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
 
             return {
               action: 'create_task',
-              data: { title: intent.title || command },
+              data: {
+                title: intent.title || command,
+                description: intent.description,
+                priority: intent.priority,
+                deadline: intent.deadline,
+                labels: intent.labels
+              },
               description: `Task "${intent.title || command}" will be added to your inbox`
             };
 
@@ -186,14 +198,27 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           case 'create_task':
             // Check if task should go directly to board
             if (data.directToBoard && data.boardId && data.columnId) {
-              const [task] = await db
-                .insert(tasks)
-                .values({
-                  columnId: data.columnId as string,
-                  title: data.title as string,
-                  userId: user.id
-                })
-                .returning();
+              const taskData: {
+                columnId: string;
+                title: string;
+                userId: string;
+                description?: string;
+                priority?: string;
+                dueDate?: Date;
+                labels?: string[];
+              } = {
+                columnId: data.columnId as string,
+                title: data.title as string,
+                userId: user.id
+              };
+
+              if (data.description) taskData.description = data.description as string;
+              if (data.priority) taskData.priority = data.priority as string;
+              if (data.deadline) taskData.dueDate = new Date(data.deadline as string);
+              if (data.labels && Array.isArray(data.labels))
+                taskData.labels = data.labels as string[];
+
+              const [task] = await db.insert(tasks).values(taskData).returning();
 
               return {
                 success: true,
@@ -202,16 +227,32 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
               };
             }
 
-            // Otherwise add to inbox
-            const [taskInbox] = await db
-              .insert(inboxItems)
-              .values({
-                title: data.title as string,
-                space: space as 'work' | 'personal',
-                source: 'command',
-                userId: user.id
-              })
-              .returning();
+            // Otherwise add to inbox with metadata
+            const inboxData: {
+              title: string;
+              space: 'work' | 'personal';
+              source: string;
+              userId: string;
+              description?: string;
+            } = {
+              title: data.title as string,
+              space: space as 'work' | 'personal',
+              source: 'command',
+              userId: user.id
+            };
+
+            // Store task metadata in description for later processing
+            if (data.description || data.priority || data.deadline || data.labels) {
+              const metadata = {
+                description: data.description,
+                priority: data.priority,
+                deadline: data.deadline,
+                labels: data.labels
+              };
+              inboxData.description = JSON.stringify(metadata);
+            }
+
+            const [taskInbox] = await db.insert(inboxItems).values(inboxData).returning();
 
             return {
               success: true,

@@ -124,21 +124,45 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           const pattern = task.recurringPattern.toLowerCase();
 
           let freq: ICalEventRepeatingFreq | undefined;
+          let interval: number | undefined;
+
           if (pattern === 'daily') {
             freq = ICalEventRepeatingFreq.DAILY;
           } else if (pattern === 'weekly') {
             freq = ICalEventRepeatingFreq.WEEKLY;
+          } else if (pattern === 'biweekly') {
+            freq = ICalEventRepeatingFreq.WEEKLY;
+            interval = 2; // Every 2 weeks
           } else if (pattern === 'monthly') {
             freq = ICalEventRepeatingFreq.MONTHLY;
+          } else if (pattern === 'end_of_month') {
+            freq = ICalEventRepeatingFreq.MONTHLY;
+            // Will occur on the last day of each month
           } else if (pattern === 'yearly') {
             freq = ICalEventRepeatingFreq.YEARLY;
           }
 
           if (freq) {
-            event.repeating({
+            const repeatOptions: {
+              freq: ICalEventRepeatingFreq;
+              until?: Date;
+              interval?: number;
+              byMonthDay?: number;
+            } = {
               freq,
               until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
-            });
+            };
+
+            if (interval) {
+              repeatOptions.interval = interval;
+            }
+
+            // For end_of_month, set to last day
+            if (pattern === 'end_of_month') {
+              repeatOptions.byMonthDay = -1; // Last day of month
+            }
+
+            event.repeating(repeatOptions);
           }
         }
       }

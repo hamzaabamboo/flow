@@ -215,7 +215,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <Drawer.Positioner>
             <Drawer.Content>
               <Drawer.Body>
-                <SidebarContent />
+                <SidebarContent onNavigate={() => setMobileSidebarOpen(false)} />
               </Drawer.Body>
             </Drawer.Content>
           </Drawer.Positioner>
@@ -271,7 +271,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <Drawer.Positioner>
             <Drawer.Content>
               <Drawer.Body>
-                <SidebarContent />
+                <SidebarContent onNavigate={() => setMobileSidebarOpen(false)} />
               </Drawer.Body>
             </Drawer.Content>
           </Drawer.Positioner>

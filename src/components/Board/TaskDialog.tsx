@@ -30,7 +30,9 @@ const recurringOptions = createListCollection({
     { label: 'None', value: '' },
     { label: 'Daily', value: 'daily' },
     { label: 'Weekly', value: 'weekly' },
+    { label: 'Bi-weekly', value: 'biweekly' },
     { label: 'Monthly', value: 'monthly' },
+    { label: 'End of Month', value: 'end_of_month' },
     { label: 'Yearly', value: 'yearly' }
   ]
 });
@@ -253,13 +255,13 @@ export function TaskDialog({
         <Dialog.Positioner>
           <Dialog.Content
             borderColor="border.default"
-            w="90vw"
+            w={{ base: '95vw', md: '90vw' }}
             maxW="800px"
             maxH="90vh"
             bg="bg.default"
             overflowY="auto"
           >
-            <VStack gap="6" p="6">
+            <VStack gap={{ base: '4', md: '6' }} p={{ base: '4', md: '6' }}>
               <VStack gap="1">
                 <Dialog.Title>{isEdit ? 'Edit Task' : 'Create New Task'}</Dialog.Title>
                 <Dialog.Description>
