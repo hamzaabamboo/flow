@@ -59,8 +59,8 @@ export function TaskDialog({
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
 
-  // Fetch boards if no columns provided (agenda page scenario)
-  // Now the API returns boards with columns in a single request - no N+1!
+  // Fetch boards to allow moving tasks between boards/columns
+  // The API returns boards with columns in a single request - no N+1!
   const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
@@ -70,7 +70,7 @@ export function TaskDialog({
       if (!response.ok) throw new Error('Failed to fetch boards');
       return response.json();
     },
-    enabled: !columns && open // Only fetch if no columns provided and dialog is open
+    enabled: open // Fetch when dialog is open to allow task movement
   });
 
   const availableColumns =
@@ -78,14 +78,30 @@ export function TaskDialog({
 
   // Initialize board/column selection when dialog opens
   useEffect(() => {
-    if (open && !columns && boards.length > 0 && !selectedBoardId) {
-      const firstBoard = boards[0];
-      setSelectedBoardId(firstBoard.id);
-      if (firstBoard.columns && firstBoard.columns.length > 0) {
-        setSelectedColumnId(firstBoard.columns[0].id);
+    if (open && boards.length > 0) {
+      // If task has columnId, find its board
+      if (task?.columnId) {
+        let taskBoard = null;
+        for (const board of boards) {
+          if (board.columns.some((col) => col.id === task.columnId)) {
+            taskBoard = board;
+            break;
+          }
+        }
+        if (taskBoard) {
+          setSelectedBoardId(taskBoard.id);
+          setSelectedColumnId(task.columnId);
+        }
+      } else if (!selectedBoardId) {
+        // No task column, use first board
+        const firstBoard = boards[0];
+        setSelectedBoardId(firstBoard.id);
+        if (firstBoard.columns && firstBoard.columns.length > 0) {
+          setSelectedColumnId(firstBoard.columns[0].id);
+        }
       }
     }
-  }, [open, columns, boards, selectedBoardId]);
+  }, [open, boards, task?.columnId, selectedBoardId]);
 
   // Reset state when dialog opens/closes or task changes
   useEffect(() => {
@@ -318,8 +334,8 @@ export function TaskDialog({
                   </Box>
 
                   <Grid gap="4" w="full" columns={{ base: 1, md: 2 }}>
-                    {/* Board Selection (only show if no columns provided - agenda page scenario) */}
-                    {!columns && boards.length > 0 && (
+                    {/* Board & Column Selection - always show to allow moving tasks */}
+                    {boards.length > 0 && (
                       <>
                         <Box>
                           <Text mb="1" fontSize="sm" fontWeight="medium">

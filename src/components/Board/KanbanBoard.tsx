@@ -28,9 +28,10 @@ interface KanbanBoardProps {
   board: BoardWithColumns;
   tasks: Task[];
   onTaskUpdate?: () => void;
+  onCopySummary?: (columnId: string) => void;
 }
 
-export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
+export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -443,6 +444,8 @@ export function KanbanBoard({ board, tasks, onTaskUpdate }: KanbanBoardProps) {
                     onRenameColumn={handleRenameColumn}
                     onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
                     onUpdateWipLimit={handleUpdateWipLimit}
+                    boardId={board.id}
+                    onCopySummary={onCopySummary}
                   />
                 ))}
 

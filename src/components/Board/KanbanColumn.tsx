@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   GripVertical,
   Grip,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -38,6 +39,8 @@ interface KanbanColumnProps {
   onRenameColumn?: (columnId: string, name: string) => void;
   onDeleteColumn?: (columnId: string) => void;
   onUpdateWipLimit?: (columnId: string, limit: number | null) => void;
+  boardId: string;
+  onCopySummary?: (columnId: string) => void;
 }
 
 export function KanbanColumn({
@@ -49,7 +52,9 @@ export function KanbanColumn({
   getPriorityColor,
   onRenameColumn,
   onDeleteColumn,
-  onUpdateWipLimit
+  onUpdateWipLimit,
+  boardId: _boardId,
+  onCopySummary
 }: KanbanColumnProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [columnName, setColumnName] = useState(column.name);
@@ -171,18 +176,31 @@ export function KanbanColumn({
               </Menu.Trigger>
               <Menu.Positioner>
                 <Menu.Content>
-                  <Menu.Item value="edit" onClick={() => setIsEditDialogOpen(true)}>
-                    <HStack gap="2">
-                      <Edit2 width="16" height="16" />
-                      <Menu.ItemText>Edit Column</Menu.ItemText>
-                    </HStack>
-                  </Menu.Item>
-                  <Menu.Item value="delete" onClick={handleDeleteColumn}>
-                    <HStack gap="2" color="red.default">
-                      <Trash2 width="16" height="16" />
-                      <Menu.ItemText>Delete Column</Menu.ItemText>
-                    </HStack>
-                  </Menu.Item>
+                  <Menu.ItemGroup>
+                    {onCopySummary && (
+                      <>
+                        <Menu.Item value="copy-summary" asChild>
+                          <HStack onClick={() => onCopySummary(column.id)} gap="2">
+                            <FileText width="16" height="16" />
+                            <Menu.ItemText>Copy Summary</Menu.ItemText>
+                          </HStack>
+                        </Menu.Item>
+                        <Menu.Separator />
+                      </>
+                    )}
+                    <Menu.Item value="edit" asChild>
+                      <HStack onClick={() => setIsEditDialogOpen(true)} gap="2">
+                        <Edit2 width="16" height="16" />
+                        <Menu.ItemText>Edit Column</Menu.ItemText>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item value="delete" asChild>
+                      <HStack onClick={handleDeleteColumn} gap="2" color="red.default">
+                        <Trash2 width="16" height="16" />
+                        <Menu.ItemText>Delete Column</Menu.ItemText>
+                      </HStack>
+                    </Menu.Item>
+                  </Menu.ItemGroup>
                 </Menu.Content>
               </Menu.Positioner>
             </Menu.Root>
@@ -279,7 +297,6 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
-  console.log(column);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id
   });

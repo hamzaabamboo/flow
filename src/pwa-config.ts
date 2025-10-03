@@ -61,7 +61,7 @@ export const pwaPlugin = VitePWA({
     short_name: 'HamFlow',
     description:
       'Personalized productivity hub with task management, calendar, AI commands, and habit tracking',
-    theme_color: '#1e40af',
+    theme_color: '#3b82f6',
     icons: [
       {
         src: 'pwa-64x64.png',

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Menu, Search, Sparkles } from 'lucide-react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { SpaceProvider, useSpace } from '../contexts/SpaceContext';
 import { ColorModeProvider } from '../contexts/ColorModeContext';
@@ -309,6 +310,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  useRegisterSW({ immediate: true });
+
   return (
     <QueryClientProvider client={queryClient}>
       <ColorModeProvider>

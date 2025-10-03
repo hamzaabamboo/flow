@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import * as Card from '../../components/ui/styled/card';
 import { Text } from '../../components/ui/text';
 import { CreateBoardDialog } from '../../components/Board/CreateBoardDialog';
-import { VStack, HStack, Box, Center } from 'styled-system/jsx';
+import { VStack, HStack, Box } from 'styled-system/jsx';
 import type { BoardInfo } from '~/shared/types/board';
 import { Heading } from '~/components/ui/heading';
 import { Spinner } from '~/components/ui/spinner';
@@ -46,9 +46,10 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <Center minH="60vh">
-        <Spinner size="xl" label="Loading boards..." />
-      </Center>
+      <VStack gap="3" justifyContent="center" alignItems="center" minH="60vh" p="8">
+        <Spinner size="lg" />
+        <Text color="fg.muted">Loading boards...</Text>
+      </VStack>
     );
   }
 

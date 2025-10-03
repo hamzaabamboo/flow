@@ -14,7 +14,7 @@ import * as Dialog from '../../components/ui/styled/dialog';
 import type { InboxItem } from '../../shared/types/misc';
 import type { BoardWithColumns } from '../../shared/types/board';
 import { Spinner } from '../../components/ui/spinner';
-import { VStack, HStack, Box, Center, Grid } from 'styled-system/jsx';
+import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
 
 export default function InboxPage() {
   const { currentSpace } = useSpace();
@@ -166,9 +166,10 @@ export default function InboxPage() {
 
   if (isLoading) {
     return (
-      <Center minH="60vh">
-        <Spinner size="xl" label="Loading inbox..." />
-      </Center>
+      <VStack gap="3" justifyContent="center" alignItems="center" minH="60vh" p="8">
+        <Spinner size="lg" />
+        <Text color="fg.muted">Loading inbox...</Text>
+      </VStack>
     );
   }
 

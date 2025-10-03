@@ -1,22 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
 import { usePageContext } from 'vike-react/usePageContext';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MoreVertical, FileText } from 'lucide-react';
 import type { Task } from '../../../components/Board/KanbanColumn';
 import { useSpace } from '../../../contexts/SpaceContext';
 import { KanbanBoard } from '../../../components/Board/KanbanBoard';
-import { Button } from '../../../components/ui/button';
 import { IconButton } from '../../../components/ui/icon-button';
 import { Text } from '../../../components/ui/text';
 import { Heading } from '../../../components/ui/heading';
 import { Badge } from '../../../components/ui/badge';
+import { Menu } from '../../../components/ui/menu';
+import { Spinner } from '../../../components/ui/spinner';
+import { Button } from '../../../components/ui/button';
 import type { BoardWithColumns } from '../../../shared/types/board';
-import { Box, HStack } from 'styled-system/jsx';
+import { useToaster } from '../../../contexts/ToasterContext';
+import { Box, HStack, VStack } from 'styled-system/jsx';
 
 export default function BoardPage() {
   const pageContext = usePageContext();
   const boardId = pageContext.routeParams.boardId;
   const { currentSpace } = useSpace();
+  const { toast } = useToaster();
 
   // Fetch board with columns
   const { data: board, isLoading: boardLoading } = useQuery<BoardWithColumns>({
@@ -52,9 +56,10 @@ export default function BoardPage() {
 
   if (boardLoading) {
     return (
-      <Box p="8">
-        <Text>Loading board...</Text>
-      </Box>
+      <VStack gap="3" justifyContent="center" alignItems="center" minH="50vh" p="8">
+        <Spinner size="lg" />
+        <Text color="fg.muted">Loading board...</Text>
+      </VStack>
     );
   }
 
@@ -68,6 +73,25 @@ export default function BoardPage() {
       </Box>
     );
   }
+
+  const handleCopySummary = async (columnId?: string) => {
+    try {
+      const url = columnId
+        ? `/api/boards/${boardId}/summary?columnId=${columnId}`
+        : `/api/boards/${boardId}/summary`;
+      const response = await fetch(url, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch summary');
+      const data = await response.json();
+
+      await navigator.clipboard.writeText(data.summary);
+      toast?.('Summary copied to clipboard!', { type: 'success' });
+    } catch (error) {
+      console.error('Failed to copy summary:', error);
+      toast?.('Failed to copy summary', { type: 'error' });
+    }
+  };
 
   return (
     <Box
@@ -98,10 +122,37 @@ export default function BoardPage() {
           <Heading size={{ base: 'xl', md: '2xl' }}>{board.name}</Heading>
           <Badge colorPalette={currentSpace === 'work' ? 'blue' : 'purple'}>{board.space}</Badge>
         </HStack>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <IconButton variant="ghost" aria-label="Board options">
+              <MoreVertical />
+            </IconButton>
+          </Menu.Trigger>
+          <Menu.Positioner>
+            <Menu.Content>
+              <Menu.ItemGroup>
+                <Menu.Item
+                  value="copy-board-summary"
+                  asChild
+                  onClick={() => void handleCopySummary()}
+                >
+                  <HStack gap="2">
+                    <FileText width="16" height="16" />
+                    Copy Board Summary
+                  </HStack>
+                </Menu.Item>
+              </Menu.ItemGroup>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Menu.Root>
       </HStack>
 
       {/* Kanban Board Component */}
-      <KanbanBoard board={board} tasks={allTasks} />
+      <KanbanBoard
+        board={board}
+        tasks={allTasks}
+        onCopySummary={(columnId: string) => void handleCopySummary(columnId)}
+      />
     </Box>
   );
 }

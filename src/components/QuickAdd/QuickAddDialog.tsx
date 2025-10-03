@@ -161,12 +161,12 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
       description: formData.get('description') as string,
       dueDate: formData.get('deadline') as string,
       priority: formData.get('priority') as string,
-      labels: labelsString ? labelsString.split(',').map(l => l.trim()) : [],
+      labels: labelsString ? labelsString.split(',').map((l) => l.trim()) : [],
       columnId: formData.get('columnId') as string,
       reminderMinutesBefore: formData.get('createReminder') === 'on' ? 60 : undefined,
-      recurringPattern: formData.get('recurringPattern') as string || undefined,
-      recurringEndDate: formData.get('recurringEndDate') as string || undefined,
-      link: formData.get('link') as string || undefined
+      recurringPattern: (formData.get('recurringPattern') as string) || undefined,
+      recurringEndDate: (formData.get('recurringEndDate') as string) || undefined,
+      link: (formData.get('link') as string) || undefined
     };
 
     try {
@@ -211,81 +211,81 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
           <Dialog.Backdrop />
           <Dialog.Positioner>
             <Dialog.Content maxW="xl" p="0">
-            <VStack gap="0" alignItems="stretch">
-              {/* Header */}
-              <HStack
-                gap="2"
-                borderColor="border.default"
-                borderBottomWidth="1px"
-                p="4"
-                bg="bg.subtle"
-              >
-                <Sparkles width="20" height="20" color="colorPalette.default" />
-                <Text fontSize="lg" fontWeight="semibold">
-                  Quick Add
-                </Text>
-              </HStack>
-
-              {/* Input Section */}
-              <VStack gap="4" alignItems="stretch" p="6">
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type something quick... (e.g., 'deploy staging tomorrow high priority')"
-                  disabled={isParsing}
-                  size="lg"
-                />
-
-                <Text color="fg.muted" fontSize="sm">
-                  ✨ AI will parse your input and open the task dialog with pre-filled fields
-                </Text>
-
-                <HStack gap="2" justify="flex-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    disabled={isParsing}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="solid"
-                    onClick={() => void parseInput()}
-                    disabled={!input.trim() || isParsing}
-                  >
-                    {isParsing ? (
-                      <>
-                        <Loader2 className="animate-spin" width="16" height="16" />
-                        Parsing...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowRight width="16" height="16" />
-                        Open Task Dialog
-                      </>
-                    )}
-                  </Button>
-                </HStack>
-              </VStack>
-
-              {/* Parsing State */}
-              {isParsing && (
-                <VStack gap="3" pb="4" textAlign="center">
-                  <Box position="relative">
-                    <Spinner size="lg" />
-                  </Box>
-                  <Text color="fg.muted" fontSize="sm">
-                    AI is analyzing your input...
+              <VStack gap="0" alignItems="stretch">
+                {/* Header */}
+                <HStack
+                  gap="2"
+                  borderColor="border.default"
+                  borderBottomWidth="1px"
+                  p="4"
+                  bg="bg.subtle"
+                >
+                  <Sparkles width="20" height="20" color="colorPalette.default" />
+                  <Text fontSize="lg" fontWeight="semibold">
+                    Quick Add
                   </Text>
+                </HStack>
+
+                {/* Input Section */}
+                <VStack gap="4" alignItems="stretch" p="6">
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type something quick... (e.g., 'deploy staging tomorrow high priority')"
+                    disabled={isParsing}
+                    size="lg"
+                  />
+
+                  <Text color="fg.muted" fontSize="sm">
+                    ✨ AI will parse your input and open the task dialog with pre-filled fields
+                  </Text>
+
+                  <HStack gap="2" justify="flex-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                      disabled={isParsing}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="solid"
+                      onClick={() => void parseInput()}
+                      disabled={!input.trim() || isParsing}
+                    >
+                      {isParsing ? (
+                        <>
+                          <Loader2 className="animate-spin" width="16" height="16" />
+                          Parsing...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight width="16" height="16" />
+                          Open Task Dialog
+                        </>
+                      )}
+                    </Button>
+                  </HStack>
                 </VStack>
-              )}
-            </VStack>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Dialog.Root>
+
+                {/* Parsing State */}
+                {isParsing && (
+                  <VStack gap="3" pb="4" textAlign="center">
+                    <Box position="relative">
+                      <Spinner size="lg" />
+                    </Box>
+                    <Text color="fg.muted" fontSize="sm">
+                      AI is analyzing your input...
+                    </Text>
+                  </VStack>
+                )}
+              </VStack>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Dialog.Root>
       )}
 
       {/* Task Dialog with Pre-filled Data */}

@@ -123,9 +123,11 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
               HamFlow
             </Text>
           </HStack>
-          <IconButton variant="ghost" size="sm" onClick={onNavigate} aria-label="Close sidebar">
-            <X />
-          </IconButton>
+          {onNavigate && (
+            <IconButton variant="ghost" size="sm" onClick={onNavigate} aria-label="Close sidebar">
+              <X />
+            </IconButton>
+          )}
         </HStack>
       </Box>
 

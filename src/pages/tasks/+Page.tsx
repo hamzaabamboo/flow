@@ -11,7 +11,7 @@ import { IconButton } from '../../components/ui/icon-button';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import { Badge } from '../../components/ui/badge';
-import { Box, VStack, HStack, Grid, Center } from 'styled-system/jsx';
+import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
 import { createListCollection, Select } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import type { ExtendedTask } from '~/shared/types/calendar';
@@ -227,9 +227,10 @@ export default function TasksPage() {
 
   if (isLoading) {
     return (
-      <Center minH="60vh">
-        <Spinner size="xl" label="Loading tasks..." />
-      </Center>
+      <VStack gap="3" justifyContent="center" alignItems="center" minH="60vh" p="8">
+        <Spinner size="lg" />
+        <Text color="fg.muted">Loading tasks...</Text>
+      </VStack>
     );
   }
 
