@@ -206,10 +206,11 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
   return (
     <>
       {/* Quick Input Dialog */}
-      <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content maxW="xl" p="0">
+      {open && (
+        <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="xl" p="0">
             <VStack gap="0" alignItems="stretch">
               {/* Header */}
               <HStack
@@ -285,18 +286,21 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
           </Dialog.Content>
         </Dialog.Positioner>
       </Dialog.Root>
+      )}
 
       {/* Task Dialog with Pre-filled Data */}
-      {parsedTask && (
+      {parsedTask && showTaskDialog && (
         <TaskDialog
           open={showTaskDialog}
           onOpenChange={(isOpen) => {
             setShowTaskDialog(isOpen);
             // Clean up when dialog closes
             if (!isOpen) {
-              setInput('');
-              setParsedTask(null);
-              setIsParsing(false);
+              setTimeout(() => {
+                setInput('');
+                setParsedTask(null);
+                setIsParsing(false);
+              }, 100);
             }
           }}
           task={{
