@@ -44,14 +44,18 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     }
   }, [open]);
 
-  // Reset state when both dialogs are closed
+  // Reset state only when task dialog is closed (not when quick add closes)
   useEffect(() => {
-    if (!open && !showTaskDialog) {
-      setInput('');
-      setParsedTask(null);
-      setIsParsing(false);
+    if (!showTaskDialog && parsedTask) {
+      // Only reset if we had a parsed task and task dialog is now closed
+      const timer = setTimeout(() => {
+        setInput('');
+        setParsedTask(null);
+        setIsParsing(false);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [open, showTaskDialog]);
+  }, [showTaskDialog, parsedTask]);
 
   const parseInput = async () => {
     if (!input.trim()) return;
@@ -151,17 +155,18 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
+    const labelsString = formData.get('labels') as string;
     const taskData = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
-      deadline: formData.get('deadline') as string,
+      dueDate: formData.get('deadline') as string,
       priority: formData.get('priority') as string,
-      labels: formData.get('labels') as string,
+      labels: labelsString ? labelsString.split(',').map(l => l.trim()) : [],
       columnId: formData.get('columnId') as string,
-      createReminder: formData.get('createReminder') === 'on',
-      recurringPattern: formData.get('recurringPattern') as string,
-      recurringEndDate: formData.get('recurringEndDate') as string,
-      space: currentSpace
+      reminderMinutesBefore: formData.get('createReminder') === 'on' ? 60 : undefined,
+      recurringPattern: formData.get('recurringPattern') as string || undefined,
+      recurringEndDate: formData.get('recurringEndDate') as string || undefined,
+      link: formData.get('link') as string || undefined
     };
 
     try {
