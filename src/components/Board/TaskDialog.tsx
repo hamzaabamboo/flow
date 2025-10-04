@@ -361,20 +361,18 @@ export function TaskDialog({
                                 <Select.ValueText placeholder="Select Board" />
                               </Select.Trigger>
                             </Select.Control>
-                            <Portal>
-                              <Select.Positioner>
-                                <Select.Content>
-                                  {boards.map((board) => (
-                                    <Select.Item
-                                      key={board.id}
-                                      item={{ label: board.name, value: board.id }}
-                                    >
-                                      <Select.ItemText>{board.name}</Select.ItemText>
-                                    </Select.Item>
-                                  ))}
-                                </Select.Content>
-                              </Select.Positioner>
-                            </Portal>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {boards.map((board) => (
+                                  <Select.Item
+                                    key={board.id}
+                                    item={{ label: board.name, value: board.id }}
+                                  >
+                                    <Select.ItemText>{board.name}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
                           </Select.Root>
                         </Box>
                         <Box>
@@ -405,20 +403,18 @@ export function TaskDialog({
                                 <Select.ValueText placeholder="Select Column" />
                               </Select.Trigger>
                             </Select.Control>
-                            <Portal>
-                              <Select.Positioner>
-                                <Select.Content>
-                                  {availableColumns.map((col) => (
-                                    <Select.Item
-                                      key={col.id}
-                                      item={{ label: col.name, value: col.id }}
-                                    >
-                                      <Select.ItemText>{col.name}</Select.ItemText>
-                                    </Select.Item>
-                                  ))}
-                                </Select.Content>
-                              </Select.Positioner>
-                            </Portal>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {availableColumns.map((col) => (
+                                  <Select.Item
+                                    key={col.id}
+                                    item={{ label: col.name, value: col.id }}
+                                  >
+                                    <Select.ItemText>{col.name}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
                           </Select.Root>
                         </Box>
                       </>
@@ -459,20 +455,15 @@ export function TaskDialog({
                               <Select.ValueText />
                             </Select.Trigger>
                           </Select.Control>
-                          <Portal>
-                            <Select.Positioner>
-                              <Select.Content>
-                                {columns.map((col) => (
-                                  <Select.Item
-                                    key={col.id}
-                                    item={{ label: col.name, value: col.id }}
-                                  >
-                                    <Select.ItemText>{col.name}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Positioner>
-                          </Portal>
+                          <Select.Positioner>
+                            <Select.Content>
+                              {columns.map((col) => (
+                                <Select.Item key={col.id} item={{ label: col.name, value: col.id }}>
+                                  <Select.ItemText>{col.name}</Select.ItemText>
+                                </Select.Item>
+                              ))}
+                            </Select.Content>
+                          </Select.Positioner>
                         </Select.Root>
                       </Box>
                     )}
@@ -601,17 +592,15 @@ export function TaskDialog({
                               <Select.ValueText placeholder="No recurrence" />
                             </Select.Trigger>
                           </Select.Control>
-                          <Portal>
-                            <Select.Positioner>
-                              <Select.Content>
-                                {recurringOptions.items.map((item) => (
-                                  <Select.Item key={item.value} item={item}>
-                                    <Select.ItemText>{item.label}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Positioner>
-                          </Portal>
+                          <Select.Positioner>
+                            <Select.Content>
+                              {recurringOptions.items.map((item) => (
+                                <Select.Item key={item.value} item={item}>
+                                  <Select.ItemText>{item.label}</Select.ItemText>
+                                </Select.Item>
+                              ))}
+                            </Select.Content>
+                          </Select.Positioner>
                         </Select.Root>
                       </Box>
 

@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Codegen
+        run: bun panda codegen
+
       - name: Type check
         run: bunx tsc --noEmit
 

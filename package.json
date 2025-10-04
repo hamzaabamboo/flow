@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "codegen": "panda codegen",
     "dev": "panda codegen && nodemon",
     "build": "bun run build:ssr && bun run build:server",
     "build:ssr": "panda codegen && bunx --bun vike build",
