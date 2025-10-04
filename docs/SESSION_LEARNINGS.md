@@ -2,6 +2,163 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-04 - Component Extraction & Visual Consistency
+
+### Component Extraction Pattern
+
+**Problem**: Agenda page (index/+Page.tsx) hit 1135 lines with heavy duplication between day/week views
+
+**Solution**: Extract reusable components for habits and stats displays
+```typescript
+// Created src/components/Agenda/HabitsCard.tsx
+interface HabitsCardProps {
+  habits: Habit[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onToggleHabit: (habit: Habit) => void;
+}
+
+// Created src/components/Agenda/StatsCard.tsx
+interface StatsCardProps {
+  title: string;
+  stats: {
+    todo: number;
+    overdue: number;
+    completed: number;
+    total: number;
+  };
+}
+```
+
+**Benefits**:
+- Reduced index/+Page.tsx from 1135 to ~900 lines
+- Eliminated duplicate Card.Root usage across day/week views
+- Single source of truth for habits/stats rendering
+- Easier to maintain and update styling
+
+### Shadow Consistency Pattern
+
+**Problem**: Inconsistent shadows across app - some components had `shadow="xs"`, `shadow="sm"`, `shadow="lg"`, `shadow="xl"`, others used Park UI defaults
+
+**User Feedback**: "shadows are very very inconsistent, get it fixed lah"
+
+**Solution**: Standardize on Park UI default shadows by removing all custom shadow props
+```typescript
+// ❌ WRONG - Custom shadow values
+<Box shadow="sm" />
+<Box shadow="xl" />
+<Card.Root shadow="lg" />
+
+// ✅ CORRECT - Let Park UI handle shadows
+<Box /> // Uses default border/shadow from Park UI
+<Card.Root /> // Consistent shadow from card recipe
+```
+
+**Files Updated**:
+- `src/components/Kanban/TaskCard.tsx` - Removed custom shadows, kept only `shadow="xs"` for subtle card depth
+- `src/components/Pomodoro/PomodoroTimer.tsx` - Removed `shadow="lg"` and `shadow="xl"`
+- All Card components now use Park UI defaults
+
+**Result**: All components now use the same shadow: `rgba(0, 0, 0, 0.8) 0px 8px 16px 0px, rgba(255, 255, 255, 0.23) 0px 0px 1px 0px inset`
+
+### Task Card Visual Consistency
+
+**Problem**: Kanban task cards looked plain compared to Tasks page list view - missing colored accent border
+
+**User Feedback**: "look at task page and board page can you make the task card same vibe" → "i mean agenda page lah" → "i'm talking about the left color lah"
+
+**Solution**: Add 4px left border with priority color to match Tasks page styling
+```typescript
+// Pattern from TaskItem.tsx (Agenda/Tasks page)
+<Box
+  data-priority={event.priority || 'none'}
+  borderLeftWidth="4px"
+  borderLeftColor="colorPalette.default"
+  borderRadius="md"
+  borderWidth="1px"
+  p="3"
+  bg="bg.default"
+  transition="all 0.2s"
+  _hover={{ bg: 'bg.subtle', boxShadow: 'sm' }}
+/>
+
+// Applied to both:
+// - src/components/Kanban/TaskCard.tsx (standalone component)
+// - src/components/Board/KanbanColumn.tsx (inline TaskCard function)
+```
+
+**Key Implementation**:
+1. Add `data-priority` attribute to enable colorPalette styling
+2. Set `borderLeftWidth="4px"` for accent border
+3. Set `borderLeftColor="colorPalette.default"` (uses global CSS from panda.config.ts)
+4. Change `borderRadius="md"` to `borderRadius="lg"` for modern look
+5. Add `shadow="xs"` for subtle depth
+
+**Color Mapping** (from panda.config.ts globalCss):
+- `[data-priority=urgent]` → colorPalette: 'red' (orange left border)
+- `[data-priority=high]` → colorPalette: 'orange'
+- `[data-priority=medium]` → colorPalette: 'yellow'
+- `[data-priority=low]` → colorPalette: 'gray'
+- `[data-priority=none]` → colorPalette: 'gray' (white/gray left border)
+
+### CSS Grid Responsive Positioning
+
+**Technique**: Use gridColumn/gridRow with responsive breakpoints instead of duplicate JSX
+```typescript
+// Day View layout
+<Grid
+  gap={4}
+  gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }}
+  gridTemplateRows={{ base: 'auto auto auto', lg: 'auto auto' }}
+  w="full"
+>
+  {/* Habits - Top on mobile (row 1), sidebar top on desktop */}
+  <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '1', lg: '1' }}>
+    <HabitsCard {...} />
+  </Box>
+
+  {/* Tasks - Middle on mobile (row 2), left spanning both rows on desktop */}
+  <Box gridColumn={{ base: '1', lg: '1' }} gridRow={{ base: '2', lg: '1 / 3' }}>
+    <Card.Root>...</Card.Root>
+  </Box>
+
+  {/* Stats - Bottom on mobile (row 3), sidebar bottom on desktop */}
+  <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '3', lg: '2' }}>
+    <StatsCard {...} />
+  </Box>
+</Grid>
+```
+
+**Benefits**:
+- Single layout definition for both mobile/desktop
+- No display:none hiding (better for a11y)
+- Eliminated ~110 lines of duplicate JSX
+- More maintainable than conditional rendering
+
+### Inline Component Discovery
+
+**Discovery**: Found that `KanbanColumn.tsx` has its own inline `TaskCard` component (lines 306-419), separate from `Kanban/TaskCard.tsx`
+
+**Why**:
+- The Kanban board uses dnd-kit for drag-and-drop
+- The inline TaskCard is tightly coupled with useSortable hook
+- Different layout (has GripVertical drag handle, Edit/Delete buttons)
+
+**Lesson**: Always grep for component usage before assuming there's only one implementation
+```bash
+grep -n "TaskCard" src/components/Board/KanbanColumn.tsx
+# Found both import and inline function definition
+```
+
+### Key Learnings
+
+1. **Component Extraction Timing**: Extract when file >1000 lines or clear duplication exists
+2. **Shadow Consistency**: Let design system handle shadows, only override when absolutely necessary
+3. **Visual Harmony**: UI components across different views should share visual language (borders, colors, shadows)
+4. **Responsive Patterns**: CSS Grid with gridColumn/gridRow more maintainable than conditional JSX
+5. **Chrome DevTools for Visual QA**: Use DevTools to inspect actual computed styles, not just code
+6. **Multiple Implementations**: Components with same name may exist in different files for different contexts
+
 ## 2025-10-03 - AI Command Parser & Inbox Revamp (Enhanced)
 
 ### Board-Aware AI Command Processing

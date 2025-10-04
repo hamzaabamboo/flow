@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Circle, Check, X, Inbox, CalendarClock } from 'lucide-react';
+import { Portal } from '@ark-ui/react/portal';
 import { navigate } from 'vike/client/router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSpace } from '../../contexts/SpaceContext';
@@ -256,22 +257,24 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         switch (suggestion.action) {
           case 'create_task':
           case 'create_inbox_item':
-            await queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
-            await queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
-            await queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
-            await queryClient.invalidateQueries({ queryKey: ['calendar'] });
+            queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
+            queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
+            queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            queryClient.invalidateQueries({ queryKey: ['calendar'] });
             break;
           case 'create_reminder':
-            await queryClient.invalidateQueries({ queryKey: ['reminders'] });
+            queryClient.invalidateQueries({ queryKey: ['reminders'] });
             break;
           case 'complete_task':
           case 'move_task':
-            await queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
-            await queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
-            await queryClient.invalidateQueries({ queryKey: ['calendar'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
+            queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
+            queryClient.invalidateQueries({ queryKey: ['calendar'] });
             break;
         }
 
+        // Wait a bit for invalidation to trigger before closing
+        await new Promise((resolve) => setTimeout(resolve, 100));
         onOpenChange(false);
 
         // Check if task was added directly to board
@@ -484,16 +487,20 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                           <Select.Trigger>
                             <Select.ValueText placeholder="Select board" />
                           </Select.Trigger>
-                          <Select.Content>
-                            {boards.map((board) => (
-                              <Select.Item
-                                key={board.id}
-                                item={{ label: board.name, value: board.id }}
-                              >
-                                {board.name}
-                              </Select.Item>
-                            ))}
-                          </Select.Content>
+                          <Portal>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {boards.map((board) => (
+                                  <Select.Item
+                                    key={board.id}
+                                    item={{ label: board.name, value: board.id }}
+                                  >
+                                    {board.name}
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Portal>
                         </Select.Root>
 
                         {selectedBoardId && (
@@ -511,18 +518,22 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                             <Select.Trigger>
                               <Select.ValueText placeholder="Select column" />
                             </Select.Trigger>
-                            <Select.Content>
-                              {boards
-                                .find((b) => b.id === selectedBoardId)
-                                ?.columns.map((column) => (
-                                  <Select.Item
-                                    key={column.id}
-                                    item={{ label: column.name, value: column.id }}
-                                  >
-                                    {column.name}
-                                  </Select.Item>
-                                ))}
-                            </Select.Content>
+                            <Portal>
+                              <Select.Positioner>
+                                <Select.Content>
+                                  {boards
+                                    .find((b) => b.id === selectedBoardId)
+                                    ?.columns.map((column) => (
+                                      <Select.Item
+                                        key={column.id}
+                                        item={{ label: column.name, value: column.id }}
+                                      >
+                                        {column.name}
+                                      </Select.Item>
+                                    ))}
+                                </Select.Content>
+                              </Select.Positioner>
+                            </Portal>
                           </Select.Root>
                         )}
                       </HStack>

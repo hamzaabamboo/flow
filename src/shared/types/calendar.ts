@@ -62,6 +62,7 @@ export interface Habit {
   currentStreak?: number;
   space?: 'work' | 'personal';
   link?: string;
+  checkDate?: string; // For week view - the specific date this habit's completion is for
 }
 
 export interface CalendarFeedResponse {

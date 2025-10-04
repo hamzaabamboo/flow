@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Trash2, CheckCircle, Circle, AlertCircle } from 'lucide-react';
+import { Portal } from '@ark-ui/react/portal';
 import { useSpace } from '../../../contexts/SpaceContext';
 import { TaskDialog } from '../../../components/Board/TaskDialog';
 import { Input } from '../../../components/ui/input';
@@ -235,23 +236,25 @@ export default function AllTasksPage() {
                   <Select.ValueText placeholder="All columns" />
                 </Select.Trigger>
               </Select.Control>
-              <Select.Positioner>
-                <Select.Content>
-                  {createListCollection({
-                    items: [
-                      { label: 'All columns', value: 'all' },
-                      ...allColumns.map((col) => ({
-                        label: `${col.boardName} - ${col.name}`,
-                        value: col.id
-                      }))
-                    ]
-                  }).items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      <Select.ItemText>{item.label}</Select.ItemText>
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
+              <Portal>
+                <Select.Positioner>
+                  <Select.Content>
+                    {createListCollection({
+                      items: [
+                        { label: 'All columns', value: 'all' },
+                        ...allColumns.map((col) => ({
+                          label: `${col.boardName} - ${col.name}`,
+                          value: col.id
+                        }))
+                      ]
+                    }).items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Portal>
             </Select.Root>
 
             <Select.Root
@@ -272,23 +275,25 @@ export default function AllTasksPage() {
                   <Select.ValueText placeholder="All priorities" />
                 </Select.Trigger>
               </Select.Control>
-              <Select.Positioner>
-                <Select.Content>
-                  {createListCollection({
-                    items: [
-                      { label: 'All priorities', value: 'all' },
-                      { label: 'Low', value: 'low' },
-                      { label: 'Medium', value: 'medium' },
-                      { label: 'High', value: 'high' },
-                      { label: 'Urgent', value: 'urgent' }
-                    ]
-                  }).items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      <Select.ItemText>{item.label}</Select.ItemText>
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
+              <Portal>
+                <Select.Positioner>
+                  <Select.Content>
+                    {createListCollection({
+                      items: [
+                        { label: 'All priorities', value: 'all' },
+                        { label: 'Low', value: 'low' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'High', value: 'high' },
+                        { label: 'Urgent', value: 'urgent' }
+                      ]
+                    }).items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Portal>
             </Select.Root>
           </HStack>
         </VStack>

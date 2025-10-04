@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, ArrowUpDown, Tag, Calendar, AlertCircle } from 'lucide-react';
 import { Check } from 'lucide-react';
+import { Portal } from '@ark-ui/react/portal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Select, createListCollection } from '../ui/select';
@@ -124,18 +125,20 @@ export function TaskFilterBar({
                 <Select.ValueText placeholder="All Priorities" />
               </Select.Trigger>
             </Select.Control>
-            <Select.Positioner>
-              <Select.Content>
-                {priorityOptions.items.map((item) => (
-                  <Select.Item key={item.value} item={item}>
-                    <Select.ItemText>{item.label}</Select.ItemText>
-                    <Select.ItemIndicator>
-                      <Check />
-                    </Select.ItemIndicator>
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Positioner>
+            <Portal>
+              <Select.Positioner>
+                <Select.Content>
+                  {priorityOptions.items.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      <Select.ItemText>{item.label}</Select.ItemText>
+                      <Select.ItemIndicator>
+                        <Check />
+                      </Select.ItemIndicator>
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Positioner>
+            </Portal>
           </Select.Root>
 
           {/* Label Filter */}
@@ -228,18 +231,20 @@ export function TaskFilterBar({
                   <Select.ValueText placeholder="Sort by..." />
                 </Select.Trigger>
               </Select.Control>
-              <Select.Positioner>
-                <Select.Content>
-                  {sortOptions.items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      <Select.ItemText>{item.label}</Select.ItemText>
-                      <Select.ItemIndicator>
-                        <Check />
-                      </Select.ItemIndicator>
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
+              <Portal>
+                <Select.Positioner>
+                  <Select.Content>
+                    {sortOptions.items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        <Select.ItemText>{item.label}</Select.ItemText>
+                        <Select.ItemIndicator>
+                          <Check />
+                        </Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Positioner>
+              </Portal>
             </Select.Root>
 
             <IconButton

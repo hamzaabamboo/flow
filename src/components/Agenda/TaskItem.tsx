@@ -1,4 +1,4 @@
-import { ExternalLink, Edit2 } from 'lucide-react';
+import { ExternalLink, Edit2, Copy } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -14,12 +14,14 @@ export function TaskItem({
   event,
   onToggleComplete,
   onTaskClick,
+  onDuplicate,
   extraBadges,
   actions
 }: {
   event: CalendarEvent;
   onToggleComplete: () => void;
   onTaskClick: () => void;
+  onDuplicate?: () => void;
   extraBadges?: ReactNode;
   actions?: ReactNode;
 }) {
@@ -97,6 +99,19 @@ export function TaskItem({
           </VStack>
         </HStack>
         <HStack gap="1" flexShrink={0}>
+          {onDuplicate && (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label="Duplicate task"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate();
+              }}
+            >
+              <Copy width="16" height="16" />
+            </IconButton>
+          )}
           <IconButton
             variant="ghost"
             size="sm"

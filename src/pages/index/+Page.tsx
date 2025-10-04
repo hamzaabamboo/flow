@@ -18,6 +18,8 @@ import { useQueryState, useDateQueryState } from '../../hooks/useQueryState';
 import type { CalendarEvent, ExtendedTask, Habit } from '../../shared/types/calendar';
 import type { Task } from '../../shared/types/board';
 import { TaskItem } from '../../components/Agenda/TaskItem';
+import { HabitsCard } from '../../components/Agenda/HabitsCard';
+import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
 
@@ -85,7 +87,9 @@ export default function AgendaPage() {
         viewMode === 'day'
           ? format(selectedDate, 'yyyy-MM-dd')
           : format(startOfWeek(selectedDate), 'yyyy-MM-dd');
-      const response = await fetch(`/api/habits?date=${dateStr}&space=${currentSpace}`);
+      const response = await fetch(
+        `/api/habits?date=${dateStr}&space=${currentSpace}&view=${viewMode}`
+      );
       if (!response.ok) throw new Error('Failed to fetch habits');
       return response.json();
     }
@@ -445,487 +449,434 @@ export default function AgendaPage() {
         ) : isErrorEvents ? (
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full">
+          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full" h="full">
             {/* Week View - Grid Layout */}
-            <VStack gap="3" alignItems="stretch" w="full">
+            <VStack gap="3" alignItems="stretch" w="full" h="full" overflow="hidden">
               {/* Grid Header */}
-              <Grid
-                gap="2"
-                gridTemplateColumns={{
-                  base: 'repeat(2, 1fr)',
-                  sm: 'repeat(4, 1fr)',
-                  md: 'repeat(7, 1fr)'
-                }}
-                w="full"
-              >
-                {weekDates.map((date) => {
-                  const isToday = isSameDay(date, new Date());
-                  const dateKey = format(date, 'yyyy-MM-dd');
-                  const dayEvents = groupedEvents[dateKey] || [];
-                  const isPast = date < new Date() && !isSameDay(date, new Date());
+              <Box w="full" h="full" overflowX="auto" overflowY="auto">
+                <Grid
+                  gap="2"
+                  gridTemplateColumns={{
+                    base: 'repeat(7, minmax(120px, 1fr))',
+                    md: 'repeat(7, 1fr)'
+                  }}
+                  w="full"
+                  overflowX="auto"
+                >
+                  {weekDates.map((date) => {
+                    const isToday = isSameDay(date, new Date());
+                    const dateKey = format(date, 'yyyy-MM-dd');
+                    const dayEvents = groupedEvents[dateKey] || [];
+                    const isPast = date < new Date() && !isSameDay(date, new Date());
 
-                  return (
-                    <Box
-                      className={css({
-                        borderColor: 'border.default',
-                        bg: 'bg.default',
-                        opacity: 1,
-                        '&[data-is-today=true]': {
-                          borderColor: 'colorPalette.default',
-                          bg: 'colorPalette.subtle'
-                        },
-                        '&[data-is-past=true]': {
-                          opacity: 0.7
-                        }
-                      })}
-                      key={date.toISOString()}
-                      data-is-today={isToday}
-                      data-is-past={isPast}
-                      borderRadius="lg"
-                      borderWidth="1px"
-                      overflow="hidden"
-                    >
-                      {/* Day Header */}
+                    return (
                       <Box
                         className={css({
-                          bg: 'bg.subtle',
+                          borderColor: 'border.default',
+                          bg: 'bg.default',
+                          opacity: 1,
                           '&[data-is-today=true]': {
+                            borderColor: 'colorPalette.default',
                             bg: 'colorPalette.subtle'
+                          },
+                          '&[data-is-past=true]': {
+                            opacity: 0.7
                           }
                         })}
+                        key={date.toISOString()}
                         data-is-today={isToday}
-                        borderBottomWidth="1px"
-                        borderBottomColor="border.default"
-                        p="2"
+                        data-is-past={isPast}
+                        borderRadius="lg"
+                        borderWidth="1px"
+                        overflow="hidden"
                       >
-                        <VStack gap="0.5" alignItems="center">
-                          <Text
-                            color={isToday ? 'colorPalette.default' : 'fg.muted'}
-                            fontSize="xs"
-                            fontWeight="semibold"
-                            textTransform="uppercase"
-                          >
-                            {format(date, 'EEE')}
-                          </Text>
-                          <Text
-                            color={isToday ? 'colorPalette.default' : 'fg.default'}
-                            fontSize="xl"
-                            fontWeight="bold"
-                          >
-                            {format(date, 'd')}
-                          </Text>
-                        </VStack>
-                      </Box>
+                        {/* Day Header */}
+                        <Box
+                          className={css({
+                            bg: 'bg.subtle',
+                            '&[data-is-today=true]': {
+                              bg: 'colorPalette.subtle'
+                            }
+                          })}
+                          data-is-today={isToday}
+                          borderBottomWidth="1px"
+                          borderBottomColor="border.default"
+                          p="2"
+                        >
+                          <VStack gap="0.5" alignItems="center">
+                            <Text
+                              color={isToday ? 'colorPalette.default' : 'fg.muted'}
+                              fontSize="xs"
+                              fontWeight="semibold"
+                              textTransform="uppercase"
+                            >
+                              {format(date, 'EEE')}
+                            </Text>
+                            <Text
+                              color={isToday ? 'colorPalette.default' : 'fg.default'}
+                              fontSize="xl"
+                              fontWeight="bold"
+                            >
+                              {format(date, 'd')}
+                            </Text>
+                          </VStack>
+                        </Box>
 
-                      {/* Day Content */}
-                      <Box minH="xs" maxH="md" p="2" overflowY="auto">
-                        <VStack gap="1.5" alignItems="stretch">
-                          {/* Combined Habits and Tasks - Sorted by Time */}
-                          {(() => {
-                            const dayHabits =
-                              habits?.filter((habit) => {
-                                if (habit.frequency === 'daily') return true;
-                                if (habit.frequency === 'weekly' && habit.targetDays) {
-                                  return habit.targetDays.includes(date.getDay());
+                        {/* Day Content */}
+                        <Box minH="xs" maxH="md" p="2" overflowY="auto">
+                          <VStack gap="1.5" alignItems="stretch">
+                            {/* Combined Habits and Tasks - Sorted by Time */}
+                            {(() => {
+                              const dayHabits =
+                                habits?.filter((habit) => {
+                                  // In week view, habits from API already have checkDate for filtering
+                                  if (viewMode === 'week') {
+                                    return habit.checkDate === dateKey;
+                                  }
+                                  // In day view, use frequency logic
+                                  if (habit.frequency === 'daily') return true;
+                                  if (habit.frequency === 'weekly' && habit.targetDays) {
+                                    return habit.targetDays.includes(date.getDay());
+                                  }
+                                  return false;
+                                }) || [];
+
+                              // Combine habits and tasks with a type indicator
+                              const combined = [
+                                ...dayHabits.map((h) => ({
+                                  type: 'habit' as const,
+                                  item: h,
+                                  time: h.reminderTime
+                                })),
+                                ...dayEvents.map((e) => ({
+                                  type: 'task' as const,
+                                  item: e,
+                                  time: e.dueDate
+                                }))
+                              ];
+
+                              // Sort by time
+                              combined.sort((a, b) => {
+                                if (a.time && b.time) {
+                                  const aDate = new Date(a.time);
+                                  const bDate = new Date(b.time);
+                                  return aDate.getTime() - bDate.getTime();
                                 }
-                                return false;
-                              }) || [];
+                                // Items without time go to bottom
+                                if (!a.time) return 1;
+                                if (!b.time) return -1;
+                                return 0;
+                              });
 
-                            // Combine habits and tasks with a type indicator
-                            const combined = [
-                              ...dayHabits.map((h) => ({
-                                type: 'habit' as const,
-                                item: h,
-                                time: h.reminderTime
-                              })),
-                              ...dayEvents.map((e) => ({
-                                type: 'task' as const,
-                                item: e,
-                                time: e.dueDate
-                              }))
-                            ];
-
-                            // Sort by time
-                            combined.sort((a, b) => {
-                              if (a.time && b.time) {
-                                const aDate = new Date(a.time);
-                                const bDate = new Date(b.time);
-                                return aDate.getTime() - bDate.getTime();
-                              }
-                              // Items without time go to bottom
-                              if (!a.time) return 1;
-                              if (!b.time) return -1;
-                              return 0;
-                            });
-
-                            return combined.map((item) => {
-                              if (item.type === 'habit') {
-                                const habit = item.item;
-                                return (
-                                  <Box
-                                    className={css({
-                                      bg: 'bg.muted',
-                                      '&[data-completed=true]': {
-                                        bg: 'green.subtle'
+                              return combined.map((item) => {
+                                if (item.type === 'habit') {
+                                  const habit = item.item;
+                                  return (
+                                    <Box
+                                      className={css({
+                                        bg: 'bg.muted',
+                                        '&[data-completed=true]': {
+                                          bg: 'green.subtle'
+                                        }
+                                      })}
+                                      key={`habit-${habit.id}-${dateKey}`}
+                                      onClick={() =>
+                                        toggleHabitMutation.mutate({
+                                          habitId: habit.id,
+                                          date,
+                                          completed: !habit.completedToday
+                                        })
                                       }
-                                    })}
-                                    key={`habit-${habit.id}-${dateKey}`}
-                                    onClick={() =>
-                                      toggleHabitMutation.mutate({
-                                        habitId: habit.id,
-                                        date,
-                                        completed: !habit.completedToday
-                                      })
-                                    }
-                                    data-completed={habit.completedToday}
-                                    cursor="pointer"
-                                    borderLeftWidth="3px"
-                                    borderLeftColor="colorPalette.default"
-                                    borderRadius="sm"
-                                    p="1.5"
-                                    transition="all 0.2s"
-                                    _hover={{ bg: 'bg.subtle' }}
-                                  >
-                                    <HStack
-                                      gap="1.5"
-                                      justifyContent="space-between"
-                                      alignItems="center"
+                                      data-completed={habit.completedToday}
+                                      cursor="pointer"
+                                      borderLeftWidth="3px"
+                                      borderLeftColor="colorPalette.default"
+                                      borderRadius="sm"
+                                      p="1.5"
+                                      transition="all 0.2s"
+                                      _hover={{ bg: 'bg.subtle' }}
                                     >
-                                      <Checkbox
-                                        checked={habit.completedToday}
-                                        size="sm"
-                                        readOnly
-                                        flex="1"
+                                      <HStack
+                                        gap="1.5"
+                                        justifyContent="space-between"
+                                        alignItems="center"
                                       >
-                                        <VStack gap="0.5" alignItems="start">
+                                        <Checkbox
+                                          checked={habit.completedToday}
+                                          size="sm"
+                                          readOnly
+                                          flex="1"
+                                        >
+                                          <VStack gap="0.5" alignItems="start">
+                                            <Text
+                                              textDecoration={
+                                                habit.completedToday ? 'line-through' : 'none'
+                                              }
+                                              fontSize="xs"
+                                              fontWeight="medium"
+                                              lineHeight="1.2"
+                                            >
+                                              {habit.name}
+                                            </Text>
+                                            {habit.reminderTime && (
+                                              <Text color="fg.muted" fontSize="2xs" lineHeight="1">
+                                                {format(
+                                                  new Date(`2000-01-01T${habit.reminderTime}`),
+                                                  'h:mm a'
+                                                )}
+                                              </Text>
+                                            )}
+                                          </VStack>
+                                        </Checkbox>
+                                        <HStack gap="1" alignItems="center">
+                                          {habit.link && (
+                                            <a
+                                              href={habit.link}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              onClick={(e) => e.stopPropagation()}
+                                              style={{ display: 'flex', alignItems: 'center' }}
+                                            >
+                                              <ExternalLink width="12" height="12" />
+                                            </a>
+                                          )}
+                                          {(habit.currentStreak ?? 0) > 0 && (
+                                            <Text fontSize="xs" fontWeight="bold">
+                                              🔥{habit.currentStreak}
+                                            </Text>
+                                          )}
+                                        </HStack>
+                                      </HStack>
+                                    </Box>
+                                  );
+                                } else {
+                                  const event = item.item;
+                                  return (
+                                    <Box
+                                      key={`${event.id}-${event.instanceDate}`}
+                                      onClick={() => handleTaskClick(event)}
+                                      data-priority={event.priority || 'none'}
+                                      cursor="pointer"
+                                      borderLeftWidth="3px"
+                                      borderLeftColor="colorPalette.default"
+                                      borderRadius="sm"
+                                      p="1.5"
+                                      bg="bg.muted"
+                                      transition="all 0.2s"
+                                      _hover={{
+                                        bg: 'bg.subtle',
+                                        borderLeftColor: 'colorPalette.emphasized'
+                                      }}
+                                    >
+                                      <HStack gap="1.5" alignItems="start">
+                                        <Checkbox
+                                          size="sm"
+                                          checked={event.completed}
+                                          onCheckedChange={() => completeTask(event)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <VStack flex="1" gap="0.5" alignItems="start">
                                           <Text
+                                            color={event.completed ? 'fg.subtle' : 'fg.default'}
                                             textDecoration={
-                                              habit.completedToday ? 'line-through' : 'none'
+                                              event.completed ? 'line-through' : 'none'
                                             }
                                             fontSize="xs"
                                             fontWeight="medium"
                                             lineHeight="1.2"
+                                            lineClamp="2"
                                           >
-                                            {habit.name}
+                                            {event.title}
                                           </Text>
-                                          {habit.reminderTime && (
+                                          {event.dueDate && (
                                             <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                              {format(
-                                                new Date(`2000-01-01T${habit.reminderTime}`),
-                                                'h:mm a'
-                                              )}
+                                              {format(new Date(event.dueDate), 'h:mm a')}
                                             </Text>
                                           )}
                                         </VStack>
-                                      </Checkbox>
-                                      <HStack gap="1" alignItems="center">
-                                        {habit.link && (
-                                          <a
-                                            href={habit.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{ display: 'flex', alignItems: 'center' }}
-                                          >
-                                            <ExternalLink width="12" height="12" />
-                                          </a>
-                                        )}
-                                        {(habit.currentStreak ?? 0) > 0 && (
-                                          <Text fontSize="xs" fontWeight="bold">
-                                            🔥{habit.currentStreak}
-                                          </Text>
-                                        )}
                                       </HStack>
-                                    </HStack>
-                                  </Box>
-                                );
-                              } else {
-                                const event = item.item;
-                                return (
-                                  <Box
-                                    key={`${event.id}-${event.instanceDate}`}
-                                    onClick={() => handleTaskClick(event)}
-                                    data-priority={event.priority || 'none'}
-                                    cursor="pointer"
-                                    borderLeftWidth="3px"
-                                    borderLeftColor="colorPalette.default"
-                                    borderRadius="sm"
-                                    p="1.5"
-                                    bg="bg.muted"
-                                    transition="all 0.2s"
-                                    _hover={{
-                                      bg: 'bg.subtle',
-                                      borderLeftColor: 'colorPalette.emphasized'
-                                    }}
-                                  >
-                                    <HStack gap="1.5" alignItems="start">
-                                      <Checkbox
-                                        size="sm"
-                                        checked={event.completed}
-                                        onCheckedChange={() => completeTask(event)}
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                      <VStack flex="1" gap="0.5" alignItems="start">
-                                        <Text
-                                          color={event.completed ? 'fg.subtle' : 'fg.default'}
-                                          textDecoration={event.completed ? 'line-through' : 'none'}
-                                          fontSize="xs"
-                                          fontWeight="medium"
-                                          lineHeight="1.2"
-                                          lineClamp="2"
-                                        >
-                                          {event.title}
-                                        </Text>
-                                        {event.dueDate && (
-                                          <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                            {format(new Date(event.dueDate), 'h:mm a')}
-                                          </Text>
-                                        )}
-                                      </VStack>
-                                    </HStack>
-                                  </Box>
-                                );
-                              }
-                            });
-                          })()}
-                          {dayEvents.length === 0 &&
-                            !habits?.filter((h) => {
-                              if (h.frequency === 'daily') return true;
-                              if (h.frequency === 'weekly' && h.targetDays) {
-                                return h.targetDays.includes(date.getDay());
-                              }
-                              return false;
-                            }).length && (
-                              <Text py="4" color="fg.subtle" fontSize="xs" textAlign="center">
-                                No tasks or habits
-                              </Text>
-                            )}
-                        </VStack>
+                                    </Box>
+                                  );
+                                }
+                              });
+                            })()}
+                            {dayEvents.length === 0 &&
+                              !habits?.filter((h) => {
+                                if (h.frequency === 'daily') return true;
+                                if (h.frequency === 'weekly' && h.targetDays) {
+                                  return h.targetDays.includes(date.getDay());
+                                }
+                                return false;
+                              }).length && (
+                                <Text py="4" color="fg.subtle" fontSize="xs" textAlign="center">
+                                  No tasks or habits
+                                </Text>
+                              )}
+                          </VStack>
+                        </Box>
                       </Box>
-                    </Box>
-                  );
-                })}
-              </Grid>
-            </VStack>
-            {/* Sidebar for Habits and Stats */}
-            <VStack display={{ base: 'none', lg: 'flex' }} gap={3}>
-              {/* Weekly Stats Section */}
-              <Card.Root w="full">
-                <Card.Header p="3">
-                  <Card.Title fontSize="sm">Weekly Stats</Card.Title>
-                </Card.Header>
-                <Card.Body p="3" pt="0">
-                  <VStack gap={2} alignItems="stretch">
-                    <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="xs">
-                        Todo
-                      </Text>
-                      <Text fontSize="xl" fontWeight="bold">
-                        {stats.todo}
-                      </Text>
-                    </HStack>
-                    {stats.overdue > 0 && (
-                      <HStack justifyContent="space-between">
-                        <Text color="fg.muted" fontSize="xs">
-                          Overdue
-                        </Text>
-                        <Text color="red.default" fontSize="md" fontWeight="semibold">
-                          {stats.overdue}
-                        </Text>
-                      </HStack>
-                    )}
-                    <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="xs">
-                        Completed
-                      </Text>
-                      <Text color="green.default" fontSize="md" fontWeight="semibold">
-                        {stats.completed}/{stats.total}
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </Card.Body>
-              </Card.Root>
-            </VStack>
-          </Grid>
-        ) : (
-          // Day View - Grid Layout
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full">
-            {/* Tasks for the day */}
-            <VStack gap="3" alignItems="stretch" w="full">
-              <Box borderRadius="lg" borderWidth="1px" minH="lg" p="4" bg="bg.default">
-                <VStack gap="2" alignItems="stretch">
-                  <Text mb="2" fontSize="lg" fontWeight="semibold">
-                    Tasks for {format(selectedDate, 'MMM d')}
-                  </Text>
-                  {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]
-                    ?.sort((a, b) => {
-                      // Sort by dueDate time (earliest first)
-                      if (a.dueDate && b.dueDate) {
-                        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-                      }
-                      // Tasks without due times go to bottom
-                      if (!a.dueDate) return 1;
-                      if (!b.dueDate) return -1;
-                      return 0;
-                    })
-                    .map((event) => (
-                      <TaskItem
-                        key={`${event.id}-${event.instanceDate}`}
-                        event={event}
-                        onToggleComplete={() => completeTask(event)}
-                        onTaskClick={() => handleTaskClick(event)}
-                        extraBadges={
-                          event.boardName && event.columnName ? (
-                            <>
-                              <Badge size="sm" variant="outline">
-                                {event.boardName}
-                              </Badge>
-                              <Badge size="sm" variant="subtle">
-                                {event.columnName}
-                              </Badge>
-                            </>
-                          ) : null
-                        }
-                        actions={
-                          event.boardId ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                void navigate(`/board/${event.boardId}`);
-                              }}
-                              aria-label="View Board"
-                            >
-                              <LayoutGrid width="16" height="16" />
-                            </IconButton>
-                          ) : undefined
-                        }
-                      />
-                    ))}
-                  {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
-                    groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
-                    <Text py="8" color="fg.subtle" textAlign="center">
-                      No tasks scheduled
-                    </Text>
-                  )}
-                </VStack>
+                    );
+                  })}
+                </Grid>
               </Box>
             </VStack>
-
             {/* Sidebar for Habits and Stats */}
-            <VStack display={{ base: 'none', lg: 'flex' }} gap={3}>
-              {/* Habits Section */}
+            <VStack gap={3}>
+              {/* Habits Section for Week View */}
               <Card.Root w="full">
                 <Card.Header p="3">
-                  <Card.Title fontSize="sm">Daily Habits</Card.Title>
+                  <Card.Title fontSize="sm">This Week's Habits</Card.Title>
                 </Card.Header>
                 <Card.Body p="3" pt="0">
                   {isLoadingHabits ? (
-                    <Center>Loading habits...</Center>
+                    <Center>
+                      <Spinner size="sm" />
+                    </Center>
                   ) : isErrorHabits ? (
-                    <Center>Error loading habits</Center>
+                    <Center>
+                      <Text color="red.default" fontSize="xs">
+                        Error loading habits
+                      </Text>
+                    </Center>
                   ) : (
-                    <VStack gap="1.5" alignItems="stretch">
-                      {habits?.map((habit) => (
-                        <HStack
-                          className={css({
-                            bg: 'bg.subtle',
-                            '&[data-completed=true]': {
-                              bg: 'green.subtle'
-                            }
-                          })}
-                          key={habit.id}
-                          onClick={() =>
-                            toggleHabitMutation.mutate({
-                              habitId: habit.id,
-                              date: selectedDate,
-                              completed: !habit.completedToday
-                            })
-                          }
-                          data-completed={habit.completedToday}
-                          cursor="pointer"
-                          justifyContent="space-between"
-                          borderRadius="md"
-                          p="1.5"
-                          transition="all 0.2s"
-                          _hover={{ bg: 'bg.emphasized' }}
-                        >
-                          <Checkbox checked={habit.completedToday} size="sm" readOnly flex="1">
-                            <Text
-                              textDecoration={habit.completedToday ? 'line-through' : 'none'}
-                              fontSize="xs"
-                              fontWeight="medium"
+                    <VStack gap="1.5" alignItems="stretch" maxH="300px" overflowY="auto">
+                      {(() => {
+                        const uniqueHabits = Array.from(
+                          new Map(habits?.map((h) => [h.id, h]) || []).values()
+                        );
+                        return uniqueHabits.length > 0 ? (
+                          uniqueHabits.map((habit) => (
+                            <HStack
+                              key={habit.id}
+                              justifyContent="space-between"
+                              borderRadius="md"
+                              p="1.5"
+                              bg="bg.subtle"
                             >
-                              {habit.name}
-                            </Text>
-                          </Checkbox>
-                          <HStack gap="1" alignItems="center">
-                            {habit.link && (
-                              <a
-                                href={habit.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ display: 'flex', alignItems: 'center' }}
-                              >
-                                <ExternalLink width="12" height="12" />
-                              </a>
-                            )}
-                            {(habit.currentStreak ?? 0) > 0 && (
-                              <Badge variant="subtle" size="sm">
-                                🔥{habit.currentStreak}
-                              </Badge>
-                            )}
-                          </HStack>
-                        </HStack>
-                      ))}
-                      {(!habits || habits.length === 0) && (
-                        <Text py="2" color="fg.subtle" fontSize="xs" textAlign="center">
-                          No habits yet
-                        </Text>
-                      )}
+                              <Text fontSize="xs" fontWeight="medium">
+                                {habit.name}
+                              </Text>
+                              {habit.link && (
+                                <a
+                                  href={habit.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'flex', alignItems: 'center' }}
+                                >
+                                  <ExternalLink width="12" height="12" />
+                                </a>
+                              )}
+                            </HStack>
+                          ))
+                        ) : (
+                          <Text py="2" color="fg.subtle" fontSize="xs" textAlign="center">
+                            No habits this week
+                          </Text>
+                        );
+                      })()}
                     </VStack>
                   )}
                 </Card.Body>
               </Card.Root>
 
-              {/* Daily Stats Section */}
-              <Card.Root w="full">
-                <Card.Header p="3">
-                  <Card.Title fontSize="sm">Daily Stats</Card.Title>
-                </Card.Header>
-                <Card.Body p="3" pt="0">
-                  <VStack gap={2} alignItems="stretch">
-                    <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="xs">
-                        Todo
-                      </Text>
-                      <Text fontSize="xl" fontWeight="bold">
-                        {stats.todo}
-                      </Text>
-                    </HStack>
-                    {stats.overdue > 0 && (
-                      <HStack justifyContent="space-between">
-                        <Text color="fg.muted" fontSize="xs">
-                          Overdue
-                        </Text>
-                        <Text color="red.default" fontSize="lg" fontWeight="semibold">
-                          {stats.overdue}
-                        </Text>
-                      </HStack>
-                    )}
-                    <HStack justifyContent="space-between">
-                      <Text color="fg.muted" fontSize="xs">
-                        Completed
-                      </Text>
-                      <Text color="green.default" fontSize="md" fontWeight="semibold">
-                        {stats.completed}/{stats.total}
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </Card.Body>
-              </Card.Root>
+              {/* Weekly Stats Section */}
+              <StatsCard title="Weekly Stats" stats={stats} />
             </VStack>
+          </Grid>
+        ) : (
+          // Day View - CSS Grid with responsive positioning
+          <Grid
+            gap={4}
+            gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }}
+            gridTemplateRows={{ base: 'auto auto auto', lg: 'auto auto' }}
+            w="full"
+          >
+            {/* Habits - Top on mobile, sidebar top on desktop */}
+            <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '1', lg: '1' }}>
+              <HabitsCard
+                habits={habits}
+                isLoading={isLoadingHabits}
+                isError={isErrorHabits}
+                onToggleHabit={(habit) =>
+                  toggleHabitMutation.mutate({
+                    habitId: habit.id,
+                    date: selectedDate,
+                    completed: !habit.completedToday
+                  })
+                }
+              />
+            </Box>
+
+            {/* Tasks - Middle on mobile, left spanning both rows on desktop */}
+            <Box gridColumn={{ base: '1', lg: '1' }} gridRow={{ base: '2', lg: '1 / 3' }}>
+              <VStack gap="3" alignItems="stretch" w="full">
+                <Card.Root minH="lg">
+                  <Card.Body p="4">
+                    <VStack gap="2" alignItems="stretch">
+                      <Text mb="2" fontSize="lg" fontWeight="semibold">
+                        Tasks for {format(selectedDate, 'MMM d')}
+                      </Text>
+                      {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]
+                        ?.sort((a, b) => {
+                          // Sort by dueDate time (earliest first)
+                          if (a.dueDate && b.dueDate) {
+                            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                          }
+                          // Tasks without due times go to bottom
+                          if (!a.dueDate) return 1;
+                          if (!b.dueDate) return -1;
+                          return 0;
+                        })
+                        .map((event) => (
+                          <TaskItem
+                            key={`${event.id}-${event.instanceDate}`}
+                            event={event}
+                            onToggleComplete={() => completeTask(event)}
+                            onTaskClick={() => handleTaskClick(event)}
+                            extraBadges={
+                              event.boardName && event.columnName ? (
+                                <>
+                                  <Badge size="sm" variant="outline">
+                                    {event.boardName}
+                                  </Badge>
+                                  <Badge size="sm" variant="subtle">
+                                    {event.columnName}
+                                  </Badge>
+                                </>
+                              ) : null
+                            }
+                            actions={
+                              event.boardId ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    void navigate(`/board/${event.boardId}`);
+                                  }}
+                                  aria-label="View Board"
+                                >
+                                  <LayoutGrid width="16" height="16" />
+                                </IconButton>
+                              ) : undefined
+                            }
+                          />
+                        ))}
+                      {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
+                        groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
+                        <Text py="8" color="fg.subtle" textAlign="center">
+                          No tasks scheduled
+                        </Text>
+                      )}
+                    </VStack>
+                  </Card.Body>
+                </Card.Root>
+              </VStack>
+            </Box>
+
+            {/* Stats - Bottom on mobile, sidebar bottom on desktop */}
+            <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '3', lg: '2' }}>
+              <StatsCard title="Daily Stats" stats={stats} />
+            </Box>
           </Grid>
         )}
 

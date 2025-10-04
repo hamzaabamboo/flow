@@ -14,3 +14,4 @@ styled-system/
 *.db-journal
 *.sqlite
 *.sqlite3
+build/

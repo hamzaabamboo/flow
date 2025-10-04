@@ -3,7 +3,7 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Settings,
+  MoreVertical,
   AlertTriangle,
   GripVertical,
   Grip,
@@ -144,13 +144,14 @@ export function KanbanColumn({
         bg="bg.muted"
       >
         <HStack flexShrink={0} justifyContent="space-between" mb="4">
-          <HStack gap="2">
+          <HStack flex="1" gap="2">
             {/* Drag handle for column */}
             <Box
               {...columnAttributes}
               {...columnListeners}
               cursor="grab"
               color="fg.muted"
+              touchAction="none"
               transition="color 0.2s"
               _hover={{ color: 'fg.default' }}
             >
@@ -168,10 +169,13 @@ export function KanbanColumn({
             )}
           </HStack>
           <HStack gap="1">
+            <IconButton variant="ghost" size="sm" onClick={onAddTask} aria-label="Add task">
+              <Plus width="16" height="16" />
+            </IconButton>
             <Menu.Root>
               <Menu.Trigger asChild>
                 <IconButton variant="ghost" size="sm" aria-label="Column options">
-                  <Settings width="16" height="16" />
+                  <MoreVertical width="16" height="16" />
                 </IconButton>
               </Menu.Trigger>
               <Menu.Positioner>
@@ -204,9 +208,6 @@ export function KanbanColumn({
                 </Menu.Content>
               </Menu.Positioner>
             </Menu.Root>
-            <IconButton variant="ghost" size="sm" onClick={onAddTask} aria-label="Add task">
-              <Plus width="16" height="16" />
-            </IconButton>
           </HStack>
         </HStack>
 
@@ -234,7 +235,13 @@ export function KanbanColumn({
       >
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content borderColor="border.default" maxW="400px" bg="bg.default">
+          <Dialog.Content
+            borderColor="border.default"
+            maxW="400px"
+            maxH={{ base: 'calc(100vh - 2rem)', md: '90vh' }}
+            bg="bg.default"
+            overflowY="auto"
+          >
             <VStack gap="4" p="6">
               <VStack gap="1">
                 <Dialog.Title>Edit Column</Dialog.Title>
@@ -309,22 +316,34 @@ function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
 
   return (
     <Box
+      data-priority={task.priority || 'none'}
       ref={setNodeRef}
       style={style}
       {...attributes}
       cursor="grab"
       position="relative"
       borderColor="border.default"
-      borderRadius="md"
+      borderLeftWidth="4px"
+      borderLeftColor="colorPalette.default"
+      borderRadius="lg"
       borderWidth="1px"
       w="full"
       p="3"
       bg="bg.default"
+      shadow="xs"
+      touchAction="none"
       transition="all 0.2s"
-      _hover={{ borderColor: 'colorPalette.default', boxShadow: 'sm' }}
+      _hover={{ borderColor: 'border.emphasized', boxShadow: 'sm' }}
     >
       <HStack gap="2" alignItems="start" mb="2">
-        <Box {...listeners} cursor="grab" flexShrink={0} mt="0.5" color="fg.muted">
+        <Box
+          {...listeners}
+          cursor="grab"
+          flexShrink={0}
+          mt="0.5"
+          color="fg.muted"
+          touchAction="none"
+        >
           <GripVertical width="16" height="16" />
         </Box>
         <VStack flex="1" gap="2" alignItems="stretch">

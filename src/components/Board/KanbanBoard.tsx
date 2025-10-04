@@ -9,7 +9,6 @@ import {
   DragOverlay,
   PointerSensor,
   TouchSensor,
-  MouseSensor,
   useSensor,
   useSensors,
   rectIntersection
@@ -41,20 +40,15 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   const [newColumnName, setNewColumnName] = useState('');
 
   const sensors = useSensors(
-    useSensor(MouseSensor, {
+    useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5
+        distance: 8
       }
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 5
-      }
-    }),
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5
+        delay: 100,
+        tolerance: 8
       }
     })
   );

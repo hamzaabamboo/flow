@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Tag, RefreshCw, Calendar, CheckSquare, Bell } from 'lucide-react';
+import { X, Save, Plus, Tag, RefreshCw, Calendar, CheckSquare, Bell, XCircle } from 'lucide-react';
 import { Portal } from '@ark-ui/react/portal';
 import { useQuery } from '@tanstack/react-query';
 import type { Task, Column, SimpleSubtask } from '../../shared/types';
@@ -58,6 +58,7 @@ export function TaskDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
+  const [dueDateKey, setDueDateKey] = useState(0);
 
   // Fetch boards to allow moving tasks between boards/columns
   // The API returns boards with columns in a single request - no N+1!
@@ -360,18 +361,20 @@ export function TaskDialog({
                                 <Select.ValueText placeholder="Select Board" />
                               </Select.Trigger>
                             </Select.Control>
-                            <Select.Positioner>
-                              <Select.Content>
-                                {boards.map((board) => (
-                                  <Select.Item
-                                    key={board.id}
-                                    item={{ label: board.name, value: board.id }}
-                                  >
-                                    <Select.ItemText>{board.name}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Positioner>
+                            <Portal>
+                              <Select.Positioner>
+                                <Select.Content>
+                                  {boards.map((board) => (
+                                    <Select.Item
+                                      key={board.id}
+                                      item={{ label: board.name, value: board.id }}
+                                    >
+                                      <Select.ItemText>{board.name}</Select.ItemText>
+                                    </Select.Item>
+                                  ))}
+                                </Select.Content>
+                              </Select.Positioner>
+                            </Portal>
                           </Select.Root>
                         </Box>
                         <Box>
@@ -402,18 +405,20 @@ export function TaskDialog({
                                 <Select.ValueText placeholder="Select Column" />
                               </Select.Trigger>
                             </Select.Control>
-                            <Select.Positioner>
-                              <Select.Content>
-                                {availableColumns.map((col) => (
-                                  <Select.Item
-                                    key={col.id}
-                                    item={{ label: col.name, value: col.id }}
-                                  >
-                                    <Select.ItemText>{col.name}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Positioner>
+                            <Portal>
+                              <Select.Positioner>
+                                <Select.Content>
+                                  {availableColumns.map((col) => (
+                                    <Select.Item
+                                      key={col.id}
+                                      item={{ label: col.name, value: col.id }}
+                                    >
+                                      <Select.ItemText>{col.name}</Select.ItemText>
+                                    </Select.Item>
+                                  ))}
+                                </Select.Content>
+                              </Select.Positioner>
+                            </Portal>
                           </Select.Root>
                         </Box>
                       </>
@@ -454,15 +459,20 @@ export function TaskDialog({
                               <Select.ValueText />
                             </Select.Trigger>
                           </Select.Control>
-                          <Select.Positioner>
-                            <Select.Content>
-                              {columns.map((col) => (
-                                <Select.Item key={col.id} item={{ label: col.name, value: col.id }}>
-                                  <Select.ItemText>{col.name}</Select.ItemText>
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select.Positioner>
+                          <Portal>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {columns.map((col) => (
+                                  <Select.Item
+                                    key={col.id}
+                                    item={{ label: col.name, value: col.id }}
+                                  >
+                                    <Select.ItemText>{col.name}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Portal>
                         </Select.Root>
                       </Box>
                     )}
@@ -501,11 +511,25 @@ export function TaskDialog({
 
                     {/* Due Date */}
                     <Box>
-                      <Text mb="1" fontSize="sm" fontWeight="medium">
-                        <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                        Due Date
-                      </Text>
+                      <HStack justifyContent="space-between" mb="1">
+                        <Text fontSize="sm" fontWeight="medium">
+                          <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                          Due Date
+                        </Text>
+                        <IconButton
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          aria-label="Clear due date"
+                          onClick={() => {
+                            setDueDateKey((prev) => prev + 1);
+                          }}
+                        >
+                          <XCircle width="14" height="14" />
+                        </IconButton>
+                      </HStack>
                       <Input
+                        key={dueDateKey}
                         type="datetime-local"
                         name="dueDate"
                         defaultValue={
@@ -577,15 +601,17 @@ export function TaskDialog({
                               <Select.ValueText placeholder="No recurrence" />
                             </Select.Trigger>
                           </Select.Control>
-                          <Select.Positioner>
-                            <Select.Content>
-                              {recurringOptions.items.map((item) => (
-                                <Select.Item key={item.value} item={item}>
-                                  <Select.ItemText>{item.label}</Select.ItemText>
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select.Positioner>
+                          <Portal>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {recurringOptions.items.map((item) => (
+                                  <Select.Item key={item.value} item={item}>
+                                    <Select.ItemText>{item.label}</Select.ItemText>
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Portal>
                         </Select.Root>
                       </Box>
 

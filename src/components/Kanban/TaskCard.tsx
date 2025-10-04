@@ -31,74 +31,64 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
 
   return (
     <Box
+      data-priority={task.priority || 'none'}
       draggable
       onDragStart={() => onDragStart(task)}
       onClick={() => setIsExpanded(!isExpanded)}
       cursor="grab"
       borderColor="border.default"
-      borderRadius="md"
+      borderLeftWidth="4px"
+      borderLeftColor="colorPalette.default"
+      borderRadius="lg"
       borderWidth="1px"
       p="3"
       bg="bg.default"
-      shadow="sm"
+      shadow="xs"
       transition="all 0.2s"
       _active={{
         cursor: 'grabbing'
       }}
       _hover={{
         borderColor: 'border.emphasized',
-        shadow: 'md'
+        shadow: 'sm'
       }}
     >
-      <HStack gap="2" alignItems="flex-start">
-        {task.priority && (
-          <Box
-            data-priority={task.priority}
-            borderRadius="xs"
-            width="1"
-            height="full"
-            minHeight="20px"
-            bg="colorPalette.solid"
-          />
+      <VStack gap="2" alignItems="flex-start">
+        <Text
+          color={task.completed ? 'fg.subtle' : 'fg.default'}
+          textDecoration={task.completed ? 'line-through' : 'none'}
+          fontSize="sm"
+          fontWeight="medium"
+        >
+          {task.title}
+        </Text>
+
+        {isExpanded && task.description && (
+          <Text color="fg.muted" fontSize="xs">
+            {task.description}
+          </Text>
         )}
 
-        <VStack flex="1" gap="2" alignItems="flex-start">
-          <Text
-            color={task.completed ? 'fg.subtle' : 'fg.default'}
-            textDecoration={task.completed ? 'line-through' : 'none'}
-            fontSize="sm"
-            fontWeight="medium"
-          >
-            {task.title}
-          </Text>
-
-          {isExpanded && task.description && (
-            <Text color="fg.muted" fontSize="xs">
-              {task.description}
-            </Text>
+        <HStack gap="2" flexWrap="wrap">
+          {task.dueDate && (
+            <Badge variant="outline" colorPalette="yellow" fontSize="xs">
+              <HStack gap="1">
+                <Calendar width="12" height="12" />
+                {formatDueDate(task.dueDate)}
+              </HStack>
+            </Badge>
           )}
 
-          <HStack gap="2" flexWrap="wrap">
-            {task.dueDate && (
-              <Badge variant="outline" colorPalette="yellow" fontSize="xs">
-                <HStack gap="1">
-                  <Calendar width="12" height="12" />
-                  {formatDueDate(task.dueDate)}
-                </HStack>
-              </Badge>
-            )}
-
-            {task.completed && (
-              <Badge variant="outline" colorPalette="green" fontSize="xs">
-                <HStack gap="1">
-                  <Check width="12" height="12" />
-                  Completed
-                </HStack>
-              </Badge>
-            )}
-          </HStack>
-        </VStack>
-      </HStack>
+          {task.completed && (
+            <Badge variant="outline" colorPalette="green" fontSize="xs">
+              <HStack gap="1">
+                <Check width="12" height="12" />
+                Completed
+              </HStack>
+            </Badge>
+          )}
+        </HStack>
+      </VStack>
     </Box>
   );
 }

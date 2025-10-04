@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
 import { Trash2, LayoutGrid, Copy, MoveRight } from 'lucide-react';
+import { Portal } from '@ark-ui/react/portal';
 import type { Task } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import TaskDialog from '../../components/Board/TaskDialog';
@@ -275,13 +276,20 @@ export default function TasksPage() {
                     <Select.Trigger>
                       <Select.ValueText placeholder="Select board" />
                     </Select.Trigger>
-                    <Select.Content>
-                      {boards.map((board) => (
-                        <Select.Item key={board.id} item={{ label: board.name, value: board.id }}>
-                          {board.name}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
+                    <Portal>
+                      <Select.Positioner>
+                        <Select.Content>
+                          {boards.map((board) => (
+                            <Select.Item
+                              key={board.id}
+                              item={{ label: board.name, value: board.id }}
+                            >
+                              {board.name}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Positioner>
+                    </Portal>
                   </Select.Root>
                 </Box>
 
@@ -303,18 +311,22 @@ export default function TasksPage() {
                       <Select.Trigger>
                         <Select.ValueText placeholder="Select column" />
                       </Select.Trigger>
-                      <Select.Content>
-                        {boards
-                          .find((b) => b.id === selectedTargetBoardId)
-                          ?.columns.map((column) => (
-                            <Select.Item
-                              key={column.id}
-                              item={{ label: column.name, value: column.id }}
-                            >
-                              {column.name}
-                            </Select.Item>
-                          ))}
-                      </Select.Content>
+                      <Portal>
+                        <Select.Positioner>
+                          <Select.Content>
+                            {boards
+                              .find((b) => b.id === selectedTargetBoardId)
+                              ?.columns.map((column) => (
+                                <Select.Item
+                                  key={column.id}
+                                  item={{ label: column.name, value: column.id }}
+                                >
+                                  {column.name}
+                                </Select.Item>
+                              ))}
+                          </Select.Content>
+                        </Select.Positioner>
+                      </Portal>
                     </Select.Root>
                   </Box>
                 )}
@@ -441,23 +453,25 @@ export default function TasksPage() {
                         <Select.ValueText placeholder="Priority" whiteSpace="nowrap" />
                       </Select.Trigger>
                     </Select.Control>
-                    <Select.Positioner>
-                      <Select.Content>
-                        {createListCollection({
-                          items: [
-                            { label: 'All Priorities', value: 'all' },
-                            { label: 'Urgent', value: 'urgent' },
-                            { label: 'High', value: 'high' },
-                            { label: 'Medium', value: 'medium' },
-                            { label: 'Low', value: 'low' }
-                          ]
-                        }).items.map((item) => (
-                          <Select.Item key={item.value} item={item}>
-                            <Select.ItemText>{item.label}</Select.ItemText>
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
+                    <Portal>
+                      <Select.Positioner>
+                        <Select.Content>
+                          {createListCollection({
+                            items: [
+                              { label: 'All Priorities', value: 'all' },
+                              { label: 'Urgent', value: 'urgent' },
+                              { label: 'High', value: 'high' },
+                              { label: 'Medium', value: 'medium' },
+                              { label: 'Low', value: 'low' }
+                            ]
+                          }).items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              <Select.ItemText>{item.label}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Positioner>
+                    </Portal>
                   </Select.Root>
 
                   {/* Status Filter */}
@@ -477,21 +491,23 @@ export default function TasksPage() {
                         <Select.ValueText placeholder="Status" whiteSpace="nowrap" />
                       </Select.Trigger>
                     </Select.Control>
-                    <Select.Positioner>
-                      <Select.Content>
-                        {createListCollection({
-                          items: [
-                            { label: 'All', value: 'all' },
-                            { label: 'Active', value: 'active' },
-                            { label: 'Done', value: 'completed' }
-                          ]
-                        }).items.map((item) => (
-                          <Select.Item key={item.value} item={item}>
-                            <Select.ItemText>{item.label}</Select.ItemText>
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
+                    <Portal>
+                      <Select.Positioner>
+                        <Select.Content>
+                          {createListCollection({
+                            items: [
+                              { label: 'All', value: 'all' },
+                              { label: 'Active', value: 'active' },
+                              { label: 'Done', value: 'completed' }
+                            ]
+                          }).items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              <Select.ItemText>{item.label}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Positioner>
+                    </Portal>
                   </Select.Root>
 
                   {/* Board Filter */}
@@ -510,23 +526,25 @@ export default function TasksPage() {
                         <Select.ValueText placeholder="Board" whiteSpace="nowrap" />
                       </Select.Trigger>
                     </Select.Control>
-                    <Select.Positioner>
-                      <Select.Content>
-                        {createListCollection({
-                          items: [
-                            { label: 'All Boards', value: 'all' },
-                            ...(boards?.map((board) => ({
-                              label: board.name,
-                              value: board.id
-                            })) || [])
-                          ]
-                        }).items.map((item) => (
-                          <Select.Item key={item.value} item={item}>
-                            <Select.ItemText>{item.label}</Select.ItemText>
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
+                    <Portal>
+                      <Select.Positioner>
+                        <Select.Content>
+                          {createListCollection({
+                            items: [
+                              { label: 'All Boards', value: 'all' },
+                              ...(boards?.map((board) => ({
+                                label: board.name,
+                                value: board.id
+                              })) || [])
+                            ]
+                          }).items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              <Select.ItemText>{item.label}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Positioner>
+                    </Portal>
                   </Select.Root>
                 </HStack>
 

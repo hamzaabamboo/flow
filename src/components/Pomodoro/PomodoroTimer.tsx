@@ -152,7 +152,6 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
           aria-label="Show Pomodoro Timer"
           data-session-type={session.type}
           borderRadius="full"
-          shadow="lg"
         >
           <Timer />
         </IconButton>
@@ -173,7 +172,6 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         borderWidth="2px"
         p="4"
         bg="bg.default"
-        shadow="xl"
       >
         <HStack gap="3" alignItems="center">
           <Text color="fg.default" fontFamily="mono" fontSize="2xl" fontWeight="bold">
@@ -228,7 +226,6 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       minWidth="280px"
       p="6"
       bg="bg.default"
-      shadow="xl"
     >
       {/* Header with minimize/close buttons */}
       <HStack justifyContent="space-between" alignItems="center" mb="4">

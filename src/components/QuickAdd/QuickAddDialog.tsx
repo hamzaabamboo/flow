@@ -44,18 +44,15 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     }
   }, [open]);
 
-  // Reset state only when task dialog is closed (not when quick add closes)
+  // Reset state when quick add dialog closes
   useEffect(() => {
-    if (!showTaskDialog && parsedTask) {
-      // Only reset if we had a parsed task and task dialog is now closed
-      const timer = setTimeout(() => {
-        setInput('');
-        setParsedTask(null);
-        setIsParsing(false);
-      }, 200);
-      return () => clearTimeout(timer);
+    if (!open) {
+      setInput('');
+      setParsedTask(null);
+      setIsParsing(false);
+      setShowTaskDialog(false);
     }
-  }, [showTaskDialog, parsedTask]);
+  }, [open]);
 
   const parseInput = async () => {
     if (!input.trim()) return;

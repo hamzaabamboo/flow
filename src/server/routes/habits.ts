@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { habits, habitLogs } from '../../../drizzle/schema';
 
@@ -7,6 +7,7 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
   .use(withAuth())
   .get('/', async ({ query, db, user }) => {
     const space = query.space || 'work';
+    const view = query.view || 'day';
 
     const conditions = [eq(habits.userId, user.id), eq(habits.space, space)];
     if (query.date) {
@@ -19,6 +20,74 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
       .where(and(...conditions))
       .orderBy(habits.name);
 
+    // For week view, return habits for each day of the week
+    if (view === 'week' && query.date) {
+      // Parse date string directly as UTC
+      const weekStartDate = new Date(`${query.date}T00:00:00.000Z`);
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setUTCDate(weekStartDate.getUTCDate() + 6);
+
+      // Fetch all habit logs for the week in a single query
+      const habitIds = allHabits.map((h) => h.id);
+      const allLogs =
+        habitIds.length > 0
+          ? await db
+              .select()
+              .from(habitLogs)
+              .where(
+                and(
+                  inArray(habitLogs.habitId, habitIds),
+                  gte(habitLogs.date, weekStartDate),
+                  lte(habitLogs.date, weekEndDate)
+                )
+              )
+          : [];
+
+      // Create a map for quick lookup: habitId_dateStr -> log
+      const logMap = new Map<string, (typeof allLogs)[0]>();
+      for (const log of allLogs) {
+        if (log.date) {
+          const dateStr = log.date.toISOString().split('T')[0];
+          logMap.set(`${log.habitId}_${dateStr}`, log);
+        }
+      }
+
+      const results = [];
+
+      // For each day in the week
+      for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(weekStartDate);
+        currentDate.setUTCDate(weekStartDate.getUTCDate() + i);
+        const dayOfWeek = currentDate.getUTCDay();
+        const dateStr = currentDate.toISOString().split('T')[0];
+
+        // Filter habits for this day
+        const dayHabits = allHabits.filter((habit) => {
+          if (habit.frequency === 'daily') return true;
+          if (habit.frequency === 'weekly' && habit.targetDays) {
+            return habit.targetDays.includes(dayOfWeek);
+          }
+          return false;
+        });
+
+        // Get completion status for each habit on this day
+        for (const habit of dayHabits) {
+          const log = logMap.get(`${habit.id}_${dateStr}`);
+
+          results.push({
+            ...habit,
+            link: habit.metadata?.link,
+            completedToday: log?.completed || false,
+            currentStreak: 0,
+            checkDate: dateStr
+          });
+        }
+      }
+
+      return results;
+    }
+
+    // Day view - original logic
     let userHabits = allHabits;
 
     if (query.date) {
