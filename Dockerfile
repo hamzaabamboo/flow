@@ -1,59 +1,43 @@
-# Multi-stage build for HamFlow
-FROM oven/bun:1-alpine AS builder
+# Build stage
+FROM oven/bun:alpine AS builder
 
 WORKDIR /app
-
-# Copy package files and configs needed for panda codegen
-COPY package.json ./
-COPY bun.lockb* ./
-COPY panda.config.ts ./
-COPY tsconfig.json ./
-
 
 # Set production environment for build
 ENV NODE_ENV=production
 
-# Install all dependencies (including dev dependencies for build)
-# This will run panda codegen as a prepare script
-RUN bun install
-
-# Copy remaining source files
+# Copy everything at once
 COPY . .
 
-# Build frontend and backend
-RUN bun run build
+# Install and build both frontend and server
+RUN bun install --frozen-lockfile && \
+    bun run build:ssr && \
+    bun run build:server
 
 # Production stage
-FROM oven/bun:1-alpine
+FROM oven/bun:alpine
 
 WORKDIR /app
-
-# Copy package files and configs
-COPY package.json ./
-COPY bun.lockb* ./
-COPY panda.config.ts ./
-COPY tsconfig.json ./
-
-# Install production dependencies only
-RUN bun install --production
-
-# Copy built artifacts from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/styled-system ./styled-system
-
-# Copy source and config files
-COPY drizzle ./drizzle
-COPY src ./src
-COPY panda.config.ts ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
 
 # Set production environment
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install only production dependencies
+RUN bun install --frozen-lockfile --production --ignore-scripts
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/build ./build
+
+# Copy only essential runtime files
+COPY drizzle ./drizzle
+
 # Expose application port
 EXPOSE 3000
 
-# Run the application
-CMD ["bun", "run", "src/server/index.ts"]
+# Run the bundled server
+CMD ["bun", "run", "start:server"]
