@@ -42,13 +42,13 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8
+        distance: 3
       }
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 100,
-        tolerance: 8
+        delay: 50,
+        tolerance: 5
       }
     })
   );

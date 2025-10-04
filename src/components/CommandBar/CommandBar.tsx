@@ -1,7 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Circle, Check, X, Inbox, CalendarClock } from 'lucide-react';
-import { Portal } from '@ark-ui/react/portal';
 import { navigate } from 'vike/client/router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSpace } from '../../contexts/SpaceContext';
@@ -487,20 +486,18 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                           <Select.Trigger>
                             <Select.ValueText placeholder="Select board" />
                           </Select.Trigger>
-                          <Portal>
-                            <Select.Positioner>
-                              <Select.Content>
-                                {boards.map((board) => (
-                                  <Select.Item
-                                    key={board.id}
-                                    item={{ label: board.name, value: board.id }}
-                                  >
-                                    {board.name}
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Positioner>
-                          </Portal>
+                          <Select.Positioner>
+                            <Select.Content>
+                              {boards.map((board) => (
+                                <Select.Item
+                                  key={board.id}
+                                  item={{ label: board.name, value: board.id }}
+                                >
+                                  {board.name}
+                                </Select.Item>
+                              ))}
+                            </Select.Content>
+                          </Select.Positioner>
                         </Select.Root>
 
                         {selectedBoardId && (
@@ -518,22 +515,21 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                             <Select.Trigger>
                               <Select.ValueText placeholder="Select column" />
                             </Select.Trigger>
-                            <Portal>
-                              <Select.Positioner>
-                                <Select.Content>
-                                  {boards
-                                    .find((b) => b.id === selectedBoardId)
-                                    ?.columns.map((column) => (
-                                      <Select.Item
-                                        key={column.id}
-                                        item={{ label: column.name, value: column.id }}
-                                      >
-                                        {column.name}
-                                      </Select.Item>
-                                    ))}
-                                </Select.Content>
-                              </Select.Positioner>
-                            </Portal>
+
+                            <Select.Positioner>
+                              <Select.Content>
+                                {boards
+                                  .find((b) => b.id === selectedBoardId)
+                                  ?.columns.map((column) => (
+                                    <Select.Item
+                                      key={column.id}
+                                      item={{ label: column.name, value: column.id }}
+                                    >
+                                      {column.name}
+                                    </Select.Item>
+                                  ))}
+                              </Select.Content>
+                            </Select.Positioner>
                           </Select.Root>
                         )}
                       </HStack>
