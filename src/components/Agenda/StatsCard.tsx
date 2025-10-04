@@ -14,7 +14,7 @@ interface StatsCardProps {
 
 export function StatsCard({ title, stats }: StatsCardProps) {
   return (
-    <Card.Root w="full">
+    <Card.Root w="full" h="full">
       <Card.Header p="3">
         <Card.Title fontSize="sm">{title}</Card.Title>
       </Card.Header>

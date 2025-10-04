@@ -16,7 +16,7 @@ interface HabitsCardProps {
 
 export function HabitsCard({ habits, isLoading, isError, onToggleHabit }: HabitsCardProps) {
   return (
-    <Card.Root w="full">
+    <Card.Root w="full" h="full">
       <Card.Header p="3">
         <Card.Title fontSize="sm">Daily Habits</Card.Title>
       </Card.Header>
