@@ -2,6 +2,69 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-08 - Elysia withAuth() and Route Grouping
+
+### Elysia withAuth Must Be Called as Function
+
+**Problem**: Stats route was returning 404 even though it was registered correctly in the server.
+
+**Root Cause**: Used `withAuth` instead of `withAuth()` when applying auth middleware.
+
+**Solution**: Always call `withAuth()` with parentheses when using in routes:
+
+```typescript
+// ❌ Wrong - doesn't work
+export const statsRoutes = new Elysia({ prefix: '/stats' })
+  .use(withAuth)
+
+// ✅ Correct
+export const statsRoutes = new Elysia({ prefix: '/stats' })
+  .use(withAuth())
+```
+
+**Key Lesson**: `withAuth` is a function that returns an Elysia plugin, so it must be invoked with `()`.
+
+### Isolating Auth Middleware with Groups
+
+**Problem**: Calendar route had both public (`/ical/:userId/:token`) and authenticated routes, but applying `withAuth()` at the top level would require auth for all routes.
+
+**Solution**: Use `.group()` to isolate authenticated routes:
+
+```typescript
+export const calendarRoutes = new Elysia({ prefix: '/calendar' })
+  .decorate('db', db)
+
+  // Public iCal route (token-based auth)
+  .get('/ical/:userId/:token', async ({ params, db, set }) => {
+    // Public route logic
+  })
+
+  // Authenticated routes in isolated group
+  .group('', (app) =>
+    app
+      .use(withAuth())
+      .get('/feed-url', ({ user }) => { /* ... */ })
+      .get('/events', async ({ query, db, user }) => { /* ... */ })
+  );
+```
+
+**Key Lesson**: Use `.group()` to apply middleware only to specific routes, keeping public routes outside the group.
+
+### Week View Responsive Breakpoint
+
+**Problem**: Week view sidebar was stacking at wrong breakpoint (lg instead of xl).
+
+**Solution**: Updated grid breakpoint in index/+Page.tsx:
+
+```typescript
+// Changed from lg to xl
+<Grid gap={4} gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }} w="full" h="full">
+```
+
+**Key Lesson**: Calendar always shows 7 columns, only the sidebar stacks at smaller screens.
+
+---
+
 ## 2025-10-08 - Task Duplicate Validation & Dialog System
 
 ### Task Duplicate Validation Error Fix

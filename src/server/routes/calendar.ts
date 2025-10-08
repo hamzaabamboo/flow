@@ -11,7 +11,7 @@ import type { Task } from '../../shared/types/board';
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .decorate('db', db)
 
-  // Public routes (no session auth required)
+  // Public iCal route (token-based auth)
   .get(
     '/ical/:userId/:token',
     async ({ params, db, set }) => {
@@ -46,7 +46,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           description: tasks.description,
           dueDate: tasks.dueDate,
           priority: tasks.priority,
-          completed: tasks.completed,
+          columnName: columns.name,
           recurringPattern: tasks.recurringPattern,
           recurringEndDate: tasks.recurringEndDate,
           metadata: tasks.metadata,
@@ -89,8 +89,9 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           url: taskUrl
         });
 
-        // Set status - CANCELLED if completed, otherwise CONFIRMED
-        event.status(task.completed ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
+        // Set status - CANCELLED if in Done column, otherwise CONFIRMED
+        const isCompleted = task.columnName?.toLowerCase() === 'done';
+        event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
 
         // Set priority
         if (task.priority) {
@@ -236,154 +237,158 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   )
 
   // Authenticated routes
-  .use(withAuth())
+  .group('', (app) =>
+    app
+      .use(withAuth())
 
-  // Get iCal feed URL (returns the URL for subscription)
-  .get('/feed-url', ({ user }) => {
-    // Generate a secure token for the user's calendar feed
-    const token = createHash('sha256')
-      .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
-      .digest('hex');
+      // Get iCal feed URL (returns the URL for subscription)
+      .get('/feed-url', ({ user }) => {
+        // Generate a secure token for the user's calendar feed
+        const token = createHash('sha256')
+          .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
+          .digest('hex');
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    return {
-      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
-      instructions:
-        'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
-    };
-  })
-
-  // Get calendar events for a date range (JSON format for frontend)
-  .get(
-    '/events',
-    async ({ query, db, user }) => {
-      const { start, end, space = 'all' } = query;
-
-      // Convert UNIX timestamps (seconds) to Date objects
-      const startDate = new Date(parseInt(start) * 1000);
-      const endDate = new Date(parseInt(end) * 1000);
-
-      // Build the query with joins
-      const queryBuilder = db
-        .select({
-          // Select all columns from tasks
-          id: tasks.id,
-          columnId: tasks.columnId,
-          userId: tasks.userId,
-          title: tasks.title,
-          description: tasks.description,
-          dueDate: tasks.dueDate,
-          priority: tasks.priority,
-          noteId: tasks.noteId,
-          completed: tasks.completed,
-          labels: tasks.labels,
-          recurringPattern: tasks.recurringPattern,
-          recurringEndDate: tasks.recurringEndDate,
-          parentTaskId: tasks.parentTaskId,
-          metadata: tasks.metadata,
-          createdAt: tasks.createdAt,
-          updatedAt: tasks.updatedAt,
-          // Manually join board space for filtering
-          space: boards.space,
-          boardId: boards.id,
-          boardName: boards.name,
-          columnName: columns.name
-        })
-        .from(tasks)
-        .leftJoin(columns, eq(tasks.columnId, columns.id))
-        .leftJoin(boards, eq(columns.boardId, boards.id));
-
-      // Define conditions
-      const whereConditions = [eq(tasks.userId, user.id)];
-      if (space !== 'all') {
-        whereConditions.push(eq(boards.space, space));
-      }
-
-      const allTasks = await queryBuilder.where(and(...whereConditions));
-
-      // Fetch subtasks separately for the fetched tasks
-      const taskIds = allTasks.map((t) => t.id);
-      const subtasksData = taskIds.length
-        ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
-        : [];
-
-      // Manually attach subtasks to their parent tasks and normalize types
-      const tasksWithSubtasks = allTasks.map((task) => ({
-        ...task,
-        description: task.description ?? undefined,
-        dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
-        priority: task.priority ?? undefined,
-        labels: task.labels ?? undefined,
-        recurringPattern: task.recurringPattern ?? undefined,
-        recurringEndDate: task.recurringEndDate ? task.recurringEndDate.toISOString() : undefined,
-        parentTaskId: task.parentTaskId ?? undefined,
-        space: task.space ?? undefined,
-        boardId: task.boardId ?? undefined,
-        boardName: task.boardName ?? undefined,
-        columnName: task.columnName ?? undefined,
-        link: task.metadata?.link ?? undefined,
-        createdAt: task.createdAt?.toISOString(),
-        updatedAt: task.updatedAt?.toISOString(),
-        subtasks: subtasksData
-          .filter((st) => st.taskId === task.id)
-          .map((st) => ({
-            ...st,
-            completed: st.completed ?? false,
-            createdAt: st.createdAt.toISOString(),
-            updatedAt: st.updatedAt.toISOString()
-          }))
-      }));
-
-      // Fetch all task completions for the user's tasks in the date range
-      const completions = await db
-        .select()
-        .from(taskCompletions)
-        .where(
-          and(
-            eq(taskCompletions.userId, user.id),
-            gte(taskCompletions.completedDate, startDate.toISOString().split('T')[0]),
-            lte(taskCompletions.completedDate, endDate.toISOString().split('T')[0])
-          )
-        );
-
-      // Create a map of task completions by taskId and date
-      const completionMap = new Map<string, Set<string>>();
-      for (const completion of completions) {
-        const taskId = completion.taskId;
-        const dateStr = completion.completedDate;
-        if (!completionMap.has(taskId)) {
-          completionMap.set(taskId, new Set());
-        }
-        completionMap.get(taskId)!.add(dateStr);
-      }
-
-      // Expand recurring tasks into individual instances
-      const taskEvents = expandRecurringTasks(
-        tasksWithSubtasks as Task[],
-        startDate,
-        endDate,
-        completionMap
-      );
-
-      // Combine and sort by date
-      const allEvents = [...taskEvents].toSorted((a, b) => {
-        const aDate = a.dueDate;
-        const bDate = b.dueDate;
-        if (!aDate || !bDate) return 0;
-        if (aDate instanceof Date && bDate instanceof Date) {
-          return aDate.getTime() - bDate.getTime();
-        }
-        return 0;
-      });
-
-      return allEvents;
-    },
-    {
-      query: t.Object({
-        start: t.String(),
-        end: t.String(),
-        space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')]))
+        return {
+          url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
+          instructions:
+            'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
+        };
       })
-    }
+
+      // Get calendar events for a date range (JSON format for frontend)
+      .get(
+        '/events',
+        async ({ query, db, user }) => {
+          const { start, end, space = 'all' } = query;
+
+          // Convert UNIX timestamps (seconds) to Date objects
+          const startDate = new Date(parseInt(start) * 1000);
+          const endDate = new Date(parseInt(end) * 1000);
+
+          // Build the query with joins
+          const queryBuilder = db
+            .select({
+              // Select all columns from tasks
+              id: tasks.id,
+              columnId: tasks.columnId,
+              userId: tasks.userId,
+              title: tasks.title,
+              description: tasks.description,
+              dueDate: tasks.dueDate,
+              priority: tasks.priority,
+              noteId: tasks.noteId,
+              labels: tasks.labels,
+              recurringPattern: tasks.recurringPattern,
+              recurringEndDate: tasks.recurringEndDate,
+              parentTaskId: tasks.parentTaskId,
+              metadata: tasks.metadata,
+              createdAt: tasks.createdAt,
+              updatedAt: tasks.updatedAt,
+              // Manually join board space for filtering
+              space: boards.space,
+              boardId: boards.id,
+              boardName: boards.name,
+              columnName: columns.name
+            })
+            .from(tasks)
+            .leftJoin(columns, eq(tasks.columnId, columns.id))
+            .leftJoin(boards, eq(columns.boardId, boards.id));
+
+          // Define conditions
+          const whereConditions = [eq(tasks.userId, user.id)];
+          if (space !== 'all') {
+            whereConditions.push(eq(boards.space, space));
+          }
+
+          const allTasks = await queryBuilder.where(and(...whereConditions));
+
+          // Fetch subtasks separately for the fetched tasks
+          const taskIds = allTasks.map((t) => t.id);
+          const subtasksData = taskIds.length
+            ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
+            : [];
+
+          // Manually attach subtasks to their parent tasks and normalize types
+          const tasksWithSubtasks = allTasks.map((task) => ({
+            ...task,
+            description: task.description ?? undefined,
+            dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
+            priority: task.priority ?? undefined,
+            labels: task.labels ?? undefined,
+            recurringPattern: task.recurringPattern ?? undefined,
+            recurringEndDate: task.recurringEndDate
+              ? task.recurringEndDate.toISOString()
+              : undefined,
+            parentTaskId: task.parentTaskId ?? undefined,
+            space: task.space ?? undefined,
+            boardId: task.boardId ?? undefined,
+            boardName: task.boardName ?? undefined,
+            columnName: task.columnName ?? undefined,
+            link: task.metadata?.link ?? undefined,
+            createdAt: task.createdAt?.toISOString(),
+            updatedAt: task.updatedAt?.toISOString(),
+            subtasks: subtasksData
+              .filter((st) => st.taskId === task.id)
+              .map((st) => ({
+                ...st,
+                completed: st.completed ?? false,
+                createdAt: st.createdAt.toISOString(),
+                updatedAt: st.updatedAt.toISOString()
+              }))
+          }));
+
+          // Fetch all task completions for the user's tasks in the date range
+          const completions = await db
+            .select()
+            .from(taskCompletions)
+            .where(
+              and(
+                eq(taskCompletions.userId, user.id),
+                gte(taskCompletions.completedDate, startDate.toISOString().split('T')[0]),
+                lte(taskCompletions.completedDate, endDate.toISOString().split('T')[0])
+              )
+            );
+
+          // Create a map of task completions by taskId and date
+          const completionMap = new Map<string, Set<string>>();
+          for (const completion of completions) {
+            const taskId = completion.taskId;
+            const dateStr = completion.completedDate;
+            if (!completionMap.has(taskId)) {
+              completionMap.set(taskId, new Set());
+            }
+            completionMap.get(taskId)!.add(dateStr);
+          }
+
+          // Expand recurring tasks into individual instances
+          const taskEvents = expandRecurringTasks(
+            tasksWithSubtasks as Task[],
+            startDate,
+            endDate,
+            completionMap
+          );
+
+          // Combine and sort by date
+          const allEvents = [...taskEvents].toSorted((a, b) => {
+            const aDate = a.dueDate;
+            const bDate = b.dueDate;
+            if (!aDate || !bDate) return 0;
+            if (aDate instanceof Date && bDate instanceof Date) {
+              return aDate.getTime() - bDate.getTime();
+            }
+            return 0;
+          });
+
+          return allEvents;
+        },
+        {
+          query: t.Object({
+            start: t.String(),
+            end: t.String(),
+            space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')]))
+          })
+        }
+      )
   );

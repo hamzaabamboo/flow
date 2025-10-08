@@ -17,8 +17,8 @@ export interface Task {
   description?: string;
   dueDate?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
   columnId: string;
+  columnName?: string | null;
   space?: 'work' | 'personal';
   createdAt?: string;
   updatedAt?: string;
@@ -32,6 +32,8 @@ export interface Task {
   column?: Column & { board?: Board };
   // Convenience accessors for common metadata fields
   link?: string;
+  // For recurring task instances (from expandRecurringTasks)
+  instanceDate?: string;
 }
 
 export interface Column {

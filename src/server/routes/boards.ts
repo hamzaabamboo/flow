@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import { eq, and, inArray } from 'drizzle-orm';
 import { boards, columns, tasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
+import { isColumnDone } from '../utils/taskCompletion';
 
 export const boardRoutes = new Elysia({ prefix: '/boards' })
   .use(withAuth())
@@ -192,14 +193,33 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         .from(columns)
         .where(eq(columns.boardId, params.boardId));
 
-      // Fetch tasks for the board (or specific column if specified)
-      let boardTasks: (typeof tasks.$inferSelect)[];
+      // Fetch tasks for the board (or specific column if specified) with column names
+      let boardTasks: Array<typeof tasks.$inferSelect & { columnName?: string | null }>;
       if (query.columnId) {
-        boardTasks = await db.select().from(tasks).where(eq(tasks.columnId, query.columnId));
+        const tasksWithColumns = await db
+          .select({
+            task: tasks,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .where(eq(tasks.columnId, query.columnId));
+        boardTasks = tasksWithColumns.map((t) => ({ ...t.task, columnName: t.columnName ?? null }));
       } else {
         const columnIds = boardColumns.map((c) => c.id);
         if (columnIds.length > 0) {
-          boardTasks = await db.select().from(tasks).where(inArray(tasks.columnId, columnIds));
+          const tasksWithColumns = await db
+            .select({
+              task: tasks,
+              columnName: columns.name
+            })
+            .from(tasks)
+            .leftJoin(columns, eq(tasks.columnId, columns.id))
+            .where(inArray(tasks.columnId, columnIds));
+          boardTasks = tasksWithColumns.map((t) => ({
+            ...t.task,
+            columnName: t.columnName ?? null
+          }));
         } else {
           boardTasks = [];
         }
@@ -220,7 +240,9 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       }
 
       const totalTasks = boardTasks.length;
-      const completedTasks = boardTasks.filter((t) => t.completed).length;
+      const completedTasks = boardTasks.filter(
+        (t) => t.columnName && isColumnDone(t.columnName)
+      ).length;
       const incompleteTasks = totalTasks - completedTasks;
 
       summary += `**Overview:**\n`;
@@ -236,7 +258,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           if (columnTasks.length > 0) {
             summary += `### ${column.name} (${columnTasks.length})\n`;
             for (const task of columnTasks) {
-              const status = task.completed ? '[x]' : '[ ]';
+              const status = task.columnName && isColumnDone(task.columnName) ? '[x]' : '[ ]';
               const priority = task.priority ? ` [${task.priority}]` : '';
               const dueDate = task.dueDate
                 ? ` (Due: ${new Date(task.dueDate).toLocaleDateString()})`
@@ -249,7 +271,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       } else {
         summary += `**Tasks:**\n\n`;
         for (const task of boardTasks) {
-          const status = task.completed ? '[x]' : '[ ]';
+          const status = task.columnName && isColumnDone(task.columnName) ? '[x]' : '[ ]';
           const priority = task.priority ? ` [${task.priority}]` : '';
           const dueDate = task.dueDate
             ? ` (Due: ${new Date(task.dueDate).toLocaleDateString()})`

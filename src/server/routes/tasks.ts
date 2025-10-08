@@ -82,7 +82,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           description: tasks.description,
           dueDate: tasks.dueDate,
           priority: tasks.priority,
-          completed: tasks.completed,
           columnId: tasks.columnId,
           labels: tasks.labels,
           recurringPattern: tasks.recurringPattern,
@@ -197,7 +196,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         taskTitle: newTask.title,
         columnId: newTask.columnId,
         dueDate: newTask.dueDate,
-        completed: newTask.completed || false,
         reminderOverride: body.reminderMinutesBefore
       });
 
@@ -244,10 +242,9 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       if (body.description !== undefined) updateData.description = body.description;
       if (body.columnId !== undefined) updateData.columnId = body.columnId;
       if (body.priority !== undefined) updateData.priority = body.priority;
-      if (body.completed !== undefined) updateData.completed = body.completed;
 
-      // Auto-move task to Done/In Progress column when completion status changes
-      if (body.completed !== undefined && currentTask.completed !== body.completed) {
+      // Handle completion toggle by moving to Done/In Progress column
+      if (body.completed !== undefined) {
         // Get the current column to find the board
         const [currentColumn] = await db
           .select()
@@ -352,7 +349,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         taskTitle: updated.title,
         columnId: updated.columnId,
         dueDate: updated.dueDate,
-        completed: updated.completed || false,
         reminderOverride: body.reminderMinutesBefore ?? updated.reminderMinutesBefore
       });
 

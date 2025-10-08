@@ -22,6 +22,7 @@ import { OverdueTasksCard } from '../../components/Agenda/OverdueTasksCard';
 import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
+import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 interface CompleteTaskPayload {
   id: string;
@@ -225,9 +226,10 @@ export default function AgendaPage() {
   });
 
   const completeTask = (event: CalendarEvent) => {
+    const currentlyCompleted = isTaskCompleted(event);
     completeTaskMutation.mutate({
       id: event.id,
-      completed: !event.completed,
+      completed: !currentlyCompleted,
       instanceDate: event.instanceDate || event.dueDate
     });
   };
@@ -321,7 +323,7 @@ export default function AgendaPage() {
     const overdue: CalendarEvent[] = [];
 
     events.forEach((event) => {
-      if (!event.dueDate || event.completed) return;
+      if (!event.dueDate || isTaskCompleted(event)) return;
 
       const eventDate = new Date(event.dueDate);
 
@@ -396,29 +398,34 @@ export default function AgendaPage() {
       });
     }
 
-    const completed = filteredEvents.filter((event) => event.completed).length;
+    const completed = filteredEvents.filter((event) => isTaskCompleted(event)).length;
     const overdue = filteredEvents.filter((event) => {
-      if (event.completed) return false;
+      if (isTaskCompleted(event)) return false;
       if (!event.dueDate) return false;
       const dueDate = new Date(event.dueDate);
       return dueDate < now;
     }).length;
     const todo = filteredEvents.filter((event) => {
-      if (event.completed) return false;
+      if (isTaskCompleted(event)) return false;
       if (!event.dueDate) return false;
       const dueDate = new Date(event.dueDate);
       return dueDate >= now; // Future or today (not overdue)
     }).length;
+
+    // Add incomplete habits to todo count (only for day view)
+    const incompleteHabitsCount =
+      viewMode === 'day' && habits ? habits.filter((habit) => !habit.completedToday).length : 0;
+
     const total = filteredEvents.length;
 
     return {
-      total,
+      total: total + incompleteHabitsCount,
       completed,
-      remaining: total - completed,
+      remaining: total - completed + incompleteHabitsCount,
       overdue,
-      todo
+      todo: todo + incompleteHabitsCount
     };
-  }, [events, viewMode, selectedDate]);
+  }, [events, viewMode, selectedDate, habits]);
 
   return (
     <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
@@ -518,7 +525,7 @@ export default function AgendaPage() {
         ) : isErrorEvents ? (
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full" h="full">
+          <Grid gap={4} gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }} w="full" h="full">
             <AgendaWeekView
               selectedDate={selectedDate}
               viewMode={viewMode}
@@ -586,6 +593,9 @@ export default function AgendaPage() {
                   onDuplicate={(event) => taskActions.handleDuplicate(event)}
                   onDelete={(event) => taskActions.handleDelete(event)}
                   onMove={(event) => taskActions.handleMove(event)}
+                  onCarryOver={(taskId, targetDate) => {
+                    carryOverTasksMutation.mutate({ taskIds: [taskId], targetDate });
+                  }}
                   extraActions={taskActions.extraActions}
                 />
               </VStack>

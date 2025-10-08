@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { format, addDays, addWeeks, endOfDay, startOfDay, endOfMonth } from 'date-fns';
-import { ArrowRight } from 'lucide-react';
-import { VStack, HStack, Box } from 'styled-system/jsx';
+import { format } from 'date-fns';
+import { VStack, HStack } from 'styled-system/jsx';
 import * as Card from '../ui/styled/card';
-import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Text } from '../ui/text';
-import { Select, createListCollection } from '../ui/select';
-import { SimpleDatePicker } from '../ui/simple-date-picker';
+import { Button } from '../ui/button';
+import { ArrowRight } from 'lucide-react';
+import { CarryOverControls } from './CarryOverControls';
 import { TaskItem } from './TaskItem';
 import type { CalendarEvent } from '../../shared/types/calendar';
 
@@ -40,42 +39,7 @@ export function OverdueTasksCard({
   extraActions,
   isCarryingOver
 }: OverdueTasksCardProps) {
-  const [carryOverTarget, setCarryOverTarget] = useState<
-    'end_of_today' | 'tomorrow' | 'next_week' | 'end_of_month' | 'custom'
-  >('end_of_today');
-  const [customCarryOverDate, setCustomCarryOverDate] = useState<Date>(new Date());
-
-  const carryOverOptions = createListCollection({
-    items: [
-      { label: 'End of Today', value: 'end_of_today' },
-      { label: 'Tomorrow', value: 'tomorrow' },
-      { label: 'Next Week', value: 'next_week' },
-      { label: 'End of Month', value: 'end_of_month' },
-      { label: 'Custom Date', value: 'custom' }
-    ]
-  });
-
-  const getTargetDate = (): Date => {
-    switch (carryOverTarget) {
-      case 'end_of_today':
-        return endOfDay(new Date());
-      case 'tomorrow':
-        return startOfDay(addDays(new Date(), 1));
-      case 'next_week':
-        return startOfDay(addWeeks(new Date(), 1));
-      case 'end_of_month':
-        return endOfMonth(new Date());
-      case 'custom':
-        return customCarryOverDate;
-    }
-  };
-
-  const handleCarryOverAll = () => {
-    onCarryOver(
-      overdueTasks.map((t) => t.id),
-      getTargetDate()
-    );
-  };
+  const [showCarryOverAll, setShowCarryOverAll] = useState(false);
 
   if (overdueTasks.length === 0) {
     return null;
@@ -96,68 +60,16 @@ export function OverdueTasksCard({
             </VStack>
           </HStack>
 
-          {/* Carry Over Controls */}
-          <VStack gap="2" alignItems="stretch">
-            <HStack gap="2" flexWrap={{ base: 'wrap', md: 'nowrap' }}>
-              <Box flex="1" minW={{ base: 'full', md: '200px' }}>
-                <Select.Root
-                  collection={carryOverOptions}
-                  value={[carryOverTarget]}
-                  onValueChange={(details) => {
-                    setCarryOverTarget(details.value[0] as typeof carryOverTarget);
-                  }}
-                  size="sm"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="Select target date" />
-                  </Select.Trigger>
-                  <Select.Positioner>
-                    <Select.Content maxW="300px">
-                      {carryOverOptions.items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          <Select.ItemText>{item.label}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Select.Root>
-              </Box>
-
-              {carryOverTarget === 'custom' && (
-                <Box flex="1" minW={{ base: 'full', md: '200px' }}>
-                  <SimpleDatePicker
-                    value={format(customCarryOverDate, 'yyyy-MM-dd')}
-                    onChange={(dateStr) => {
-                      if (dateStr) {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        setCustomCarryOverDate(new Date(year, month - 1, day));
-                      }
-                    }}
-                    size="sm"
-                  />
-                </Box>
-              )}
-
-              <Button
-                size="sm"
-                variant="solid"
-                onClick={handleCarryOverAll}
-                disabled={isCarryingOver}
-                colorPalette="red"
-                minW={{ base: 'full', md: 'auto' }}
-              >
-                <ArrowRight width="16" height="16" />
-                Carry Over All
-              </Button>
-            </HStack>
-
-            <Text color="fg.muted" fontSize="xs">
-              Moving to:{' '}
-              {carryOverTarget === 'custom'
-                ? format(customCarryOverDate, 'MMM d, yyyy')
-                : carryOverOptions.items.find((i) => i.value === carryOverTarget)?.label}
-            </Text>
-          </VStack>
+          {/* Carry Over All Button */}
+          <Button
+            size="sm"
+            variant="solid"
+            onClick={() => setShowCarryOverAll(true)}
+            colorPalette="red"
+          >
+            <ArrowRight width="16" height="16" />
+            Carry Over All
+          </Button>
         </VStack>
       </Card.Header>
       <Card.Body p="4" pt="0" overflow="visible">
@@ -180,6 +92,8 @@ export function OverdueTasksCard({
                 onDuplicate={onDuplicate ? () => onDuplicate(event) : undefined}
                 onDelete={onDelete ? () => onDelete(event) : undefined}
                 onMove={onMove ? () => onMove(event) : undefined}
+                onCarryOver={(taskId, targetDate) => onCarryOver([taskId], targetDate)}
+                hideCheckboxOnOverdue={true}
                 extraActions={extraActions}
                 extraBadges={
                   <>
@@ -202,6 +116,21 @@ export function OverdueTasksCard({
             ))}
         </VStack>
       </Card.Body>
+
+      {/* Carry Over All Dialog */}
+      <CarryOverControls
+        open={showCarryOverAll}
+        onOpenChange={setShowCarryOverAll}
+        onCarryOver={(targetDate) => {
+          onCarryOver(
+            overdueTasks.map((t) => t.id),
+            targetDate
+          );
+        }}
+        isCarryingOver={isCarryingOver}
+        buttonText="Carry Over All"
+        colorPalette="red"
+      />
     </Card.Root>
   );
 }

@@ -28,6 +28,7 @@ import * as Dialog from '../ui/styled/dialog';
 import type { Task, Column } from '../../shared/types';
 import { Box, VStack, HStack } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
+import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 export { type Task, type Column } from '../../shared/types';
 
@@ -409,7 +410,7 @@ function TaskCard({ task, onEdit, onDelete, onDuplicate, onMove, column }: TaskC
           )}
 
           <HStack gap="2" flexWrap="wrap">
-            {task.dueDate && !(task.completed || column?.name.toLowerCase() === 'done') && (
+            {task.dueDate && !isTaskCompleted({ ...task, columnName: column?.name }) && (
               <Countdown targetDate={task.dueDate} size="sm" />
             )}
           </HStack>

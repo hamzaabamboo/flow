@@ -24,6 +24,7 @@ import { commandRoutes } from './routes/command';
 import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
 import { remindersRoutes } from './routes/reminders';
+import { statsRoutes } from './routes/stats';
 import { oidcAuth } from './auth/oidc';
 import { cronJobs } from './cron';
 import { wsManager } from './websocket';
@@ -91,6 +92,7 @@ app
       .use(settingsRoutes)
       .use(calendarRoutes)
       .use(remindersRoutes)
+      .use(statsRoutes)
   )
   // WebSocket for real-time updates
   .ws('/ws', {

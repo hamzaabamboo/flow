@@ -15,6 +15,7 @@ interface AgendaDayViewProps {
   onDuplicate?: (event: CalendarEvent) => void;
   onDelete?: (event: CalendarEvent) => void;
   onMove?: (event: CalendarEvent) => void;
+  onCarryOver?: (taskId: string, targetDate: Date) => void;
   extraActions?: Array<{
     value: string;
     label: string;
@@ -31,6 +32,7 @@ export function AgendaDayView({
   onDuplicate,
   onDelete,
   onMove,
+  onCarryOver,
   extraActions
 }: AgendaDayViewProps) {
   const sortedEvents = events.toSorted((a, b) => {
@@ -60,6 +62,8 @@ export function AgendaDayView({
               onDuplicate={onDuplicate ? () => onDuplicate(event) : undefined}
               onDelete={onDelete ? () => onDelete(event) : undefined}
               onMove={onMove ? () => onMove(event) : undefined}
+              onCarryOver={onCarryOver}
+              hideCheckboxOnOverdue={true}
               extraActions={extraActions}
               extraBadges={
                 event.boardName && event.columnName ? (

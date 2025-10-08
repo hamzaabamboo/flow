@@ -30,7 +30,6 @@ export interface ExtendedTask {
   description?: string;
   dueDate?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
-  completed: boolean;
   columnId: string;
   columnName: string;
   boardName: string;

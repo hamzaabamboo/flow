@@ -76,7 +76,6 @@ export const tasks = pgTable('tasks', {
   dueDate: timestamp('due_date'),
   priority: varchar('priority', { length: 20 }), // 'low', 'medium', 'high', 'urgent'
   noteId: varchar('note_id', { length: 255 }), // Link to Notes Server
-  completed: boolean('completed').default(false),
   labels: jsonb('labels').$type<string[]>().default([]), // Array of label strings
   recurringPattern: varchar('recurring_pattern', { length: 100 }), // 'daily', 'weekly', 'monthly', 'custom:cron'
   recurringEndDate: timestamp('recurring_end_date'), // When to stop recurring (optional)

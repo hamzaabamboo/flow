@@ -5,6 +5,7 @@ import { css } from 'styled-system/css';
 import { Text } from '../ui/text';
 import { Checkbox } from '../ui/checkbox';
 import type { CalendarEvent, Habit } from '../../shared/types/calendar';
+import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 interface AgendaWeekViewProps {
   selectedDate: Date;
@@ -29,16 +30,8 @@ export function AgendaWeekView({
 
   return (
     <VStack gap="3" alignItems="stretch" w="full" h="full" overflow="hidden">
-      <Box w="full" h="full" overflowX="auto" overflowY="auto">
-        <Grid
-          gap="2"
-          gridTemplateColumns={{
-            base: 'repeat(7, minmax(120px, 1fr))',
-            md: 'repeat(7, 1fr)'
-          }}
-          w="full"
-          overflowX="auto"
-        >
+      <Box w="full" h="full" overflowY="auto">
+        <Grid gap="2" gridTemplateColumns="repeat(7, 1fr)" w="full">
           {weekDates.map((date) => {
             const isToday = isSameDay(date, new Date());
             const dateKey = format(date, 'yyyy-MM-dd');
@@ -243,14 +236,16 @@ export function AgendaWeekView({
                               <HStack gap="1.5" alignItems="start">
                                 <Checkbox
                                   size="sm"
-                                  checked={event.completed}
+                                  checked={isTaskCompleted(event)}
                                   onCheckedChange={() => onToggleTask(event)}
                                   onClick={(e) => e.stopPropagation()}
                                 />
                                 <VStack flex="1" gap="0.5" alignItems="start">
                                   <Text
-                                    color={event.completed ? 'fg.subtle' : 'fg.default'}
-                                    textDecoration={event.completed ? 'line-through' : 'none'}
+                                    color={isTaskCompleted(event) ? 'fg.subtle' : 'fg.default'}
+                                    textDecoration={
+                                      isTaskCompleted(event) ? 'line-through' : 'none'
+                                    }
                                     fontSize="xs"
                                     fontWeight="medium"
                                     lineHeight="1.2"

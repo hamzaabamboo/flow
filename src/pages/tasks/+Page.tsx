@@ -18,6 +18,7 @@ import type { ExtendedTask } from '~/shared/types/calendar';
 import type { CalendarEvent } from '~/shared/types/calendar';
 import { Spinner } from '~/components/ui/spinner';
 import { PriorityBadge } from '~/components/PriorityBadge';
+import { isTaskCompleted } from '~/shared/utils/taskCompletion';
 
 export default function TasksPage() {
   const { currentSpace } = useSpace();
@@ -96,15 +97,18 @@ export default function TasksPage() {
         return false;
       }
       if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
-      if (filterStatus === 'completed' && !task.completed) return false;
-      if (filterStatus === 'active' && task.completed) return false;
+      const taskCompleted = isTaskCompleted(task);
+      if (filterStatus === 'completed' && !taskCompleted) return false;
+      if (filterStatus === 'active' && taskCompleted) return false;
       if (filterBoard !== 'all' && task.boardId !== filterBoard) return false;
       return true;
     })
     .toSorted((a, b) => {
       // Completed tasks go to bottom
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
+      const aCompleted = isTaskCompleted(a);
+      const bCompleted = isTaskCompleted(b);
+      if (aCompleted !== bCompleted) {
+        return aCompleted ? 1 : -1;
       }
 
       // Sort by deadline first (tasks with no deadline go to the end)
@@ -125,15 +129,15 @@ export default function TasksPage() {
   // Group tasks by status for summary
   const taskSummary = {
     total: filteredTasks.length,
-    completed: filteredTasks.filter((t) => t.completed).length,
-    urgent: filteredTasks.filter((t) => t.priority === 'urgent' && !t.completed).length,
+    completed: filteredTasks.filter((t) => isTaskCompleted(t)).length,
+    urgent: filteredTasks.filter((t) => t.priority === 'urgent' && !isTaskCompleted(t)).length,
     dueToday: filteredTasks.filter((t) => {
-      if (!t.dueDate || t.completed) return false;
+      if (!t.dueDate || isTaskCompleted(t)) return false;
       const today = new Date().toDateString();
       return new Date(t.dueDate).toDateString() === today;
     }).length,
     overdue: filteredTasks.filter((t) => {
-      if (!t.dueDate || t.completed) return false;
+      if (!t.dueDate || isTaskCompleted(t)) return false;
       return new Date(t.dueDate) < new Date();
     }).length
   };
@@ -407,10 +411,11 @@ export default function TasksPage() {
                     key={task.id}
                     event={task as CalendarEvent}
                     onToggleComplete={() => {
+                      const currentlyCompleted = isTaskCompleted(task);
                       updateTaskMutation.mutate({
                         taskId: task.id,
                         updates: {
-                          completed: !task.completed
+                          completed: !currentlyCompleted
                         }
                       });
                     }}

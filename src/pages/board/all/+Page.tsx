@@ -14,6 +14,7 @@ import { Countdown } from '../../../components/ui/countdown';
 import type { Task, BoardWithColumns as Board } from '../../../shared/types/board';
 import { Spinner } from '../../../components/ui/spinner';
 import { Box, VStack, HStack, Center } from 'styled-system/jsx';
+import { isTaskCompleted } from '../../../shared/utils/taskCompletion';
 
 const getPriorityColor = (priority?: string) => {
   switch (priority) {
@@ -146,9 +147,10 @@ export default function AllTasksPage() {
   };
 
   const toggleTaskComplete = (task: Task) => {
+    const currentlyCompleted = isTaskCompleted(task);
     updateTaskMutation.mutate({
       taskId: task.id,
-      updates: { completed: !task.completed }
+      updates: { completed: !currentlyCompleted }
     });
   };
 
@@ -179,11 +181,11 @@ export default function AllTasksPage() {
 
   // Group tasks by status
   const groupedTasks = {
-    todo: filteredTasks.filter((t) => !t.completed && t.columnName === 'To Do'),
-    inProgress: filteredTasks.filter((t) => !t.completed && t.columnName === 'In Progress'),
-    done: filteredTasks.filter((t) => t.completed || t.columnName === 'Done'),
+    todo: filteredTasks.filter((t) => !isTaskCompleted(t) && t.columnName === 'To Do'),
+    inProgress: filteredTasks.filter((t) => !isTaskCompleted(t) && t.columnName === 'In Progress'),
+    done: filteredTasks.filter((t) => isTaskCompleted(t) || t.columnName === 'Done'),
     other: filteredTasks.filter(
-      (t) => !t.completed && !['To Do', 'In Progress', 'Done'].includes(t.columnName)
+      (t) => !isTaskCompleted(t) && !['To Do', 'In Progress', 'Done'].includes(t.columnName)
     )
   };
 
@@ -476,9 +478,9 @@ function TaskRow({
             variant="ghost"
             size="sm"
             onClick={onToggleComplete}
-            aria-label={task.completed ? 'Mark as incomplete' : 'Mark as complete'}
+            aria-label={isTaskCompleted(task) ? 'Mark as incomplete' : 'Mark as complete'}
           >
-            {task.completed ? (
+            {isTaskCompleted(task) ? (
               <CheckCircle width="20" height="20" />
             ) : (
               <Circle width="20" height="20" />
@@ -487,8 +489,8 @@ function TaskRow({
 
           <VStack flex="1" gap="1" alignItems="flex-start">
             <Text
-              color={task.completed ? 'fg.muted' : 'fg.default'}
-              textDecoration={task.completed ? 'line-through' : undefined}
+              color={isTaskCompleted(task) ? 'fg.muted' : 'fg.default'}
+              textDecoration={isTaskCompleted(task) ? 'line-through' : undefined}
               fontSize="sm"
               fontWeight="medium"
             >

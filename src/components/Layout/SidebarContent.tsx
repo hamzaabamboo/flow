@@ -14,7 +14,6 @@ import {
   X
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { InboxItem, Task, Habit } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
@@ -23,6 +22,7 @@ import { Avatar } from '../ui/avatar';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Box, VStack, HStack, Divider } from 'styled-system/jsx';
+import { usePageContext } from 'vike-react/usePageContext';
 
 interface SidebarNavItem {
   label: string;
@@ -53,62 +53,22 @@ function isActiveRoute(href: string, currentPath: string): boolean {
 export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { currentSpace, toggleSpace } = useSpace();
   const { user, logout } = useAuth();
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const pageContext = usePageContext();
+  const currentPath = pageContext.urlPathname || '/';
 
-  // Get today's date for queries
-  const today = new Date().toISOString().split('T')[0];
-
-  // Fetch inbox count
-  const { data: inboxItems = [] } = useQuery<InboxItem[]>({
-    queryKey: ['inbox', currentSpace],
+  // Fetch badge counts from server
+  const { data: badgeCounts = { inbox: 0, agenda: 0, tasks: 0 } } = useQuery<{
+    inbox: number;
+    agenda: number;
+    tasks: number;
+  }>({
+    queryKey: ['stats', 'badges', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/inbox?space=${currentSpace}`);
-      if (!response.ok) return [];
+      const response = await fetch(`/api/stats/badges?space=${currentSpace}`);
+      if (!response.ok) return { inbox: 0, agenda: 0, tasks: 0 };
       return response.json();
     }
   });
-
-  // Fetch today's tasks (incomplete with due date today or overdue)
-  const { data: tasks = [] } = useQuery<Task[]>({
-    queryKey: ['tasks', currentSpace],
-    queryFn: async () => {
-      const response = await fetch(`/api/tasks?space=${currentSpace}`);
-      if (!response.ok) return [];
-      return response.json();
-    }
-  });
-
-  // Fetch today's habits (incomplete)
-  const { data: habits = [] } = useQuery<Habit[]>({
-    queryKey: ['habits', today, currentSpace],
-    queryFn: async () => {
-      const response = await fetch(`/api/habits?date=${today}&space=${currentSpace}`);
-      if (!response.ok) return [];
-      return response.json();
-    }
-  });
-
-  // Calculate badge counts
-  const inboxCount = inboxItems.length;
-
-  const incompleteTasks = tasks.filter((task) => {
-    if (task.completed) return false;
-    if (!task.dueDate) return false;
-    const dueDate = new Date(task.dueDate);
-    const todayDate = new Date(today);
-    return dueDate <= todayDate; // Today or overdue
-  });
-
-  const incompleteHabits = habits.filter((habit) => !habit.completedToday);
-
-  const agendaCount = incompleteTasks.length + incompleteHabits.length;
-  const tasksCount = tasks.filter((task) => !task.completed).length;
-
-  const badgeCounts: Record<string, number> = {
-    inbox: inboxCount,
-    agenda: agendaCount,
-    tasks: tasksCount
-  };
 
   return (
     <VStack gap="0" h="full">

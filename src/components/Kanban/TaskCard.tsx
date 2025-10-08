@@ -4,6 +4,7 @@ import type { Task } from '../../shared/types';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
 import { Box, HStack, VStack } from 'styled-system/jsx';
+import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 interface TaskCardProps {
   task: Task;
@@ -55,8 +56,8 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
     >
       <VStack gap="2" alignItems="flex-start">
         <Text
-          color={task.completed ? 'fg.subtle' : 'fg.default'}
-          textDecoration={task.completed ? 'line-through' : 'none'}
+          color={isTaskCompleted(task) ? 'fg.subtle' : 'fg.default'}
+          textDecoration={isTaskCompleted(task) ? 'line-through' : 'none'}
           fontSize="sm"
           fontWeight="medium"
         >
@@ -79,7 +80,7 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
             </Badge>
           )}
 
-          {task.completed && (
+          {isTaskCompleted(task) && (
             <Badge variant="outline" colorPalette="green" fontSize="xs">
               <HStack gap="1">
                 <Check width="12" height="12" />

@@ -8,6 +8,7 @@ import {
 } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { logger } from '../logger';
+import { isColumnDone } from '../utils/taskCompletion';
 
 export class SummaryService {
   constructor(
@@ -32,14 +33,15 @@ export class SummaryService {
       sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
 
       // Get tasks due today for all selected spaces
-      const todayTasks = await this.db
+      const todayTasksRaw = await this.db
         .select({
           id: tasks.id,
           title: tasks.title,
           priority: tasks.priority,
           dueDate: tasks.dueDate,
           boardName: boards.name,
-          space: boards.space
+          space: boards.space,
+          columnName: columns.name
         })
         .from(tasks)
         .leftJoin(columns, eq(tasks.columnId, columns.id))
@@ -50,22 +52,27 @@ export class SummaryService {
             spaces.length === 1
               ? eq(boards.space, spaces[0])
               : or(...spaces.map((s) => eq(boards.space, s))),
-            eq(tasks.completed, false),
             gte(tasks.dueDate, today),
             lte(tasks.dueDate, tomorrow)
           )
         )
         .orderBy(tasks.priority, tasks.dueDate);
 
+      // Filter out completed tasks (those in Done column)
+      const todayTasks = todayTasksRaw.filter(
+        (task) => !task.columnName || !isColumnDone(task.columnName)
+      );
+
       // Get upcoming tasks (next 7 days)
-      const upcomingTasks = await this.db
+      const upcomingTasksRaw = await this.db
         .select({
           id: tasks.id,
           title: tasks.title,
           priority: tasks.priority,
           dueDate: tasks.dueDate,
           boardName: boards.name,
-          space: boards.space
+          space: boards.space,
+          columnName: columns.name
         })
         .from(tasks)
         .leftJoin(columns, eq(tasks.columnId, columns.id))
@@ -76,12 +83,16 @@ export class SummaryService {
             spaces.length === 1
               ? eq(boards.space, spaces[0])
               : or(...spaces.map((s) => eq(boards.space, s))),
-            eq(tasks.completed, false),
             gte(tasks.dueDate, tomorrow),
             lte(tasks.dueDate, sevenDaysLater)
           )
         )
         .orderBy(tasks.dueDate, tasks.priority);
+
+      // Filter out completed tasks (those in Done column)
+      const upcomingTasks = upcomingTasksRaw.filter(
+        (task) => !task.columnName || !isColumnDone(task.columnName)
+      );
 
       // Format message
       const spaceLabel = spaces.length === 2 ? 'work & personal' : spaces[0];
@@ -148,10 +159,11 @@ export class SummaryService {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get completed tasks today
-      const completedToday = await this.db
+      // Get completed tasks today (tasks moved to Done column today)
+      const completedTodayRaw = await this.db
         .select({
-          space: boards.space
+          space: boards.space,
+          columnName: columns.name
         })
         .from(tasks)
         .leftJoin(columns, eq(tasks.columnId, columns.id))
@@ -162,20 +174,25 @@ export class SummaryService {
             spaces.length === 1
               ? eq(boards.space, spaces[0])
               : or(...spaces.map((s) => eq(boards.space, s))),
-            eq(tasks.completed, true),
             gte(tasks.updatedAt, today),
             lte(tasks.updatedAt, tomorrow)
           )
         );
 
+      // Filter to only tasks in Done column
+      const completedToday = completedTodayRaw.filter(
+        (task) => task.columnName && isColumnDone(task.columnName)
+      );
+
       // Get unfinished tasks that were due today or overdue
-      const unfinishedTasks = await this.db
+      const unfinishedTasksRaw = await this.db
         .select({
           id: tasks.id,
           title: tasks.title,
           priority: tasks.priority,
           dueDate: tasks.dueDate,
-          space: boards.space
+          space: boards.space,
+          columnName: columns.name
         })
         .from(tasks)
         .leftJoin(columns, eq(tasks.columnId, columns.id))
@@ -186,11 +203,15 @@ export class SummaryService {
             spaces.length === 1
               ? eq(boards.space, spaces[0])
               : or(...spaces.map((s) => eq(boards.space, s))),
-            eq(tasks.completed, false),
             lte(tasks.dueDate, tomorrow)
           )
         )
         .orderBy(tasks.dueDate);
+
+      // Filter out completed tasks (those in Done column)
+      const unfinishedTasks = unfinishedTasksRaw.filter(
+        (task) => !task.columnName || !isColumnDone(task.columnName)
+      );
 
       // Get today's habits for all spaces
       const todayDay = today.getDay();

@@ -3,6 +3,7 @@ import { reminders, columns } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { DEFAULT_REMINDER_MINUTES_BEFORE } from '../../shared/constants';
 import { logger } from '../logger';
+import { isColumnDone } from '../utils/taskCompletion';
 
 interface ReminderSyncOptions {
   userId: string;
@@ -10,7 +11,6 @@ interface ReminderSyncOptions {
   taskTitle: string;
   columnId: string;
   dueDate: Date | null;
-  completed: boolean;
   reminderOverride?: number | null;
 }
 
@@ -22,7 +22,7 @@ export class ReminderSyncService {
    * Call this after any task create/update operation
    */
   async syncReminders(options: ReminderSyncOptions): Promise<void> {
-    const { taskId, userId, dueDate, completed, reminderOverride, columnId, taskTitle } = options;
+    const { taskId, userId, dueDate, reminderOverride, columnId, taskTitle } = options;
 
     try {
       // STEP 1: Delete existing unsent reminders for this task
@@ -30,7 +30,17 @@ export class ReminderSyncService {
         .delete(reminders)
         .where(and(eq(reminders.taskId, taskId), eq(reminders.sent, false)));
 
-      // STEP 2: Determine if we need to create a new reminder
+      // STEP 2: Get column to check if task is completed
+      const column = await this.db.query.columns.findFirst({
+        where: eq(columns.id, columnId),
+        with: {
+          board: true
+        }
+      });
+
+      const completed = column?.name ? isColumnDone(column.name) : false;
+
+      // STEP 3: Determine if we need to create a new reminder
       const shouldCreateReminder =
         !completed && // Not completed
         dueDate !== null && // Has a due date
@@ -41,14 +51,7 @@ export class ReminderSyncService {
         return;
       }
 
-      // STEP 3: Get board settings (hierarchical)
-      const column = await this.db.query.columns.findFirst({
-        where: eq(columns.id, columnId),
-        with: {
-          board: true
-        }
-      });
-
+      // STEP 4: Get board settings (hierarchical)
       if (!column?.board) {
         logger.warn(`Board not found for column ${columnId}, using defaults`);
       }
@@ -70,7 +73,7 @@ export class ReminderSyncService {
         return;
       }
 
-      // STEP 4: Calculate and create reminder
+      // STEP 5: Calculate and create reminder
       const now = new Date();
       const reminderTime = new Date(dueDate);
       reminderTime.setMinutes(reminderTime.getMinutes() - minutesBefore);

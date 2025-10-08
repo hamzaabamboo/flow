@@ -22,15 +22,9 @@ export function expandRecurringTasks(
     if (!task.recurringPattern) {
       // Simple UNIX timestamp comparison - no timezone bullshit
       if (taskDueDate >= startDate && taskDueDate <= endDate) {
-        // Use UTC date string for instanceDate (for completion tracking)
-        const taskDateStr = taskDueDate.toISOString().split('T')[0];
-        const isCompleted =
-          task.completed || (completionMap.get(task.id)?.has(taskDateStr) ?? false);
-
+        // Non-recurring tasks don't have a completed field - use columnName instead
         events.push({
-          ...formattedTask,
-          completed: isCompleted,
-          instanceDate: taskDateStr
+          ...formattedTask
         });
       }
       continue;
