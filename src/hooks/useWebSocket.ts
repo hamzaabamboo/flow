@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useEffectEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Global toast callback - will be set by ToasterProvider
@@ -20,79 +20,7 @@ export function useWebSocket() {
   const maxReconnectAttempts = 10;
   const isIntentionallyClosed = useRef(false);
 
-  const connect = useCallback(() => {
-    // Don't reconnect if intentionally closed or too many attempts
-    if (isIntentionallyClosed.current || reconnectAttempts.current >= maxReconnectAttempts) {
-      return;
-    }
-
-    // Clean up existing connection if any
-    if (ws.current) {
-      ws.current.onclose = null; // Prevent recursion
-      if (
-        ws.current.readyState === WebSocket.OPEN ||
-        ws.current.readyState === WebSocket.CONNECTING
-      ) {
-        ws.current.close(1000, 'Reconnecting');
-      }
-      ws.current = null;
-    }
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-    try {
-      ws.current = new WebSocket(wsUrl);
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error);
-      return;
-    }
-
-    ws.current.onopen = () => {
-      console.log('WebSocket connected');
-      reconnectAttempts.current = 0; // Reset attempts on successful connection
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-        reconnectTimeout.current = null;
-      }
-    };
-
-    ws.current.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        handleMessage(message);
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
-    };
-
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.current.onclose = (event) => {
-      // Don't reconnect if intentionally closed with code 1000
-      if (event.code === 1000 && isIntentionallyClosed.current) {
-        console.log('WebSocket closed intentionally');
-        return;
-      }
-
-      reconnectAttempts.current++;
-      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000); // Max 30s
-
-      console.log(
-        `WebSocket disconnected (code: ${event.code}), reconnecting in ${backoffTime / 1000}s... (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`
-      );
-
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        reconnectTimeout.current = setTimeout(connect, backoffTime);
-      } else {
-        console.error('Max reconnection attempts reached. Please refresh the page.');
-      }
-    };
-  }, []);
-
-  const handleMessage = (message: { type: string; data?: unknown }) => {
+  const handleMessage = useEffectEvent((message: { type: string; data?: unknown }) => {
     // Handle different message types
     switch (message.type) {
       case 'task-update':
@@ -156,12 +84,14 @@ export function useWebSocket() {
 
         // Also try browser notification if permitted
         if ('Notification' in window && Notification.permission === 'granted' && data?.message) {
-          new Notification('⏰ HamFlow Reminder', {
+          const notification = new Notification('⏰ HamFlow Reminder', {
             body: data.message,
             icon: '/favicon.ico',
             tag: 'reminder',
             requireInteraction: true
           });
+          // Reference notification to avoid unused variable warning
+          void notification;
         }
 
         // Invalidate reminders list
@@ -181,7 +111,84 @@ export function useWebSocket() {
       default:
         console.log('Unknown message type:', message.type);
     }
-  };
+  });
+
+  const connect = useCallback(() => {
+    // Don't reconnect if intentionally closed or too many attempts
+    if (isIntentionallyClosed.current || reconnectAttempts.current >= maxReconnectAttempts) {
+      return;
+    }
+
+    // Clean up existing connection if any
+    if (ws.current) {
+      // oxlint-disable-next-line unicorn/prefer-add-event-listener
+      ws.current.onclose = null; // Prevent recursion
+      if (
+        ws.current.readyState === WebSocket.OPEN ||
+        ws.current.readyState === WebSocket.CONNECTING
+      ) {
+        ws.current.close(1000, 'Reconnecting');
+      }
+      ws.current = null;
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+    try {
+      ws.current = new WebSocket(wsUrl);
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error);
+      return;
+    }
+
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
+    ws.current.onopen = () => {
+      console.log('WebSocket connected');
+      reconnectAttempts.current = 0; // Reset attempts on successful connection
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
+    };
+
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
+    ws.current.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        handleMessage(message);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
+    ws.current.onclose = (event) => {
+      // Don't reconnect if intentionally closed with code 1000
+      if (event.code === 1000 && isIntentionallyClosed.current) {
+        console.log('WebSocket closed intentionally');
+        return;
+      }
+
+      reconnectAttempts.current++;
+      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000); // Max 30s
+
+      console.log(
+        `WebSocket disconnected (code: ${event.code}), reconnecting in ${backoffTime / 1000}s... (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`
+      );
+
+      if (reconnectAttempts.current < maxReconnectAttempts) {
+        reconnectTimeout.current = setTimeout(connect, backoffTime);
+      } else {
+        console.error('Max reconnection attempts reached. Please refresh the page.');
+      }
+    };
+  }, [maxReconnectAttempts]);
 
   const sendMessage = useCallback((type: string, data: unknown) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
@@ -220,9 +227,13 @@ export function useWebSocket() {
 
       // Force close WebSocket connection immediately
       if (ws.current) {
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onclose = null; // Prevent reconnection
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onerror = null; // Prevent error handling
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onmessage = null; // Clear message handler
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onopen = null; // Clear open handler
 
         // Force close without waiting
@@ -250,9 +261,13 @@ export function useWebSocket() {
 
       // Close WebSocket connection
       if (ws.current) {
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onclose = null; // Prevent reconnection
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onerror = null; // Prevent error handling
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onmessage = null; // Clear message handler
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener
         ws.current.onopen = null; // Clear open handler
 
         if (

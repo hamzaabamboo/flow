@@ -32,7 +32,7 @@ export function NotificationDropdown() {
       const now = new Date();
       return allReminders
         .filter((r: Reminder) => !r.sent && new Date(r.reminderTime) > now)
-        .sort(
+        .toSorted(
           (a: Reminder, b: Reminder) =>
             new Date(a.reminderTime).getTime() - new Date(b.reminderTime).getTime()
         )

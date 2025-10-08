@@ -12,7 +12,7 @@ export function ToasterProvider({ children }: { children: ReactNode }) {
   const [toaster, setToaster] = useState<CreateToasterReturn>();
 
   useEffect(() => {
-    import('@ark-ui/react/toast').then(({ createToaster }) => {
+    void import('@ark-ui/react/toast').then(({ createToaster }) => {
       const toaster = createToaster({
         placement: 'bottom-end',
         max: 10,
@@ -30,6 +30,7 @@ export function ToasterProvider({ children }: { children: ReactNode }) {
         });
       };
       setGlobalToast(toastFn);
+      return Promise.resolve();
     });
   }, []);
 

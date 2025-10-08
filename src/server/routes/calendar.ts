@@ -9,25 +9,9 @@ import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
 
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
-  .use(withAuth())
   .decorate('db', db)
-  // Get iCal feed URL (returns the URL for subscription)
-  .get('/feed-url', ({ user }) => {
-    // Generate a secure token for the user's calendar feed
-    const token = createHash('sha256')
-      .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
-      .digest('hex');
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-    return {
-      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
-      instructions:
-        'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
-    };
-  })
-
-  // Generate iCal feed for tasks and habits only
+  // Public routes (no session auth required)
   .get(
     '/ical/:userId/:token',
     async ({ params, db, set }) => {
@@ -251,6 +235,25 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
     }
   )
 
+  // Authenticated routes
+  .use(withAuth())
+
+  // Get iCal feed URL (returns the URL for subscription)
+  .get('/feed-url', ({ user }) => {
+    // Generate a secure token for the user's calendar feed
+    const token = createHash('sha256')
+      .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
+      .digest('hex');
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    return {
+      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
+      instructions:
+        'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
+    };
+  })
+
   // Get calendar events for a date range (JSON format for frontend)
   .get(
     '/events',
@@ -364,7 +367,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       );
 
       // Combine and sort by date
-      const allEvents = [...taskEvents].sort((a, b) => {
+      const allEvents = [...taskEvents].toSorted((a, b) => {
         const aDate = a.dueDate;
         const bDate = b.dueDate;
         if (!aDate || !bDate) return 0;

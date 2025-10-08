@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 /**
  * Custom hook to sync state with URL query parameters
@@ -66,8 +66,12 @@ export function useQueryState<T extends string>(
  * @returns [date, setDate] tuple
  */
 export function useDateQueryState(key: string, defaultDate?: Date): [Date, (date: Date) => void] {
-  const today = defaultDate || new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = useMemo(() => {
+    const d = defaultDate || new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [defaultDate]);
+
   const defaultValue = today.toISOString().split('T')[0];
 
   const getInitialDate = useCallback((): Date => {

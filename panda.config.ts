@@ -227,6 +227,12 @@ export default defineConfig({
     },
     '[data-session-type=long-break]': {
       colorPalette: 'blue'
+    },
+    '[data-variant=danger]': {
+      colorPalette: 'red'
+    },
+    '[data-variant=info]': {
+      colorPalette: 'blue'
     }
   },
 

@@ -65,10 +65,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 onClick={() => {
                   localStorage.clear();
                   sessionStorage.clear();
-                  navigator.serviceWorker.getRegistrations().then((registrations) => {
+                  void navigator.serviceWorker.getRegistrations().then((registrations) => {
                     for (const registration of registrations) {
                       void registration.unregister();
                     }
+                    return Promise.resolve();
                   });
                   window.location.reload();
                 }}

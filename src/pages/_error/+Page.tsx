@@ -8,6 +8,26 @@ import { Text } from '../../components/ui/text';
 import { Box, VStack, HStack, Center } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
 
+const handleGoBack = () => {
+  if (typeof window !== 'undefined' && window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = '/';
+  }
+};
+
+const handleRefresh = () => {
+  if (typeof window !== 'undefined') {
+    window.location.reload();
+  }
+};
+
+const handleGoHome = () => {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/';
+  }
+};
+
 function Page() {
   const pageContext = usePageContext();
 
@@ -63,26 +83,6 @@ function Page() {
   };
 
   const { title, subtitle, message, icon } = getErrorContent();
-
-  const handleGoBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = '/';
-    }
-  };
-
-  const handleRefresh = () => {
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
-  };
-
-  const handleGoHome = () => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    }
-  };
 
   const errorIconStyles = css({
     '&[data-error-type="404"]': { colorPalette: 'blue' },

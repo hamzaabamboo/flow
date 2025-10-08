@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import {
   DndContext,
@@ -14,10 +14,12 @@ import {
   rectIntersection
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { useDialogs } from '../../utils/useDialogs';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Text } from '../ui/text';
 import * as Dialog from '../ui/styled/dialog';
+import { Select, createListCollection } from '../ui/select';
 import type { BoardWithColumns, Task, Column } from '../../shared/types';
 import { TaskDialog } from './TaskDialog';
 import { KanbanColumn } from './KanbanColumn';
@@ -30,14 +32,34 @@ interface KanbanBoardProps {
   onCopySummary?: (columnId: string) => void;
 }
 
+const getPriorityColor = (priority?: string) => {
+  switch (priority) {
+    case 'urgent':
+      return 'red';
+    case 'high':
+      return 'orange';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'green';
+    default:
+      return 'gray';
+  }
+};
+
 export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: KanbanBoardProps) {
   const queryClient = useQueryClient();
+  const { alert } = useDialogs();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTaskColumnId, setNewTaskColumnId] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  const [taskToMove, setTaskToMove] = useState<Task | null>(null);
+  const [selectedTargetBoardId, setSelectedTargetBoardId] = useState<string>('');
+  const [selectedTargetColumnId, setSelectedTargetColumnId] = useState<string>('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -52,6 +74,18 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
       }
     })
   );
+
+  // Fetch all boards for move dialog
+  const { data: allBoards = [] } = useQuery<BoardWithColumns[]>({
+    queryKey: ['boards', board.space],
+    queryFn: async () => {
+      const response = await fetch(`/api/boards?space=${board.space}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch boards');
+      return response.json();
+    }
+  });
 
   // Create task mutation
   const createTaskMutation = useMutation({
@@ -109,6 +143,55 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     }
   });
 
+  // Duplicate task mutation
+  const duplicateTaskMutation = useMutation({
+    mutationFn: async (task: Task) => {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          columnId: task.columnId,
+          title: `${task.title} (Copy)`,
+          description: task.description,
+          priority: task.priority,
+          dueDate: task.dueDate,
+          labels: task.labels,
+          subtasks: task.subtasks?.map((st) => ({ title: st.title, completed: false }))
+        })
+      });
+      if (!response.ok) throw new Error('Failed to duplicate task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      onTaskUpdate?.();
+    }
+  });
+
+  // Move task mutation
+  const moveTaskMutation = useMutation({
+    mutationFn: async ({ taskId, columnId }: { taskId: string; columnId: string }) => {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ columnId })
+      });
+      if (!response.ok) throw new Error('Failed to move task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      setIsMoveDialogOpen(false);
+      setTaskToMove(null);
+      onTaskUpdate?.();
+    }
+  });
+
   // Create column mutation
   const createColumnMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -162,7 +245,11 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });
     },
     onError: (error) => {
-      alert(error.message);
+      void alert({
+        title: 'Error',
+        description: error.message,
+        variant: 'danger'
+      });
     }
   });
 
@@ -364,21 +451,6 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     return columnTasks;
   };
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'red';
-      case 'high':
-        return 'orange';
-      case 'medium':
-        return 'yellow';
-      case 'low':
-        return 'green';
-      default:
-        return 'gray';
-    }
-  };
-
   const openAddTaskDialog = (columnId: string) => {
     setNewTaskColumnId(columnId);
     setEditingTask(null);
@@ -396,7 +468,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     ? (board.columnOrder
         .map((id) => board.columns.find((col) => col.id === id))
         .filter(Boolean) as Column[])
-    : board.columns.sort((a, b) => (a.position || 0) - (b.position || 0));
+    : board.columns.toSorted((a, b) => (a.position || 0) - (b.position || 0));
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
@@ -434,6 +506,13 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
                     onAddTask={() => openAddTaskDialog(column.id)}
                     onEditTask={openEditTaskDialog}
                     onDeleteTask={(task) => deleteTaskMutation.mutate(task.id)}
+                    onDuplicateTask={(task) => duplicateTaskMutation.mutate(task)}
+                    onMoveTask={(task) => {
+                      setTaskToMove(task);
+                      setSelectedTargetBoardId(board.id);
+                      setSelectedTargetColumnId(task.columnId);
+                      setIsMoveDialogOpen(true);
+                    }}
                     getPriorityColor={getPriorityColor}
                     onRenameColumn={handleRenameColumn}
                     onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
@@ -524,6 +603,113 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
         defaultColumnId={newTaskColumnId || undefined}
         columns={board.columns}
       />
+
+      {/* Move Task Dialog */}
+      <Dialog.Root
+        open={isMoveDialogOpen}
+        onOpenChange={(details) => setIsMoveDialogOpen(details.open)}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="500px">
+            <VStack gap="4" alignItems="stretch" p="6">
+              <VStack gap="1" alignItems="stretch">
+                <Dialog.Title>Move Task</Dialog.Title>
+                <Dialog.Description>
+                  Move "{taskToMove?.title}" to a different board or column
+                </Dialog.Description>
+              </VStack>
+
+              <VStack gap="3" alignItems="stretch">
+                <Box>
+                  <Text mb="2" fontSize="sm" fontWeight="medium">
+                    Target Board
+                  </Text>
+                  <Select.Root
+                    collection={createListCollection({
+                      items: allBoards.map((b) => ({ label: b.name, value: b.id }))
+                    })}
+                    value={[selectedTargetBoardId]}
+                    onValueChange={(details) => {
+                      const newBoardId = details.value[0];
+                      setSelectedTargetBoardId(newBoardId);
+                      const targetBoard = allBoards.find((b) => b.id === newBoardId);
+                      if (targetBoard && targetBoard.columns.length > 0) {
+                        setSelectedTargetColumnId(targetBoard.columns[0].id);
+                      }
+                    }}
+                  >
+                    <Select.Trigger>
+                      <Select.ValueText placeholder="Select Board" />
+                    </Select.Trigger>
+                    <Select.Positioner>
+                      <Select.Content>
+                        {allBoards.map((b) => (
+                          <Select.Item key={b.id} item={{ label: b.name, value: b.id }}>
+                            <Select.ItemText>{b.name}</Select.ItemText>
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Positioner>
+                  </Select.Root>
+                </Box>
+
+                {selectedTargetBoardId && (
+                  <Box>
+                    <Text mb="2" fontSize="sm" fontWeight="medium">
+                      Target Column
+                    </Text>
+                    <Select.Root
+                      collection={createListCollection({
+                        items:
+                          allBoards
+                            .find((b) => b.id === selectedTargetBoardId)
+                            ?.columns.map((c) => ({ label: c.name, value: c.id })) || []
+                      })}
+                      value={[selectedTargetColumnId]}
+                      onValueChange={(details) => setSelectedTargetColumnId(details.value[0])}
+                    >
+                      <Select.Trigger>
+                        <Select.ValueText placeholder="Select Column" />
+                      </Select.Trigger>
+                      <Select.Positioner>
+                        <Select.Content>
+                          {allBoards
+                            .find((b) => b.id === selectedTargetBoardId)
+                            ?.columns.map((col) => (
+                              <Select.Item key={col.id} item={{ label: col.name, value: col.id }}>
+                                <Select.ItemText>{col.name}</Select.ItemText>
+                              </Select.Item>
+                            ))}
+                        </Select.Content>
+                      </Select.Positioner>
+                    </Select.Root>
+                  </Box>
+                )}
+              </VStack>
+
+              <HStack gap="3" justifyContent="flex-end">
+                <Dialog.CloseTrigger asChild>
+                  <Button variant="outline">Cancel</Button>
+                </Dialog.CloseTrigger>
+                <Button
+                  onClick={() => {
+                    if (taskToMove && selectedTargetColumnId) {
+                      moveTaskMutation.mutate({
+                        taskId: taskToMove.id,
+                        columnId: selectedTargetColumnId
+                      });
+                    }
+                  }}
+                  disabled={!selectedTargetColumnId || moveTaskMutation.isPending}
+                >
+                  Move Task
+                </Button>
+              </HStack>
+            </VStack>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
 
       {/* Add Column Dialog */}
       <Dialog.Root

@@ -2,6 +2,344 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-08 - Task Duplicate Validation & Dialog System
+
+### Task Duplicate Validation Error Fix
+
+**Problem**: Duplicating tasks resulted in validation errors when optional fields (description, dueDate, priority) were null.
+
+**User Feedback**: "error when tryin gto duplicate ah" with validation error showing:
+```json
+{
+  "status": 400,
+  "value": {
+    "description": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] },
+    "dueDate": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] },
+    "priority": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] }
+  }
+}
+```
+
+**Root Cause**: API validation expected either a valid string or the field to be omitted entirely, but the duplicate mutation was sending explicit `null` values for optional fields.
+
+**Solution**: Conditionally build payload object to only include properties with actual values:
+
+```typescript
+// src/pages/tasks/+Page.tsx - duplicateTaskMutation
+const duplicateTaskMutation = useMutation({
+  mutationFn: async (task: ExtendedTask) => {
+    // Build payload with only defined values
+    const payload: Record<string, unknown> = {
+      columnId: task.columnId,
+      title: `${task.title} (Copy)`,
+      labels: task.labels || []
+    };
+
+    // Only add optional fields if they have values
+    if (task.description) payload.description = task.description;
+    if (task.priority) payload.priority = task.priority;
+    if (task.dueDate) payload.dueDate = task.dueDate;
+    if (task.subtasks?.length) {
+      payload.subtasks = task.subtasks.map((st) => ({
+        title: st.title,
+        completed: false
+      }));
+    }
+
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error('Failed to duplicate task');
+    return response.json();
+  }
+});
+```
+
+**Key Insight**: When working with optional fields in API payloads, prefer omitting the field entirely over sending `null`, especially when API validation uses Zod schemas that expect `string | undefined` rather than `string | null`.
+
+### Global Dialog System with Lazy Loading
+
+**Problem**: Multiple usages of browser's `window.confirm()` and `window.alert()` throughout the codebase - poor UX and inconsistent styling.
+
+**User Feedback**:
+- "make delete modal use proper dialog not prompt"
+- "do it for every usage of prompt and confirm in the codebase, create a shared component /utils or sth if need"
+- "no lah i mean like, lazy loaded"
+
+**Solution**: Created a global dialog system using React Context with lazy-loaded components:
+
+**Architecture**:
+```typescript
+// src/utils/useDialogs.tsx - Main hook and provider
+import { lazy, Suspense } from 'react';
+
+const DialogComponents = lazy(() =>
+  import('./DialogComponents').then((module) => ({
+    default: module.DialogComponents
+  }))
+);
+
+export function DialogProvider({ children }: { children: ReactNode }) {
+  const [confirmDialog, setConfirmDialog] = useState<{
+    options: ConfirmOptions;
+    resolve: (value: boolean) => void;
+  } | null>(null);
+
+  const confirm = (options: ConfirmOptions): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmDialog({ options, resolve });
+    });
+  };
+
+  return (
+    <DialogContext.Provider value={{ confirm, alert }}>
+      {children}
+      {(confirmDialog || alertDialog) && (
+        <Suspense fallback={null}>
+          <DialogComponents
+            confirmDialog={confirmDialog}
+            alertDialog={alertDialog}
+            onConfirmClose={handleConfirmClose}
+            onAlertClose={handleAlertClose}
+          />
+        </Suspense>
+      )}
+    </DialogContext.Provider>
+  );
+}
+```
+
+**Usage Pattern**:
+```typescript
+import { useDialogs } from '~/utils/useDialogs';
+
+const { confirm, alert } = useDialogs();
+
+// For async handlers - use void operator to satisfy eslint
+onClick={() => {
+  void (async () => {
+    const confirmed = await confirm({
+      title: 'Delete Task',
+      description: 'Are you sure? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
+
+    if (confirmed) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  })();
+}}
+```
+
+**Files Updated**:
+- `src/utils/useDialogs.tsx` - Hook and provider with lazy loading
+- `src/utils/DialogComponents.tsx` - Separate file for dialog UI (code splitting)
+- `src/pages/+Layout.tsx` - Added `<DialogProvider>` to provider tree
+- `src/pages/tasks/+Page.tsx` - Replaced `confirm()` for delete task
+- `src/pages/inbox/+Page.tsx` - Replaced `confirm()` for delete items (2 places)
+- `src/components/Board/KanbanColumn.tsx` - Replaced `confirm()` and `alert()`
+- `src/components/Board/KanbanBoard.tsx` - Replaced `alert()` in error handler
+
+**Async Handler Pattern**:
+```typescript
+// ❌ WRONG - Promise-returning function in attribute
+onClick={async () => { await doSomething(); }}
+
+// ✅ CORRECT - Void operator for async IIFE
+onClick={() => {
+  void (async () => {
+    await doSomething();
+  })();
+}}
+```
+
+**Benefits**:
+- Lazy loading reduces initial bundle size (dialog UI only loaded when needed)
+- Consistent styling across all dialogs (Park UI components)
+- Promise-based API feels natural in async code
+- Global provider means no prop drilling
+- TypeScript type safety for options
+
+### Dialog Styling Fix
+
+**Problem**: Dialog looked ugly with wrong import, no Portal, and dynamic styling warnings.
+
+**User Feedback**:
+- "dialog looks kinda ugly"
+- "u sure u didn't use wrongly?"
+- "DO NOT USE VAR() INSIDE PROPERTIES, USE TOKEN.VAR OR TOKEN()"
+- "USE COLORPALETTE AND AVOID DYNAMIC STYLES LAH"
+- ".500 doesn't exist lah"
+
+**Solution**: Proper Park UI Dialog implementation with data attributes for variant colors.
+
+```typescript
+// ❌ WRONG - Wrong Dialog import, no Portal, dynamic colorPalette, wrong token
+import { Dialog } from '~/components/ui/dialog';
+
+<Dialog.Root open={true}>
+  <Dialog.Backdrop />
+  <Dialog.Positioner>
+    <Dialog.Content>
+      <Box color={variant === 'danger' ? 'red.500' : 'blue.500'}>
+        <AlertTriangle color="var(--colors-red-500)" />
+      </Box>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog.Root>
+
+// ✅ CORRECT - Styled Dialog, Portal, data attribute, proper token
+import { Portal } from '@ark-ui/react/portal';
+import * as Dialog from '~/components/ui/styled/dialog';
+
+<Dialog.Root open={true}>
+  <Portal>
+    <Dialog.Backdrop />
+    <Dialog.Positioner>
+      <Dialog.Content maxW="440px" bg="bg.default" borderColor="border.default">
+        <Box
+          data-variant={variant || 'info'}
+          color="colorPalette.default"
+        >
+          <AlertTriangle width="20" height="20" />
+        </Box>
+      </Dialog.Content>
+    </Dialog.Positioner>
+  </Portal>
+</Dialog.Root>
+```
+
+**Global CSS Setup** (panda.config.ts):
+```typescript
+globalCss: {
+  '[data-variant=danger]': {
+    colorPalette: 'red'
+  },
+  '[data-variant=info]': {
+    colorPalette: 'blue'
+  }
+}
+```
+
+**Key Points**:
+- Use `* as Dialog from '~/components/ui/styled/dialog'` not generic Dialog component
+- Wrap everything in `<Portal>` for proper z-index and rendering
+- Use data attributes (`data-variant`) to set colorPalette via global CSS
+- Use semantic tokens like `colorPalette.default`, NOT `colorPalette.500`
+- Never use `var(--colors-*)` in props, always use Panda tokens
+- Icon colors inherit from parent Box's `color` prop
+- Better spacing: `gap="5"`, `p="6"` for dialogs
+- Proper sizing: `maxW="440px"`, `w={{ base: '90vw', md: '440px' }}`
+
+### Key Learnings
+
+1. **CSS Props with Dynamic Values**: ❌ NEVER USE DYNAMIC VALUES INSIDE CSS PROPS - Use data attributes + css() instead! `css={{ color: dynamicValue }}` is NOT ALLOWED. Use colorPalette prop or data-attribute + css() pattern.
+2. **Conditional Object Properties**: Use `if (value) obj.key = value` pattern instead of `{ key: value || null }` when working with APIs that have strict validation
+2. **Lazy Loading Pattern**: Split heavy components into separate files and use `React.lazy()` + `Suspense` for code splitting
+3. **Global UI State**: React Context + Promises = clean API for modal/dialog systems
+4. **Async Event Handlers**: Always wrap with `void (async () => { ... })()` to satisfy ESLint rules
+5. **Testing Validation**: Browser-based testing confirmed the fix works for both minimal tasks (no optional fields) and complete tasks (with priority, description, etc.)
+6. **Dialog Styling**: Use styled Dialog import, Portal wrapper, data attributes for variants, and proper semantic tokens (`.default` not `.500`)
+
+## 2025-10-08 - Calendar Route Auth & Elysia Route Grouping (earlier)
+
+### Problem: iCal Feed Authentication Blocking
+
+**Issue**: Calendar feed endpoint `/api/calendar/ical/:userId/:token` was blocked by session auth middleware, preventing calendar apps from accessing the feed.
+
+**User Feedback**: "hmm it's getting hit by auth, should not need auth lah"
+
+**Root Cause**: `withAuth()` middleware applied to entire router affected all routes including public endpoints with their own token-based authentication.
+
+### Solution: Proper Elysia Route Organization
+
+**Pattern**: Separate public and authenticated routes without using `.group()`
+
+```typescript
+// ❌ WRONG - Tried using .group() but syntax was complex
+export const calendarRoutes = new Elysia({ prefix: '/calendar' })
+  .decorate('db', db)
+  .group('', (app) => app.get('/ical/:userId/:token', handler))  // Complex nesting
+  .group('', (app) => app.use(withAuth()).get('/events', handler))
+
+// ✅ CORRECT - Simple sequential route definition
+export const calendarRoutes = new Elysia({ prefix: '/calendar' })
+  .decorate('db', db)
+
+  // Public routes first (no auth required)
+  .get('/ical/:userId/:token', async ({ params, db, set }) => {
+    // Token-based auth inside handler
+    const expectedToken = createHash('sha256')
+      .update(`${userId}-${process.env.CALENDAR_SECRET}`)
+      .digest('hex');
+    if (token !== expectedToken) {
+      set.status = 401;
+      return 'Unauthorized';
+    }
+    // Generate iCal feed...
+  })
+
+  // Apply auth middleware AFTER public routes
+  .use(withAuth())
+
+  // Authenticated routes
+  .get('/feed-url', ({ user }) => { /* ... */ })
+  .get('/events', async ({ query, db, user }) => { /* ... */ })
+```
+
+### Key Insights
+
+**Elysia Middleware Order**:
+- Middleware applied with `.use()` affects all routes defined AFTER it
+- Public routes must be defined BEFORE `.use(withAuth())`
+- No need for complex `.group()` nesting in most cases
+
+**iCal MIME Type**:
+- Must set `Content-Type: text/calendar; charset=utf-8`
+- Use object syntax: `set.headers = { 'Content-Type': '...' }`
+- Elysia properly handles the response
+
+**Calendar Feed Security**:
+- Public endpoint: `/api/calendar/ical/:userId/:token`
+- Token generated using: `createHash('sha256').update(userId + secret).digest('hex')`
+- Each user gets unique, stable feed URL
+- No session cookies required for calendar subscriptions
+
+### Route Structure Best Practices
+
+```typescript
+// 1. Public routes with custom auth
+.get('/public/endpoint', ({ params }) => {
+  // Verify custom token/key
+  if (!isValid(params.token)) return 'Unauthorized';
+  // Handle request
+})
+
+// 2. Apply session auth middleware
+.use(withAuth())
+
+// 3. Protected routes
+.get('/protected/endpoint', ({ user }) => {
+  // user is guaranteed to exist
+})
+```
+
+### Files Modified
+- `src/server/routes/calendar.ts` - Restructured route order, removed `.group()` complexity
+
+### Testing Checklist
+- [x] Public calendar feed accessible without cookies
+- [x] Feed returns valid iCalendar format (VCALENDAR object)
+- [x] Authenticated endpoints still require session
+- [x] Token validation working correctly
+- [x] MIME type set to `text/calendar`
+
 ## 2025-10-04 - Component Extraction & Visual Consistency
 
 ### Component Extraction Pattern

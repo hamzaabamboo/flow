@@ -80,22 +80,24 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
 
     logger.info(`Sending ${type} summaries to ${optedInUsers.length} opted-in users`);
 
-    for (const user of optedInUsers) {
-      try {
-        const userSettings =
-          (user.settings as {
-            summarySpaces?: ('work' | 'personal')[];
-          }) || {};
+    await Promise.all(
+      optedInUsers.map(async (user) => {
+        try {
+          const userSettings =
+            (user.settings as {
+              summarySpaces?: ('work' | 'personal')[];
+            }) || {};
 
-        // Default to both spaces if not specified
-        const spaces = userSettings.summarySpaces || ['work', 'personal'];
+          // Default to both spaces if not specified
+          const spaces = userSettings.summarySpaces || ['work', 'personal'];
 
-        await sendDailySummary(user.id, type, spaces, db);
-        logger.info(`Sent ${type} summary to user ${user.id} for spaces: ${spaces.join(', ')}`);
-      } catch (error) {
-        logger.error(error, `Failed to send ${type} summary to user ${user.id}`);
-      }
-    }
+          await sendDailySummary(user.id, type, spaces, db);
+          logger.info(`Sent ${type} summary to user ${user.id} for spaces: ${spaces.join(', ')}`);
+        } catch (error) {
+          logger.error(error, `Failed to send ${type} summary to user ${user.id}`);
+        }
+      })
+    );
   } catch (error) {
     logger.error(error, `Failed to send ${type} summaries`);
   }
@@ -119,19 +121,21 @@ export const cronJobs = new Elysia()
           .from(reminders)
           .where(and(eq(reminders.sent, false), lte(reminders.reminderTime, now)));
 
-        for (const reminder of dueReminders) {
-          try {
-            // Send reminder via HamBot and WebSocket
-            await sendToHamBot(reminder, db);
+        await Promise.all(
+          dueReminders.map(async (reminder) => {
+            try {
+              // Send reminder via HamBot and WebSocket
+              await sendToHamBot(reminder, db);
 
-            // Mark as sent
-            await db.update(reminders).set({ sent: true }).where(eq(reminders.id, reminder.id));
+              // Mark as sent
+              await db.update(reminders).set({ sent: true }).where(eq(reminders.id, reminder.id));
 
-            logger.info(`Reminder sent: ${reminder.id}`);
-          } catch (error) {
-            logger.error(error, `Failed to send reminder ${reminder.id}`);
-          }
-        }
+              logger.info(`Reminder sent: ${reminder.id}`);
+            } catch (error) {
+              logger.error(error, `Failed to send reminder ${reminder.id}`);
+            }
+          })
+        );
       }
     })
   )

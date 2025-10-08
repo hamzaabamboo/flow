@@ -12,6 +12,7 @@ import { RadioButtonGroup } from '../ui/radio-button-group';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Checkbox } from '../ui/checkbox';
+import { SimpleDatePicker } from '../ui/simple-date-picker';
 import * as Dialog from '../ui/styled/dialog';
 import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
 
@@ -335,8 +336,8 @@ export function TaskDialog({
                   </Box>
 
                   <Grid gap="4" w="full" columns={{ base: 1, md: 2 }}>
-                    {/* Board & Column Selection - always show to allow moving tasks */}
-                    {boards.length > 0 && (
+                    {/* Board & Column Selection - show when boards are available and no columns prop */}
+                    {boards.length > 0 && !columns && (
                       <>
                         <Box>
                           <Text mb="1" fontSize="sm" fontWeight="medium">
@@ -611,20 +612,15 @@ export function TaskDialog({
                             <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
                             End Date (optional)
                           </Text>
-                          <Input
-                            type="date"
+                          <SimpleDatePicker
                             value={
                               recurringEndDate
                                 ? new Date(recurringEndDate).toISOString().split('T')[0]
                                 : ''
                             }
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setRecurringEndDate(
-                                e.target.value ? new Date(e.target.value).toISOString() : ''
-                              );
+                            onChange={(value) => {
+                              setRecurringEndDate(value ? new Date(value).toISOString() : '');
                             }}
-                            onClick={(e) => e.stopPropagation()}
                             placeholder="Leave empty for indefinite"
                           />
                           <Text mt="1" color="fg.muted" fontSize="xs">
@@ -694,7 +690,7 @@ export function TaskDialog({
                         </Text>
                         <VStack gap="2" alignItems="start">
                           {subtasks.map((subtask, index) => (
-                            <HStack key={index} gap="2" w="full">
+                            <HStack key={`subtask-${index}-${subtask.title}`} gap="2" w="full">
                               <Checkbox
                                 size="sm"
                                 checked={subtask.completed}

@@ -335,7 +335,7 @@ export default function HabitsPage() {
                         habit.targetDays &&
                         habit.targetDays.length > 0 && (
                           <HStack gap="1" flexWrap="wrap">
-                            {habit.targetDays.sort().map((day) => (
+                            {habit.targetDays.toSorted().map((day) => (
                               <Badge key={day} size="sm" variant="outline">
                                 {DAYS_OF_WEEK[day].label}
                               </Badge>

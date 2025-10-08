@@ -4,6 +4,7 @@ import { MessageCircle, Bot, Mail, FileText, PartyPopper, Trash2, ArrowRight } f
 import { navigate } from 'vike/client/router';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useToaster } from '../../contexts/ToasterContext';
+import { useDialogs } from '../../utils/useDialogs';
 import { Button } from '../../components/ui/button';
 import { IconButton } from '../../components/ui/icon-button';
 import * as Card from '../../components/ui/styled/card';
@@ -15,11 +16,26 @@ import type { InboxItem } from '../../shared/types/misc';
 import type { BoardWithColumns } from '../../shared/types/board';
 import { Spinner } from '../../components/ui/spinner';
 import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
+
+const getSourceIcon = (source: string) => {
+  switch (source) {
+    case 'command':
+      return <MessageCircle width="16" height="16" />;
+    case 'hambot':
+      return <Bot width="16" height="16" />;
+    case 'email':
+      return <Mail width="16" height="16" />;
+    default:
+      return <FileText width="16" height="16" />;
+  }
+};
 
 export default function InboxPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
   const { toast } = useToaster();
+  const { confirm } = useDialogs();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showDestinationModal, setShowDestinationModal] = useState(false);
   const [pendingItems, setPendingItems] = useState<string[]>([]);
@@ -151,19 +167,6 @@ export default function InboxPage() {
     setSelectedItems(newSelection);
   };
 
-  const getSourceIcon = (source: string) => {
-    switch (source) {
-      case 'command':
-        return <MessageCircle width="16" height="16" />;
-      case 'hambot':
-        return <Bot width="16" height="16" />;
-      case 'email':
-        return <Mail width="16" height="16" />;
-      default:
-        return <FileText width="16" height="16" />;
-    }
-  };
-
   if (isLoading) {
     return (
       <VStack gap="3" justifyContent="center" alignItems="center" minH="60vh" p="8">
@@ -191,9 +194,17 @@ export default function InboxPage() {
 
               <Button
                 onClick={() => {
-                  if (confirm('Delete selected items?')) {
-                    deleteItems.mutate(Array.from(selectedItems));
-                  }
+                  void (async () => {
+                    const confirmed = await confirm({
+                      title: 'Delete Items',
+                      description: `Are you sure you want to delete ${selectedItems.size} item(s)? This action cannot be undone.`,
+                      confirmText: 'Delete',
+                      variant: 'danger'
+                    });
+                    if (confirmed) {
+                      deleteItems.mutate(Array.from(selectedItems));
+                    }
+                  })();
                 }}
                 variant="outline"
                 size="sm"
@@ -234,16 +245,26 @@ export default function InboxPage() {
                 cursor="pointer"
                 gap="3"
                 alignItems="center"
-                borderColor={selectedItems.has(item.id) ? 'colorPalette.default' : 'border.default'}
+                data-selected={selectedItems.has(item.id)}
+                className={css({
+                  borderColor: 'border.default',
+                  bg: 'bg.default',
+                  transition: 'all 0.15s',
+                  '&[data-selected=true]': {
+                    borderColor: 'colorPalette.default',
+                    bg: 'colorPalette.subtle'
+                  },
+                  _hover: {
+                    bg: 'bg.muted'
+                  },
+                  '&[data-selected=true]:hover': {
+                    bg: 'colorPalette.muted'
+                  }
+                })}
                 borderRadius="lg"
                 borderWidth="1px"
                 w="full"
                 p="4"
-                bg={selectedItems.has(item.id) ? 'colorPalette.subtle' : 'bg.default'}
-                transition="all 0.15s"
-                _hover={{
-                  bg: selectedItems.has(item.id) ? 'colorPalette.muted' : 'bg.muted'
-                }}
               >
                 <Checkbox
                   checked={selectedItems.has(item.id)}
@@ -279,9 +300,17 @@ export default function InboxPage() {
                   </IconButton>
                   <IconButton
                     onClick={() => {
-                      if (confirm(`Delete "${item.title}"?`)) {
-                        deleteItems.mutate([item.id]);
-                      }
+                      void (async () => {
+                        const confirmed = await confirm({
+                          title: 'Delete Item',
+                          description: `Are you sure you want to delete "${item.title}"? This action cannot be undone.`,
+                          confirmText: 'Delete',
+                          variant: 'danger'
+                        });
+                        if (confirmed) {
+                          deleteItems.mutate([item.id]);
+                        }
+                      })();
                     }}
                     variant="ghost"
                     size="sm"

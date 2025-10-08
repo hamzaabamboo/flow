@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { navigate } from 'vike/client/router';
-import { Trash2, LayoutGrid, Copy, MoveRight } from 'lucide-react';
 import { Portal } from '@ark-ui/react/portal';
 import type { Task } from '../../shared/types';
 import { useSpace } from '../../contexts/SpaceContext';
-import TaskDialog from '../../components/Board/TaskDialog';
+import { TaskDialog } from '../../components/Board/TaskDialog';
 import { TaskItem } from '../../components/Agenda/TaskItem';
+import { MoveTaskDialog } from '../../components/MoveTaskDialog';
+import { useTaskActions } from '../../hooks/useTaskActions';
 import { Button } from '../../components/ui/button';
-import { IconButton } from '../../components/ui/icon-button';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
 import { Badge } from '../../components/ui/badge';
@@ -19,8 +18,6 @@ import type { ExtendedTask } from '~/shared/types/calendar';
 import type { CalendarEvent } from '~/shared/types/calendar';
 import { Spinner } from '~/components/ui/spinner';
 import { PriorityBadge } from '~/components/PriorityBadge';
-import * as Dialog from '~/components/ui/styled/dialog';
-import type { Column } from '~/shared/types';
 
 export default function TasksPage() {
   const { currentSpace } = useSpace();
@@ -33,10 +30,14 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'calendar'>('list');
   const [editingTask, setEditingTask] = useState<ExtendedTask | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
-  const [taskToMove, setTaskToMove] = useState<ExtendedTask | null>(null);
-  const [selectedTargetBoardId, setSelectedTargetBoardId] = useState<string>('');
-  const [selectedTargetColumnId, setSelectedTargetColumnId] = useState<string>('');
+
+  // Use task actions hook
+  const taskActions = useTaskActions({
+    onTaskEdit: (task) => {
+      setEditingTask(task as ExtendedTask);
+      setIsTaskDialogOpen(true);
+    }
+  });
 
   // Fetch all tasks across all boards
   const { data: allTasks = [], isLoading } = useQuery<ExtendedTask[]>({
@@ -51,7 +52,7 @@ export default function TasksPage() {
   });
 
   // Fetch boards for filter options
-  const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
+  const { data: boards = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
       const response = await fetch(`/api/boards?space=${currentSpace}`, {
@@ -81,67 +82,6 @@ export default function TasksPage() {
     }
   });
 
-  // Delete task mutation
-  const deleteTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to delete task');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
-    }
-  });
-
-  // Duplicate task mutation
-  const duplicateTaskMutation = useMutation({
-    mutationFn: async (task: ExtendedTask) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          columnId: task.columnId,
-          title: `${task.title} (Copy)`,
-          description: task.description,
-          priority: task.priority,
-          dueDate: task.dueDate,
-          labels: task.labels,
-          subtasks: task.subtasks?.map((st) => ({ title: st.title, completed: false }))
-        })
-      });
-      if (!response.ok) throw new Error('Failed to duplicate task');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
-      queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
-    }
-  });
-
-  // Move task mutation
-  const moveTaskMutation = useMutation({
-    mutationFn: async ({ taskId, columnId }: { taskId: string; columnId: string }) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ columnId })
-      });
-      if (!response.ok) throw new Error('Failed to move task');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
-      queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
-      setIsMoveDialogOpen(false);
-      setTaskToMove(null);
-    }
-  });
-
   // Priority weights for sorting
   const priorityWeight: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
 
@@ -161,7 +101,7 @@ export default function TasksPage() {
       if (filterBoard !== 'all' && task.boardId !== filterBoard) return false;
       return true;
     })
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       // Completed tasks go to bottom
       if (a.completed !== b.completed) {
         return a.completed ? 1 : -1;
@@ -238,124 +178,13 @@ export default function TasksPage() {
   return (
     <>
       {/* Move Task Dialog */}
-      <Dialog.Root
-        open={isMoveDialogOpen}
-        onOpenChange={(details) => setIsMoveDialogOpen(details.open)}
-      >
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content maxW="500px">
-            <VStack gap="6" alignItems="stretch" p="6">
-              <VStack gap="1" alignItems="stretch">
-                <Dialog.Title>Move Task</Dialog.Title>
-                <Dialog.Description>
-                  Move "{taskToMove?.title}" to a different board or column
-                </Dialog.Description>
-              </VStack>
-
-              <VStack gap="4" alignItems="stretch">
-                <Box>
-                  <Text mb="2" fontWeight="medium">
-                    Board
-                  </Text>
-                  <Select.Root
-                    collection={createListCollection({
-                      items: boards.map((b) => ({ label: b.name, value: b.id }))
-                    })}
-                    value={selectedTargetBoardId ? [selectedTargetBoardId] : []}
-                    onValueChange={(details) => {
-                      const newBoardId = details.value[0];
-                      setSelectedTargetBoardId(newBoardId);
-                      // Auto-select first column of new board
-                      const board = boards.find((b) => b.id === newBoardId);
-                      if (board && board.columns.length > 0) {
-                        setSelectedTargetColumnId(board.columns[0].id);
-                      }
-                    }}
-                  >
-                    <Select.Trigger>
-                      <Select.ValueText placeholder="Select board" />
-                    </Select.Trigger>
-                    <Portal>
-                      <Select.Positioner>
-                        <Select.Content>
-                          {boards.map((board) => (
-                            <Select.Item
-                              key={board.id}
-                              item={{ label: board.name, value: board.id }}
-                            >
-                              {board.name}
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Positioner>
-                    </Portal>
-                  </Select.Root>
-                </Box>
-
-                {selectedTargetBoardId && (
-                  <Box>
-                    <Text mb="2" fontWeight="medium">
-                      Column
-                    </Text>
-                    <Select.Root
-                      collection={createListCollection({
-                        items:
-                          boards
-                            .find((b) => b.id === selectedTargetBoardId)
-                            ?.columns.map((c) => ({ label: c.name, value: c.id })) || []
-                      })}
-                      value={selectedTargetColumnId ? [selectedTargetColumnId] : []}
-                      onValueChange={(details) => setSelectedTargetColumnId(details.value[0])}
-                    >
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="Select column" />
-                      </Select.Trigger>
-                      <Portal>
-                        <Select.Positioner>
-                          <Select.Content>
-                            {boards
-                              .find((b) => b.id === selectedTargetBoardId)
-                              ?.columns.map((column) => (
-                                <Select.Item
-                                  key={column.id}
-                                  item={{ label: column.name, value: column.id }}
-                                >
-                                  {column.name}
-                                </Select.Item>
-                              ))}
-                          </Select.Content>
-                        </Select.Positioner>
-                      </Portal>
-                    </Select.Root>
-                  </Box>
-                )}
-              </VStack>
-
-              <HStack gap="3" justifyContent="flex-end">
-                <Dialog.CloseTrigger asChild>
-                  <Button variant="outline">Cancel</Button>
-                </Dialog.CloseTrigger>
-                <Button
-                  variant="solid"
-                  onClick={() => {
-                    if (taskToMove && selectedTargetColumnId) {
-                      moveTaskMutation.mutate({
-                        taskId: taskToMove.id,
-                        columnId: selectedTargetColumnId
-                      });
-                    }
-                  }}
-                  disabled={!selectedTargetColumnId || moveTaskMutation.isPending}
-                  loading={moveTaskMutation.isPending}
-                >
-                  Move Task
-                </Button>
-              </HStack>
-            </VStack>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Dialog.Root>
+      <MoveTaskDialog
+        open={taskActions.isMoveDialogOpen}
+        onOpenChange={taskActions.setIsMoveDialogOpen}
+        task={taskActions.taskToMove}
+        onMove={(taskId, columnId) => taskActions.moveTaskMutation.mutate({ taskId, columnId })}
+        isMoving={taskActions.isMoving}
+      />
 
       <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
         {/* Header */}
@@ -585,10 +414,10 @@ export default function TasksPage() {
                         }
                       });
                     }}
-                    onTaskClick={() => {
-                      setEditingTask(task);
-                      setIsTaskDialogOpen(true);
-                    }}
+                    onTaskClick={() => taskActions.handleEdit(task)}
+                    onDuplicate={() => taskActions.handleDuplicate(task)}
+                    onDelete={() => taskActions.handleDelete(task)}
+                    onMove={() => taskActions.handleMove(task)}
                     extraBadges={
                       <>
                         <Badge size="sm" variant="outline">
@@ -599,58 +428,7 @@ export default function TasksPage() {
                         </Badge>
                       </>
                     }
-                    actions={
-                      <>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            void navigate(`/board/${task.boardId}`);
-                          }}
-                          aria-label="View Board"
-                        >
-                          <LayoutGrid width="16" height="16" />
-                        </IconButton>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setTaskToMove(task);
-                            setSelectedTargetBoardId(task.boardId);
-                            setSelectedTargetColumnId(task.columnId);
-                            setIsMoveDialogOpen(true);
-                          }}
-                          aria-label="Move to board"
-                          colorPalette="purple"
-                        >
-                          <MoveRight width="16" height="16" />
-                        </IconButton>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            duplicateTaskMutation.mutate(task);
-                          }}
-                          aria-label="Duplicate task"
-                          colorPalette="blue"
-                        >
-                          <Copy width="16" height="16" />
-                        </IconButton>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this task?')) {
-                              deleteTaskMutation.mutate(task.id);
-                            }
-                          }}
-                          aria-label="Delete task"
-                          colorPalette="red"
-                        >
-                          <Trash2 />
-                        </IconButton>
-                      </>
-                    }
+                    extraActions={taskActions.extraActions}
                   />
                 ))}
 

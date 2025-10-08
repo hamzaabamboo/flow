@@ -15,6 +15,28 @@ import type { Task, BoardWithColumns as Board } from '../../../shared/types/boar
 import { Spinner } from '../../../components/ui/spinner';
 import { Box, VStack, HStack, Center } from 'styled-system/jsx';
 
+const getPriorityColor = (priority?: string) => {
+  switch (priority) {
+    case 'urgent':
+      return 'red';
+    case 'high':
+      return 'orange';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'green';
+    default:
+      return 'gray';
+  }
+};
+
+const getPriorityIcon = (priority?: string) => {
+  if (priority === 'urgent' || priority === 'high') {
+    return <AlertCircle width="16" height="16" />;
+  }
+  return null;
+};
+
 export default function AllTasksPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
@@ -130,28 +152,6 @@ export default function AllTasksPage() {
     });
   };
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'red';
-      case 'high':
-        return 'orange';
-      case 'medium':
-        return 'yellow';
-      case 'low':
-        return 'green';
-      default:
-        return 'gray';
-    }
-  };
-
-  const getPriorityIcon = (priority?: string) => {
-    if (priority === 'urgent' || priority === 'high') {
-      return <AlertCircle width="16" height="16" />;
-    }
-    return null;
-  };
-
   // Extract all unique columns for filter
   const allColumns = boards
     .flatMap((board) =>
@@ -162,7 +162,7 @@ export default function AllTasksPage() {
         boardId: board.id
       }))
     )
-    .sort((a, b) => `${a.boardName} - ${a.name}`.localeCompare(`${b.boardName} - ${b.name}`));
+    .toSorted((a, b) => `${a.boardName} - ${a.name}`.localeCompare(`${b.boardName} - ${b.name}`));
 
   // Filter tasks based on search and filters
   const filteredTasks = allTasks.filter((task) => {

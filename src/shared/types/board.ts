@@ -64,6 +64,7 @@ export interface BoardInfo {
   overdueCount?: number;
   todayCount?: number;
   columnCount?: number;
+  updatedAt?: string;
 }
 
 export interface ColumnData {

@@ -25,7 +25,13 @@ export default function HomePage() {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const data = await response.json();
+      // Sort by most recently updated first
+      return data.toSorted((a: BoardInfo, b: BoardInfo) => {
+        const aDate = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bDate = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return bDate - aDate;
+      });
     },
     enabled: isAuthenticated
   });

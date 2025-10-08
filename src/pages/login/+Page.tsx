@@ -3,12 +3,12 @@ import { Button } from '../../components/ui/button';
 import * as Card from '../../components/ui/styled/card';
 import { VStack, Box } from 'styled-system/jsx';
 
-export default function LoginPage() {
-  const handleOAuthLogin = () => {
-    const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/';
-    window.location.href = `/api/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
-  };
+const handleOAuthLogin = () => {
+  const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/';
+  window.location.href = `/api/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+};
 
+export default function LoginPage() {
   return (
     <Box
       display="flex"

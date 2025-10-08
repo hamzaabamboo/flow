@@ -1,5 +1,5 @@
 {
-  "plugins": ["@pandabox/prettier-plugin"],
+  "plugins": ["@prettier/plugin-oxc", "@pandabox/prettier-plugin"],
   "useTabs": false,
   "tabWidth": 2,
   "singleQuote": true,

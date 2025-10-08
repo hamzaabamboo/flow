@@ -1,24 +1,24 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { format, startOfWeek, endOfWeek, addDays, isSameDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, ExternalLink } from 'lucide-react';
-import { navigate } from 'vike/client/router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
-import { css } from '../../../styled-system/css';
-import * as Card from '../../components/ui/styled/card';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Checkbox } from '../../components/ui/checkbox';
+import { IconButton } from '../../components/ui/icon-button';
 import { Text } from '../../components/ui/text';
 import { Heading } from '../../components/ui/heading';
-import { IconButton } from '../../components/ui/icon-button';
 import { useSpace } from '../../contexts/SpaceContext';
 import { TaskDialog } from '../../components/Board/TaskDialog';
+import { MoveTaskDialog } from '../../components/MoveTaskDialog';
+import { useTaskActions } from '../../hooks/useTaskActions';
 import { useQueryState, useDateQueryState } from '../../hooks/useQueryState';
 import type { CalendarEvent, ExtendedTask, Habit } from '../../shared/types/calendar';
 import type { Task } from '../../shared/types/board';
-import { TaskItem } from '../../components/Agenda/TaskItem';
 import { HabitsCard } from '../../components/Agenda/HabitsCard';
+import { AgendaWeekView } from '../../components/Agenda/AgendaWeekView';
+import { AgendaDayView } from '../../components/Agenda/AgendaDayView';
+import { AgendaSidebar } from '../../components/Agenda/AgendaSidebar';
+import { OverdueTasksCard } from '../../components/Agenda/OverdueTasksCard';
 import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
@@ -31,10 +31,23 @@ interface CompleteTaskPayload {
 
 export default function AgendaPage() {
   const { currentSpace } = useSpace();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useQueryState<'day' | 'week'>('view', 'day');
   const [selectedDate, setSelectedDate] = useDateQueryState('date');
   const [editingTask, setEditingTask] = useState<ExtendedTask | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+
+  // Use task actions hook
+  const taskActions = useTaskActions({
+    onTaskEdit: (task) => {
+      const extendedTask = calendarEventToExtendedTask(task as CalendarEvent);
+      setEditingTask(extendedTask);
+      setIsTaskDialogOpen(true);
+    },
+    onSuccess: () => {
+      refetchEvents();
+    }
+  });
 
   // Get calendar events
   const {
@@ -49,7 +62,9 @@ export default function AgendaPage() {
 
       if (viewMode === 'day') {
         // Get local midnight and end of day
+        // For day view, fetch from 30 days ago to include overdue tasks
         start = new Date(selectedDate);
+        start.setDate(start.getDate() - 30);
         start.setHours(0, 0, 0, 0);
         end = new Date(selectedDate);
         end.setHours(23, 59, 59, 999);
@@ -176,6 +191,39 @@ export default function AgendaPage() {
     }
   });
 
+  // Carry over tasks mutation
+  const carryOverTasksMutation = useMutation({
+    mutationFn: async ({ taskIds, targetDate }: { taskIds: string[]; targetDate: Date }) => {
+      const promises = taskIds.map((taskId) => {
+        // Preserve time, just update date
+        const task = overdueTasks.find((t) => t.id === taskId);
+        if (!task?.dueDate) return Promise.resolve();
+
+        const oldDate = new Date(task.dueDate);
+        const newDate = new Date(
+          targetDate.getFullYear(),
+          targetDate.getMonth(),
+          targetDate.getDate(),
+          oldDate.getHours(),
+          oldDate.getMinutes(),
+          oldDate.getSeconds()
+        );
+
+        return fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueDate: newDate.toISOString() })
+        });
+      });
+
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+    }
+  });
+
   const completeTask = (event: CalendarEvent) => {
     completeTaskMutation.mutate({
       id: event.id,
@@ -263,6 +311,29 @@ export default function AgendaPage() {
     }
   };
 
+  // Separate overdue tasks
+  const overdueTasks = useMemo(() => {
+    if (!events || viewMode !== 'day') {
+      return [];
+    }
+
+    const now = new Date();
+    const overdue: CalendarEvent[] = [];
+
+    events.forEach((event) => {
+      if (!event.dueDate || event.completed) return;
+
+      const eventDate = new Date(event.dueDate);
+
+      // Include tasks that are past their due date/time
+      if (eventDate < now) {
+        overdue.push(event);
+      }
+    });
+
+    return overdue;
+  }, [events, viewMode]);
+
   const groupedEvents = useMemo(() => {
     const grouped: Record<string, CalendarEvent[]> = {};
 
@@ -298,8 +369,6 @@ export default function AgendaPage() {
 
     return grouped;
   }, [events, viewMode, selectedDate]);
-
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selectedDate), i));
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -450,338 +519,22 @@ export default function AgendaPage() {
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
           <Grid gap={4} gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }} w="full" h="full">
-            {/* Week View - Grid Layout */}
-            <VStack gap="3" alignItems="stretch" w="full" h="full" overflow="hidden">
-              {/* Grid Header */}
-              <Box w="full" h="full" overflowX="auto" overflowY="auto">
-                <Grid
-                  gap="2"
-                  gridTemplateColumns={{
-                    base: 'repeat(7, minmax(120px, 1fr))',
-                    md: 'repeat(7, 1fr)'
-                  }}
-                  w="full"
-                  overflowX="auto"
-                >
-                  {weekDates.map((date) => {
-                    const isToday = isSameDay(date, new Date());
-                    const dateKey = format(date, 'yyyy-MM-dd');
-                    const dayEvents = groupedEvents[dateKey] || [];
-                    const isPast = date < new Date() && !isSameDay(date, new Date());
-
-                    return (
-                      <Box
-                        className={css({
-                          borderColor: 'border.default',
-                          bg: 'bg.default',
-                          opacity: 1,
-                          '&[data-is-today=true]': {
-                            borderColor: 'colorPalette.default',
-                            bg: 'colorPalette.subtle'
-                          },
-                          '&[data-is-past=true]': {
-                            opacity: 0.7
-                          }
-                        })}
-                        key={date.toISOString()}
-                        data-is-today={isToday}
-                        data-is-past={isPast}
-                        borderRadius="lg"
-                        borderWidth="1px"
-                        overflow="hidden"
-                      >
-                        {/* Day Header */}
-                        <Box
-                          className={css({
-                            bg: 'bg.subtle',
-                            '&[data-is-today=true]': {
-                              bg: 'colorPalette.subtle'
-                            }
-                          })}
-                          data-is-today={isToday}
-                          borderBottomWidth="1px"
-                          borderBottomColor="border.default"
-                          p="2"
-                        >
-                          <VStack gap="0.5" alignItems="center">
-                            <Text
-                              color={isToday ? 'colorPalette.default' : 'fg.muted'}
-                              fontSize="xs"
-                              fontWeight="semibold"
-                              textTransform="uppercase"
-                            >
-                              {format(date, 'EEE')}
-                            </Text>
-                            <Text
-                              color={isToday ? 'colorPalette.default' : 'fg.default'}
-                              fontSize="xl"
-                              fontWeight="bold"
-                            >
-                              {format(date, 'd')}
-                            </Text>
-                          </VStack>
-                        </Box>
-
-                        {/* Day Content */}
-                        <Box minH="xs" maxH="md" p="2" overflowY="auto">
-                          <VStack gap="1.5" alignItems="stretch">
-                            {/* Combined Habits and Tasks - Sorted by Time */}
-                            {(() => {
-                              const dayHabits =
-                                habits?.filter((habit) => {
-                                  // In week view, habits from API already have checkDate for filtering
-                                  if (viewMode === 'week') {
-                                    return habit.checkDate === dateKey;
-                                  }
-                                  // In day view, use frequency logic
-                                  if (habit.frequency === 'daily') return true;
-                                  if (habit.frequency === 'weekly' && habit.targetDays) {
-                                    return habit.targetDays.includes(date.getDay());
-                                  }
-                                  return false;
-                                }) || [];
-
-                              // Combine habits and tasks with a type indicator
-                              const combined = [
-                                ...dayHabits.map((h) => ({
-                                  type: 'habit' as const,
-                                  item: h,
-                                  time: h.reminderTime
-                                })),
-                                ...dayEvents.map((e) => ({
-                                  type: 'task' as const,
-                                  item: e,
-                                  time: e.dueDate
-                                }))
-                              ];
-
-                              // Sort by time
-                              combined.sort((a, b) => {
-                                if (a.time && b.time) {
-                                  const aDate = new Date(a.time);
-                                  const bDate = new Date(b.time);
-                                  return aDate.getTime() - bDate.getTime();
-                                }
-                                // Items without time go to bottom
-                                if (!a.time) return 1;
-                                if (!b.time) return -1;
-                                return 0;
-                              });
-
-                              return combined.map((item) => {
-                                if (item.type === 'habit') {
-                                  const habit = item.item;
-                                  return (
-                                    <Box
-                                      className={css({
-                                        bg: 'bg.muted',
-                                        '&[data-completed=true]': {
-                                          bg: 'green.subtle'
-                                        }
-                                      })}
-                                      key={`habit-${habit.id}-${dateKey}`}
-                                      onClick={() =>
-                                        toggleHabitMutation.mutate({
-                                          habitId: habit.id,
-                                          date,
-                                          completed: !habit.completedToday
-                                        })
-                                      }
-                                      data-completed={habit.completedToday}
-                                      cursor="pointer"
-                                      borderLeftWidth="3px"
-                                      borderLeftColor="colorPalette.default"
-                                      borderRadius="sm"
-                                      p="1.5"
-                                      transition="all 0.2s"
-                                      _hover={{ bg: 'bg.subtle' }}
-                                    >
-                                      <HStack
-                                        gap="1.5"
-                                        justifyContent="space-between"
-                                        alignItems="center"
-                                      >
-                                        <Checkbox
-                                          checked={habit.completedToday}
-                                          size="sm"
-                                          readOnly
-                                          flex="1"
-                                        >
-                                          <VStack gap="0.5" alignItems="start">
-                                            <Text
-                                              textDecoration={
-                                                habit.completedToday ? 'line-through' : 'none'
-                                              }
-                                              fontSize="xs"
-                                              fontWeight="medium"
-                                              lineHeight="1.2"
-                                            >
-                                              {habit.name}
-                                            </Text>
-                                            {habit.reminderTime && (
-                                              <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                                {format(
-                                                  new Date(`2000-01-01T${habit.reminderTime}`),
-                                                  'h:mm a'
-                                                )}
-                                              </Text>
-                                            )}
-                                          </VStack>
-                                        </Checkbox>
-                                        <HStack gap="1" alignItems="center">
-                                          {habit.link && (
-                                            <a
-                                              href={habit.link}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              onClick={(e) => e.stopPropagation()}
-                                              style={{ display: 'flex', alignItems: 'center' }}
-                                            >
-                                              <ExternalLink width="12" height="12" />
-                                            </a>
-                                          )}
-                                          {(habit.currentStreak ?? 0) > 0 && (
-                                            <Text fontSize="xs" fontWeight="bold">
-                                              🔥{habit.currentStreak}
-                                            </Text>
-                                          )}
-                                        </HStack>
-                                      </HStack>
-                                    </Box>
-                                  );
-                                } else {
-                                  const event = item.item;
-                                  return (
-                                    <Box
-                                      key={`${event.id}-${event.instanceDate}`}
-                                      onClick={() => handleTaskClick(event)}
-                                      data-priority={event.priority || 'none'}
-                                      cursor="pointer"
-                                      borderLeftWidth="3px"
-                                      borderLeftColor="colorPalette.default"
-                                      borderRadius="sm"
-                                      p="1.5"
-                                      bg="bg.muted"
-                                      transition="all 0.2s"
-                                      _hover={{
-                                        bg: 'bg.subtle',
-                                        borderLeftColor: 'colorPalette.emphasized'
-                                      }}
-                                    >
-                                      <HStack gap="1.5" alignItems="start">
-                                        <Checkbox
-                                          size="sm"
-                                          checked={event.completed}
-                                          onCheckedChange={() => completeTask(event)}
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                        <VStack flex="1" gap="0.5" alignItems="start">
-                                          <Text
-                                            color={event.completed ? 'fg.subtle' : 'fg.default'}
-                                            textDecoration={
-                                              event.completed ? 'line-through' : 'none'
-                                            }
-                                            fontSize="xs"
-                                            fontWeight="medium"
-                                            lineHeight="1.2"
-                                            lineClamp="2"
-                                          >
-                                            {event.title}
-                                          </Text>
-                                          {event.dueDate && (
-                                            <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                                              {format(new Date(event.dueDate), 'h:mm a')}
-                                            </Text>
-                                          )}
-                                        </VStack>
-                                      </HStack>
-                                    </Box>
-                                  );
-                                }
-                              });
-                            })()}
-                            {dayEvents.length === 0 &&
-                              !habits?.filter((h) => {
-                                if (h.frequency === 'daily') return true;
-                                if (h.frequency === 'weekly' && h.targetDays) {
-                                  return h.targetDays.includes(date.getDay());
-                                }
-                                return false;
-                              }).length && (
-                                <Text py="4" color="fg.subtle" fontSize="xs" textAlign="center">
-                                  No tasks or habits
-                                </Text>
-                              )}
-                          </VStack>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Grid>
-              </Box>
-            </VStack>
-            {/* Sidebar for Habits and Stats */}
-            <VStack gap={3}>
-              {/* Habits Section for Week View */}
-              <Card.Root w="full">
-                <Card.Header p="3">
-                  <Card.Title fontSize="sm">This Week's Habits</Card.Title>
-                </Card.Header>
-                <Card.Body p="3" pt="0">
-                  {isLoadingHabits ? (
-                    <Center>
-                      <Spinner size="sm" />
-                    </Center>
-                  ) : isErrorHabits ? (
-                    <Center>
-                      <Text color="red.default" fontSize="xs">
-                        Error loading habits
-                      </Text>
-                    </Center>
-                  ) : (
-                    <VStack gap="1.5" alignItems="stretch" maxH="300px" overflowY="auto">
-                      {(() => {
-                        const uniqueHabits = Array.from(
-                          new Map(habits?.map((h) => [h.id, h]) || []).values()
-                        );
-                        return uniqueHabits.length > 0 ? (
-                          uniqueHabits.map((habit) => (
-                            <HStack
-                              key={habit.id}
-                              justifyContent="space-between"
-                              borderRadius="md"
-                              p="1.5"
-                              bg="bg.subtle"
-                            >
-                              <Text fontSize="xs" fontWeight="medium">
-                                {habit.name}
-                              </Text>
-                              {habit.link && (
-                                <a
-                                  href={habit.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ display: 'flex', alignItems: 'center' }}
-                                >
-                                  <ExternalLink width="12" height="12" />
-                                </a>
-                              )}
-                            </HStack>
-                          ))
-                        ) : (
-                          <Text py="2" color="fg.subtle" fontSize="xs" textAlign="center">
-                            No habits this week
-                          </Text>
-                        );
-                      })()}
-                    </VStack>
-                  )}
-                </Card.Body>
-              </Card.Root>
-
-              {/* Weekly Stats Section */}
-              <StatsCard title="Weekly Stats" stats={stats} />
-            </VStack>
+            <AgendaWeekView
+              selectedDate={selectedDate}
+              viewMode={viewMode}
+              groupedEvents={groupedEvents}
+              habits={habits}
+              onToggleHabit={(params) => toggleHabitMutation.mutate(params)}
+              onTaskClick={handleTaskClick}
+              onToggleTask={completeTask}
+            />
+            <AgendaSidebar
+              habits={habits}
+              isLoadingHabits={isLoadingHabits}
+              isErrorHabits={isErrorHabits}
+              stats={stats}
+              statsTitle="Weekly Stats"
+            />
           </Grid>
         ) : (
           // Day View - CSS Grid with responsive positioning
@@ -810,66 +563,31 @@ export default function AgendaPage() {
             {/* Tasks - Middle on mobile, left spanning both rows on desktop */}
             <Box gridColumn={{ base: '1', lg: '1' }} gridRow={{ base: '2', lg: '1 / 3' }}>
               <VStack gap="3" alignItems="stretch" w="full">
-                <Card.Root minH="lg">
-                  <Card.Body p="4">
-                    <VStack gap="2" alignItems="stretch">
-                      <Text mb="2" fontSize="lg" fontWeight="semibold">
-                        Tasks for {format(selectedDate, 'MMM d')}
-                      </Text>
-                      {groupedEvents[format(selectedDate, 'yyyy-MM-dd')]
-                        ?.sort((a, b) => {
-                          // Sort by dueDate time (earliest first)
-                          if (a.dueDate && b.dueDate) {
-                            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-                          }
-                          // Tasks without due times go to bottom
-                          if (!a.dueDate) return 1;
-                          if (!b.dueDate) return -1;
-                          return 0;
-                        })
-                        .map((event) => (
-                          <TaskItem
-                            key={`${event.id}-${event.instanceDate}`}
-                            event={event}
-                            onToggleComplete={() => completeTask(event)}
-                            onTaskClick={() => handleTaskClick(event)}
-                            extraBadges={
-                              event.boardName && event.columnName ? (
-                                <>
-                                  <Badge size="sm" variant="outline">
-                                    {event.boardName}
-                                  </Badge>
-                                  <Badge size="sm" variant="subtle">
-                                    {event.columnName}
-                                  </Badge>
-                                </>
-                              ) : null
-                            }
-                            actions={
-                              event.boardId ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    void navigate(`/board/${event.boardId}`);
-                                  }}
-                                  aria-label="View Board"
-                                >
-                                  <LayoutGrid width="16" height="16" />
-                                </IconButton>
-                              ) : undefined
-                            }
-                          />
-                        ))}
-                      {(!groupedEvents[format(selectedDate, 'yyyy-MM-dd')] ||
-                        groupedEvents[format(selectedDate, 'yyyy-MM-dd')].length === 0) && (
-                        <Text py="8" color="fg.subtle" textAlign="center">
-                          No tasks scheduled
-                        </Text>
-                      )}
-                    </VStack>
-                  </Card.Body>
-                </Card.Root>
+                <OverdueTasksCard
+                  overdueTasks={overdueTasks}
+                  onCarryOver={(taskIds, targetDate) => {
+                    carryOverTasksMutation.mutate({ taskIds, targetDate });
+                  }}
+                  onToggleComplete={completeTask}
+                  onTaskClick={(event) => taskActions.handleEdit(event)}
+                  onDuplicate={(event) => taskActions.handleDuplicate(event)}
+                  onDelete={(event) => taskActions.handleDelete(event)}
+                  onMove={(event) => taskActions.handleMove(event)}
+                  extraActions={taskActions.extraActions}
+                  isCarryingOver={carryOverTasksMutation.isPending}
+                />
+                <AgendaDayView
+                  selectedDate={selectedDate}
+                  events={(groupedEvents[format(selectedDate, 'yyyy-MM-dd')] || []).filter(
+                    (event) => !overdueTasks.includes(event)
+                  )}
+                  onToggleComplete={completeTask}
+                  onTaskClick={(event) => taskActions.handleEdit(event)}
+                  onDuplicate={(event) => taskActions.handleDuplicate(event)}
+                  onDelete={(event) => taskActions.handleDelete(event)}
+                  onMove={(event) => taskActions.handleMove(event)}
+                  extraActions={taskActions.extraActions}
+                />
               </VStack>
             </Box>
 
@@ -893,6 +611,15 @@ export default function AgendaPage() {
           mode={editingTask ? 'edit' : 'create'}
           task={editingTask ? (editingTask as Task) : undefined}
           onSubmit={handleDialogSubmit}
+        />
+
+        {/* Move Task Dialog */}
+        <MoveTaskDialog
+          open={taskActions.isMoveDialogOpen}
+          onOpenChange={taskActions.setIsMoveDialogOpen}
+          task={taskActions.taskToMove}
+          onMove={(taskId, columnId) => taskActions.moveTaskMutation.mutate({ taskId, columnId })}
+          isMoving={taskActions.isMoving}
         />
       </VStack>
     </Box>

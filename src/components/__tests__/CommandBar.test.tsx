@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { CommandBar } from '../CommandBar/CommandBar';
+// oxlint-disable-next-line no-unassigned-import
 import '@testing-library/jest-dom';
 
 // Mock the SpaceContext

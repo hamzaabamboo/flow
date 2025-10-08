@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Select, createListCollection } from '../ui/select';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
+import { SimpleDatePicker } from '../ui/simple-date-picker';
 import * as Popover from '../ui/styled/popover';
 import type { FilterOptions } from '../../shared/types';
 import { Box, HStack, VStack } from 'styled-system/jsx';
@@ -197,20 +198,22 @@ export function TaskFilterBar({
                     <Text mb="1" fontSize="sm">
                       Due Before:
                     </Text>
-                    <Input
-                      type="date"
+                    <SimpleDatePicker
                       value={filters.dueBefore || ''}
-                      onChange={(e) => handleDateFilter('before', e.target.value)}
+                      onChange={(value) => handleDateFilter('before', value)}
+                      placeholder="Select date"
+                      size="sm"
                     />
                   </Box>
                   <Box>
                     <Text mb="1" fontSize="sm">
                       Due After:
                     </Text>
-                    <Input
-                      type="date"
+                    <SimpleDatePicker
                       value={filters.dueAfter || ''}
-                      onChange={(e) => handleDateFilter('after', e.target.value)}
+                      onChange={(value) => handleDateFilter('after', value)}
+                      placeholder="Select date"
+                      size="sm"
                     />
                   </Box>
                 </VStack>

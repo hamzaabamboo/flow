@@ -26,6 +26,57 @@ interface CommandSuggestion {
   description?: string;
 }
 
+const getActionLabel = (action: string): string => {
+  switch (action) {
+    case 'create_task':
+      return 'Create Task';
+    case 'create_reminder':
+      return 'Create Reminder';
+    case 'create_inbox_item':
+      return 'Add to Inbox';
+    default:
+      return 'Execute';
+  }
+};
+
+const getNavigationPath = (action: string): string | null => {
+  switch (action) {
+    case 'create_task':
+      return '/tasks';
+    case 'create_inbox_item':
+      return '/inbox';
+    case 'create_reminder':
+      return '/'; // Agenda page
+    default:
+      return null;
+  }
+};
+
+const getSuccessMessage = (action: string): string => {
+  switch (action) {
+    case 'create_task':
+      return 'Task added to inbox';
+    case 'create_reminder':
+      return 'Reminder created';
+    case 'create_inbox_item':
+      return 'Added to inbox for processing';
+    default:
+      return 'Action completed';
+  }
+};
+
+const getActionIcon = (action: string) => {
+  switch (action) {
+    case 'create_task':
+    case 'create_inbox_item':
+      return <Inbox width="20" height="20" />;
+    case 'create_reminder':
+      return <CalendarClock width="20" height="20" />;
+    default:
+      return <Check width="20" height="20" />;
+  }
+};
+
 export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const [command, setCommand] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -144,6 +195,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       recognitionRef.current = null;
     };
 
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     recognition.onerror = () => {
       setIsListening(false);
       recognitionRef.current = null;
@@ -301,57 +353,6 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
     inputRef.current?.focus();
   };
 
-  const getSuccessMessage = (action: string): string => {
-    switch (action) {
-      case 'create_task':
-        return 'Task added to inbox';
-      case 'create_reminder':
-        return 'Reminder created';
-      case 'create_inbox_item':
-        return 'Added to inbox for processing';
-      default:
-        return 'Action completed';
-    }
-  };
-
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'create_task':
-      case 'create_inbox_item':
-        return <Inbox width="20" height="20" />;
-      case 'create_reminder':
-        return <CalendarClock width="20" height="20" />;
-      default:
-        return <Check width="20" height="20" />;
-    }
-  };
-
-  const getActionLabel = (action: string): string => {
-    switch (action) {
-      case 'create_task':
-        return 'Create Task';
-      case 'create_reminder':
-        return 'Create Reminder';
-      case 'create_inbox_item':
-        return 'Add to Inbox';
-      default:
-        return 'Execute';
-    }
-  };
-
-  const getNavigationPath = (action: string): string | null => {
-    switch (action) {
-      case 'create_task':
-        return '/tasks';
-      case 'create_inbox_item':
-        return '/inbox';
-      case 'create_reminder':
-        return '/'; // Agenda page
-      default:
-        return null;
-    }
-  };
-
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // Handle history navigation
     if (e.key === 'ArrowUp' && !suggestion && commandHistory.length > 0) {
@@ -466,71 +467,75 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                       <Text fontSize="sm" fontWeight="medium">
                         Destination
                       </Text>
-                      <HStack gap="2">
-                        <Select.Root
-                          collection={createListCollection({
-                            items: boards.map((b) => ({ label: b.name, value: b.id }))
-                          })}
-                          value={selectedBoardId ? [selectedBoardId] : []}
-                          onValueChange={(details) => {
-                            const newBoardId = details.value[0];
-                            setSelectedBoardId(newBoardId);
-                            // Auto-select first column of new board
-                            const board = boards.find((b) => b.id === newBoardId);
-                            if (board && board.columns.length > 0) {
-                              setSelectedColumnId(board.columns[0].id);
-                            }
-                          }}
-                          size="sm"
-                        >
-                          <Select.Trigger>
-                            <Select.ValueText placeholder="Select board" />
-                          </Select.Trigger>
-                          <Select.Positioner>
-                            <Select.Content>
-                              {boards.map((board) => (
-                                <Select.Item
-                                  key={board.id}
-                                  item={{ label: board.name, value: board.id }}
-                                >
-                                  {board.name}
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select.Positioner>
-                        </Select.Root>
-
-                        {selectedBoardId && (
+                      <HStack gap="2" flexWrap={{ base: 'wrap', md: 'nowrap' }}>
+                        <Box flex="1" minW={{ base: 'full', md: '0' }}>
                           <Select.Root
                             collection={createListCollection({
-                              items:
-                                boards
-                                  .find((b) => b.id === selectedBoardId)
-                                  ?.columns.map((c) => ({ label: c.name, value: c.id })) || []
+                              items: boards.map((b) => ({ label: b.name, value: b.id }))
                             })}
-                            value={selectedColumnId ? [selectedColumnId] : []}
-                            onValueChange={(details) => setSelectedColumnId(details.value[0])}
+                            value={selectedBoardId ? [selectedBoardId] : []}
+                            onValueChange={(details) => {
+                              const newBoardId = details.value[0];
+                              setSelectedBoardId(newBoardId);
+                              // Auto-select first column of new board
+                              const board = boards.find((b) => b.id === newBoardId);
+                              if (board && board.columns.length > 0) {
+                                setSelectedColumnId(board.columns[0].id);
+                              }
+                            }}
                             size="sm"
                           >
                             <Select.Trigger>
-                              <Select.ValueText placeholder="Select column" />
+                              <Select.ValueText placeholder="Select board" />
                             </Select.Trigger>
-
                             <Select.Positioner>
-                              <Select.Content>
-                                {boards
-                                  .find((b) => b.id === selectedBoardId)
-                                  ?.columns.map((column) => (
-                                    <Select.Item
-                                      key={column.id}
-                                      item={{ label: column.name, value: column.id }}
-                                    >
-                                      {column.name}
-                                    </Select.Item>
-                                  ))}
+                              <Select.Content maxW="300px">
+                                {boards.map((board) => (
+                                  <Select.Item
+                                    key={board.id}
+                                    item={{ label: board.name, value: board.id }}
+                                  >
+                                    {board.name}
+                                  </Select.Item>
+                                ))}
                               </Select.Content>
                             </Select.Positioner>
                           </Select.Root>
+                        </Box>
+
+                        {selectedBoardId && (
+                          <Box flex="1" minW={{ base: 'full', md: '0' }}>
+                            <Select.Root
+                              collection={createListCollection({
+                                items:
+                                  boards
+                                    .find((b) => b.id === selectedBoardId)
+                                    ?.columns.map((c) => ({ label: c.name, value: c.id })) || []
+                              })}
+                              value={selectedColumnId ? [selectedColumnId] : []}
+                              onValueChange={(details) => setSelectedColumnId(details.value[0])}
+                              size="sm"
+                            >
+                              <Select.Trigger>
+                                <Select.ValueText placeholder="Select column" />
+                              </Select.Trigger>
+
+                              <Select.Positioner>
+                                <Select.Content maxW="300px">
+                                  {boards
+                                    .find((b) => b.id === selectedBoardId)
+                                    ?.columns.map((column) => (
+                                      <Select.Item
+                                        key={column.id}
+                                        item={{ label: column.name, value: column.id }}
+                                      >
+                                        {column.name}
+                                      </Select.Item>
+                                    ))}
+                                </Select.Content>
+                              </Select.Positioner>
+                            </Select.Root>
+                          </Box>
                         )}
                       </HStack>
                     </VStack>
@@ -578,9 +583,9 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                     'Remind me to call dentist in 30 minutes',
                     'Create note about meeting ideas',
                     'Start pomodoro'
-                  ].map((example, idx) => (
+                  ].map((example) => (
                     <Button
-                      key={idx}
+                      key={example}
                       variant="ghost"
                       size="sm"
                       onClick={() => {
@@ -601,9 +606,9 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                       📚 Recent Commands
                     </Text>
                     <VStack gap="2" alignItems="stretch">
-                      {commandHistory.slice(0, 3).map((cmd, idx) => (
+                      {commandHistory.slice(0, 3).map((cmd) => (
                         <Button
-                          key={idx}
+                          key={cmd}
                           variant="ghost"
                           size="sm"
                           onClick={() => {

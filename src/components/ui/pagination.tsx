@@ -18,11 +18,11 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>((props, ref) 
         {(pagination) =>
           pagination.pages.map((page, index) =>
             page.type === 'page' ? (
-              <StyledPagination.Item key={index} {...page} asChild>
+              <StyledPagination.Item key={`page-${page.value}`} {...page} asChild>
                 <Button variant="outline">{page.value}</Button>
               </StyledPagination.Item>
             ) : (
-              <StyledPagination.Ellipsis key={index} index={index}>
+              <StyledPagination.Ellipsis key={`ellipsis-${index}`} index={index}>
                 &#8230;
               </StyledPagination.Ellipsis>
             )

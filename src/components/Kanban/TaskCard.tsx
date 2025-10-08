@@ -10,24 +10,24 @@ interface TaskCardProps {
   onDragStart: (task: Task) => void;
 }
 
+const formatDueDate = (date?: string) => {
+  if (!date) return null;
+  const dueDate = new Date(date);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (dueDate.toDateString() === today.toDateString()) {
+    return 'Today';
+  } else if (dueDate.toDateString() === tomorrow.toDateString()) {
+    return 'Tomorrow';
+  } else {
+    return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+};
+
 export function TaskCard({ task, onDragStart }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const formatDueDate = (date?: string) => {
-    if (!date) return null;
-    const dueDate = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (dueDate.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (dueDate.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
-    } else {
-      return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-  };
 
   return (
     <Box

@@ -15,6 +15,12 @@ const TIMERS = {
   'long-break': 15 * 60 // 15 minutes
 };
 
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitle?: string }) {
   const [session, setSession] = useState<PomodoroSession>({
     taskId,
@@ -60,12 +66,6 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     }
   });
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const playSound = () => {
     if (!audioRef.current) {
       audioRef.current = new Audio(
@@ -85,10 +85,11 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
 
       // Show notification
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Pomodoro Complete!', {
+        const notification = new Notification('Pomodoro Complete!', {
           body: `Great work! Time for a ${completedSessions % 4 === 3 ? 'long' : 'short'} break.`,
           icon: '/favicon.ico'
         });
+        void notification;
       }
 
       // Switch to break
@@ -102,10 +103,11 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       setTimeLeft(TIMERS.work);
 
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Break Complete!', {
+        const notification = new Notification('Break Complete!', {
           body: 'Ready to focus again?',
           icon: '/favicon.ico'
         });
+        void notification;
       }
     }
   }, [session, completedSessions, saveSession]);

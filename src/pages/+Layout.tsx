@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { SpaceProvider, useSpace } from '../contexts/SpaceContext';
 import { ColorModeProvider } from '../contexts/ColorModeContext';
 import { ToasterProvider } from '../contexts/ToasterProvider';
+import { DialogProvider } from '../utils/useDialogs';
 import { Sidebar } from '../components/Layout/Sidebar';
 import { SidebarContent } from '../components/Layout/SidebarContent';
 import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
@@ -21,6 +22,7 @@ import { IconButton } from '../components/ui/icon-button';
 import { Drawer } from '../components/ui/drawer';
 import { Kbd } from '../components/ui/kbd';
 import { Box, Center, HStack } from 'styled-system/jsx';
+// oxlint-disable-next-line import/no-unassigned-import
 import '../index.css';
 
 const queryClient = new QueryClient({
@@ -318,8 +320,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <AuthProvider>
           <SpaceProvider>
             <ToasterProvider>
-              <Box id="app">
-                <style>{`
+              <DialogProvider>
+                <Box id="app">
+                  <style>{`
                   @keyframes spin {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
@@ -343,10 +346,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     }
                   }
                 `}</style>
-                <ErrorBoundary>
-                  <AppContent>{children}</AppContent>
-                </ErrorBoundary>
-              </Box>
+                  <ErrorBoundary>
+                    <AppContent>{children}</AppContent>
+                  </ErrorBoundary>
+                </Box>
+              </DialogProvider>
             </ToasterProvider>
           </SpaceProvider>
         </AuthProvider>

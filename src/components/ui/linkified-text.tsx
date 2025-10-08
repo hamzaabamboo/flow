@@ -17,7 +17,7 @@ export function LinkifiedText({ children, ...textProps }: LinkifiedTextProps) {
         if (part.match(URL_REGEX)) {
           return (
             <Link
-              key={index}
+              key={`${part}-${index}`}
               href={part}
               target="_blank"
               rel="noopener noreferrer"
@@ -30,7 +30,7 @@ export function LinkifiedText({ children, ...textProps }: LinkifiedTextProps) {
             </Link>
           );
         }
-        return part;
+        return <span key={`text-${index}`}>{part}</span>;
       })}
     </Text>
   );

@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import {
   Plus,
-  Edit2,
   Trash2,
   MoreVertical,
   AlertTriangle,
   GripVertical,
   Grip,
   ExternalLink,
-  FileText
+  FileText,
+  Edit2
 } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useDialogs } from '../../utils/useDialogs';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
@@ -21,6 +22,7 @@ import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { TaskActionsMenu } from '../TaskActionsMenu';
 import * as Menu from '../ui/styled/menu';
 import * as Dialog from '../ui/styled/dialog';
 import type { Task, Column } from '../../shared/types';
@@ -35,6 +37,8 @@ interface KanbanColumnProps {
   onAddTask: () => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
+  onDuplicateTask?: (task: Task) => void;
+  onMoveTask?: (task: Task) => void;
   getPriorityColor: (priority?: string) => string;
   onRenameColumn?: (columnId: string, name: string) => void;
   onDeleteColumn?: (columnId: string) => void;
@@ -49,6 +53,8 @@ export function KanbanColumn({
   onAddTask,
   onEditTask,
   onDeleteTask,
+  onDuplicateTask,
+  onMoveTask,
   getPriorityColor,
   onRenameColumn,
   onDeleteColumn,
@@ -56,6 +62,7 @@ export function KanbanColumn({
   boardId: _boardId,
   onCopySummary
 }: KanbanColumnProps) {
+  const { confirm, alert } = useDialogs();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [columnName, setColumnName] = useState(column.name);
   const [wipLimit, setWipLimit] = useState(column.wipLimit?.toString() || '');
@@ -108,13 +115,27 @@ export function KanbanColumn({
   };
 
   const handleDeleteColumn = () => {
-    if (tasks.length > 0) {
-      alert('Cannot delete column with tasks. Please move or delete all tasks first.');
-      return;
-    }
-    if (onDeleteColumn && confirm(`Are you sure you want to delete column "${column.name}"?`)) {
-      onDeleteColumn(column.id);
-    }
+    void (async () => {
+      if (tasks.length > 0) {
+        await alert({
+          title: 'Cannot Delete Column',
+          description: 'Cannot delete column with tasks. Please move or delete all tasks first.',
+          variant: 'danger'
+        });
+        return;
+      }
+      if (onDeleteColumn) {
+        const confirmed = await confirm({
+          title: 'Delete Column',
+          description: `Are you sure you want to delete column "${column.name}"? This action cannot be undone.`,
+          confirmText: 'Delete',
+          variant: 'danger'
+        });
+        if (confirmed) {
+          onDeleteColumn(column.id);
+        }
+      }
+    })();
   };
 
   const columnDragStyles = css({
@@ -221,6 +242,8 @@ export function KanbanColumn({
                   column={column}
                   onEdit={onEditTask}
                   onDelete={onDeleteTask}
+                  onDuplicate={onDuplicateTask}
+                  onMove={onMoveTask}
                   getPriorityColor={getPriorityColor}
                 />
               ))}
@@ -237,7 +260,7 @@ export function KanbanColumn({
         <Dialog.Positioner>
           <Dialog.Content
             borderColor="border.default"
-            maxW="400px"
+            maxW={{ base: 'calc(100vw - 2rem)', md: '400px' }}
             maxH={{ base: 'calc(100vh - 2rem)', md: '90vh' }}
             bg="bg.default"
             overflowY="auto"
@@ -277,15 +300,11 @@ export function KanbanColumn({
                 </Box>
               </VStack>
 
-              <HStack gap="2" w="full" pt="2">
+              <HStack gap="3" justifyContent="flex-end" w="full" pt="2">
                 <Dialog.CloseTrigger asChild>
-                  <Button variant="outline" w="full">
-                    Cancel
-                  </Button>
+                  <Button variant="outline">Cancel</Button>
                 </Dialog.CloseTrigger>
-                <Button onClick={handleSaveColumn} w="full">
-                  Save Changes
-                </Button>
+                <Button onClick={handleSaveColumn}>Save Changes</Button>
               </HStack>
             </VStack>
           </Dialog.Content>
@@ -300,10 +319,12 @@ interface TaskCardProps {
   column: Column;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onDuplicate?: (task: Task) => void;
+  onMove?: (task: Task) => void;
   getPriorityColor?: (priority?: string) => string;
 }
 
-function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
+function TaskCard({ task, onEdit, onDelete, onDuplicate, onMove, column }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id
   });
@@ -320,7 +341,8 @@ function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      cursor="grab"
+      onClick={() => onEdit(task)}
+      cursor="pointer"
       position="relative"
       borderColor="border.default"
       borderLeftWidth="4px"
@@ -392,31 +414,14 @@ function TaskCard({ task, onEdit, onDelete, column }: TaskCardProps) {
             )}
           </HStack>
         </VStack>
-        <VStack gap="0" flexShrink={0}>
-          <IconButton
-            variant="ghost"
-            size="xs"
-            aria-label="Edit task"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(task);
-            }}
-          >
-            <Edit2 width="14" height="14" />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            size="xs"
-            aria-label="Delete task"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(task);
-            }}
-            colorPalette="red"
-          >
-            <Trash2 width="14" height="14" />
-          </IconButton>
-        </VStack>
+        <TaskActionsMenu
+          task={task}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onMove={onMove}
+          size="xs"
+        />
       </HStack>
     </Box>
   );

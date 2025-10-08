@@ -129,7 +129,6 @@ export default function SettingsPage() {
     if (!settings) return;
 
     const newSettings = { ...settings };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let current: any = newSettings;
 
     for (let i = 0; i < path.length - 1; i++) {

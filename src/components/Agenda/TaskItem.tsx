@@ -1,4 +1,4 @@
-import { ExternalLink, Edit2, Copy } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -7,6 +7,7 @@ import { IconButton } from '../ui/icon-button';
 import { PriorityBadge } from '../PriorityBadge';
 import { LinkifiedText } from '../ui/linkified-text';
 import { Countdown } from '../ui/countdown';
+import { TaskActionsMenu } from '../TaskActionsMenu';
 import type { CalendarEvent } from '../../shared/types/calendar';
 import { Box, HStack, VStack } from 'styled-system/jsx';
 
@@ -15,15 +16,26 @@ export function TaskItem({
   onToggleComplete,
   onTaskClick,
   onDuplicate,
+  onDelete,
+  onMove,
   extraBadges,
-  actions
+  actions,
+  extraActions
 }: {
   event: CalendarEvent;
   onToggleComplete: () => void;
   onTaskClick: () => void;
   onDuplicate?: () => void;
+  onDelete?: () => void;
+  onMove?: () => void;
   extraBadges?: ReactNode;
   actions?: ReactNode;
+  extraActions?: Array<{
+    value: string;
+    label: string;
+    icon: ReactNode;
+    onClick: (task: CalendarEvent) => void;
+  }>;
 }) {
   return (
     <Box
@@ -99,31 +111,16 @@ export function TaskItem({
           </VStack>
         </HStack>
         <HStack gap="1" flexShrink={0}>
-          {onDuplicate && (
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label="Duplicate task"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDuplicate();
-              }}
-            >
-              <Copy width="16" height="16" />
-            </IconButton>
-          )}
-          <IconButton
-            variant="ghost"
+          <TaskActionsMenu
+            task={event}
+            onEdit={() => onTaskClick()}
+            {...(onDuplicate && { onDuplicate: () => onDuplicate() })}
+            {...(onDelete && { onDelete: () => onDelete() })}
+            {...(onMove && { onMove: () => onMove() })}
             size="sm"
-            aria-label="Edit task"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTaskClick();
-            }}
-          >
-            <Edit2 width="16" height="16" />
-          </IconButton>
-          {actions && <Box onClick={(e) => e.stopPropagation()}>{actions}</Box>}
+            extraActions={extraActions}
+          />
+          {actions}
         </HStack>
       </HStack>
     </Box>

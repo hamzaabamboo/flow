@@ -6,6 +6,116 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-10-07)
+
+### ✅ Completed This Session - Bug Fixes & Enhancements
+
+- **Edit Column Modal Mobile Fix** - Responsive design improvement
+  - Fixed modal width constraints for mobile devices
+  - Changed from fixed 400px to responsive calc(100vw - 2rem) on mobile
+  - Prevents modal from breaking on narrow screens
+
+- **Command Dropdown Size Fix** - UI layout improvements
+  - Added responsive flexbox wrapping for board/column selectors
+  - Fixed width constraints with maxW="300px" on dropdown content
+  - Improved mobile experience with full-width selectors on small screens
+
+- **Carry Over Overdue Tasks Feature** - Manual task management with flexible targeting ✅
+  - Overdue section appears in Agenda day view with red-bordered card
+  - Shows all overdue incomplete tasks with original due date badges
+  - Flexible date selector with presets:
+    - End of Today - moves tasks to end of current day
+    - Tomorrow - moves tasks to start of next day
+    - Next Week - moves tasks to same day next week
+    - End of Month - moves tasks to last day of current month
+    - Custom Date - pick any future date with date picker
+  - "Carry Over All" button moves all overdue tasks to selected target date
+  - Individual carry over button on each task
+  - Preserves original time when updating due dates
+  - Visual indicator shows target date before carrying over
+  - Responsive layout for mobile and desktop
+
+- **Sort Boards by Activity** - Improved board organization
+  - Boards now sorted by most recently updated first
+  - Uses updatedAt timestamp from database
+  - Applied to boards list page
+
+- **Task Dialog Board Selector Fix** - UI bug resolution
+  - Fixed duplicate column selectors appearing simultaneously
+  - Board/column selector now mutually exclusive with columns prop
+  - Cleaner UI with proper conditional rendering
+
+- **Edit Column Modal Button Layout** - UI polish
+  - Fixed button layout in edit column dialog
+  - Changed from full-width buttons to flex-end alignment
+  - Matches pattern used in other dialogs (CreateBoardDialog)
+
+- **Board Page Feature Parity** - Unified task actions across pages ✅
+  - Added Duplicate task button (Copy icon - blue) to Board page
+  - Added Move to Board button (MoveRight icon - purple) to Board page
+  - Implemented duplicate task mutation in KanbanBoard
+  - Implemented move task dialog with board and column selectors
+  - Board page now has same task actions as Tasks page
+  - All task action buttons: Edit, Duplicate, Move, Delete
+
+- **Task Actions Menu Component** - Consistent UI pattern across pages ✅
+  - Converted inline action buttons to popup Menu component
+  - Created shared TaskActionsMenu component (src/components/TaskActionsMenu.tsx)
+  - Menu shows on MoreVertical icon click with dropdown actions
+  - Implemented on both Board page (KanbanColumn) and Tasks page
+  - Click task card to edit (default behavior)
+  - Menu includes: Edit, Duplicate, Move to Board, Delete
+  - Tasks page includes extra "View Board" action
+  - Supports generic type for Task/ExtendedTask compatibility
+  - Ensures future feature parity between different views
+
+- **Park UI DatePicker Integration** - Replaced native date inputs ✅
+  - Replaced all HTML `type="date"` inputs with Park UI DatePicker component
+  - Created SimpleDatePicker wrapper (src/components/ui/simple-date-picker.tsx)
+  - Simplified API: works with ISO date strings (YYYY-MM-DD)
+  - Includes calendar icon trigger and clear button
+  - Supports day, month, and year views with navigation
+  - Updated locations:
+    - Agenda page: Custom carry over date picker
+    - TaskDialog: Recurring task end date picker
+    - TaskFilterBar: Due before/after filters
+  - Better UX with visual calendar interface
+  - Consistent styling across all date inputs
+  - Note: Kept `datetime-local` (TaskDialog due date) and `type="time"` (Habits reminder) as native inputs since Park UI DatePicker doesn't support time selection
+
+### ✅ Verified Existing Features (Already Implemented)
+
+- **Duplicate Tasks Feature** - Already working ✅
+  - Copy button added in Phase 3 (blue icon)
+  - Creates duplicate with "(Copy)" suffix
+  - Copies all metadata: description, priority, due date, labels
+
+- **Move Tasks Across Boards** - Already working ✅
+  - "Move to Board" button in Tasks page (purple MoveRight icon)
+  - Move Task Dialog with board and column selectors
+  - Proper query invalidation after move
+
+- **BI-weekly and End of Month Recurring** - Already working ✅
+  - Added "Bi-weekly" and "End of Month" options
+  - Proper date calculations in recurring.ts utility
+
+- **Remove Due Date Button** - Already exists ✅
+  - XCircle icon button next to due date label in TaskDialog
+  - Clears due date input by resetting the key
+
+- **Quick Add Bug Fixes** - Already fixed in Phase 3 ✅
+  - Split useEffect into separate hooks (focus + cleanup)
+  - Proper state management between dialogs
+
+- **Commands Data Refresh** - Already fixed in Phase 3 ✅
+  - Added await to all invalidateQueries calls
+  - Calendar query invalidation for task operations
+
+- **Calendar Integration** - Fully working ✅
+  - iCal feed generation with RRULE support
+  - Task and habit events properly exported
+  - JSON API for frontend calendar views
+
 ## Latest Updates (2025-10-03)
 
 ### ✅ Completed This Session - Part 3 (PWA & UI Polish)
