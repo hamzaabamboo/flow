@@ -5,7 +5,7 @@ import { staticPlugin } from '@elysiajs/static';
 import { cookie } from '@elysiajs/cookie';
 import { jwt } from '@elysiajs/jwt';
 import { wrap } from '@bogeychan/elysia-logger';
-import { renderPage, createDevMiddleware } from 'vike/server';
+import { renderPage } from 'vike/server';
 import { connect } from 'elysia-connect-middleware';
 import { eq } from 'drizzle-orm';
 
@@ -44,6 +44,7 @@ const root = join(process.cwd());
 
 // Vike SSR setup
 if (!isProduction) {
+  const { createDevMiddleware } = await import('vike/server');
   const { devMiddleware } = await createDevMiddleware({ root });
   app.use(connect(devMiddleware));
 } else {

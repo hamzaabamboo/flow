@@ -12,32 +12,27 @@ COPY . .
 # Install and build both frontend and server
 RUN bun install --frozen-lockfile && \
     bun run build:ssr && \
-    bun run build:server
+    bun build src/server/index.ts --outfile=./build/server --compile --target=bun-linux-x64
 
 # Production stage
-FROM oven/bun:alpine
+FROM gcr.io/distroless/base
 
 WORKDIR /app
 
-# Set production environment
-ENV NODE_ENV=production
-ENV PORT=3000
-
-# Copy package files
-COPY package.json bun.lockb* ./
-
-# Install only production dependencies
-RUN bun install --frozen-lockfile --production --ignore-scripts
+# Copy compiled server binary
+COPY --from=builder /app/build/server server
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/build ./build
 
 # Copy only essential runtime files
-COPY drizzle ./drizzle
+COPY --from=builder /app/drizzle ./drizzle
+
+# Set production environment
+ENV NODE_ENV=production
+
+# Run the compiled server
+CMD ["./server"]
 
 # Expose application port
 EXPOSE 3000
-
-# Run the bundled server
-CMD ["bun", "run", "start:server"]

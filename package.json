@@ -7,7 +7,7 @@
     "dev": "panda codegen && nodemon",
     "build": "bun run build:ssr && bun run build:server",
     "build:ssr": "panda codegen && bunx --bun vike build",
-    "build:server": "bun build src/server/index.ts --outdir=./build --target=bun",
+    "build:server": "bun build src/server/index.ts --outfile=./build/server --compile --target=bun-darwin-x64",
     "start:server": "NODE_ENV=production bun run build/index.js",
     "start:prod": "NODE_ENV=production bun run src/server/index.ts",
     "db:generate": "drizzle-kit generate",
