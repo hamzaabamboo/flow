@@ -23,7 +23,7 @@ import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
 import { isTaskCompleted } from '../../shared/utils/taskCompletion';
-import { utcToJst, jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
+import { jstToUtc } from '../../shared/utils/timezone';
 
 interface CompleteTaskPayload {
   id: string;

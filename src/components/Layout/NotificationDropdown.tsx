@@ -71,15 +71,13 @@ export function NotificationDropdown() {
               colorPalette="red"
               display="flex"
               position="absolute"
-              top="2"
-              right="2"
+              bottom="0"
+              right="0"
               justifyContent="center"
               alignItems="center"
               borderRadius="full"
-              minW="5"
-              h="5"
-              px="1"
-              bg="colorPalette.solid"
+              boxSize="4"
+              bg="colorPalette.default"
             >
               <Text color="white" fontSize="2xs" fontWeight="bold">
                 {upcomingCount > 9 ? '9+' : upcomingCount}

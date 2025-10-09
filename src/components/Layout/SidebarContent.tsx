@@ -21,7 +21,7 @@ import { Link } from '../ui/link';
 import { Avatar } from '../ui/avatar';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
-import { Box, VStack, HStack, Divider } from 'styled-system/jsx';
+import { Box, VStack, HStack, Divider, Center } from 'styled-system/jsx';
 import { usePageContext } from 'vike-react/usePageContext';
 
 interface SidebarNavItem {
@@ -139,18 +139,18 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                 <IconComponent style={{ marginRight: '12px' }} width="20" height="20" />
                 {item.label}
                 {showBadge && (
-                  <Box
+                  <Center
                     colorPalette="red"
                     borderRadius="full"
                     ml="auto"
-                    py="0.5"
-                    px="2"
+                    boxSize="7"
                     fontSize="xs"
                     fontWeight="bold"
                     bg="colorPalette.default"
+                    color="colorPalette.fg"
                   >
                     {badgeCount}
-                  </Box>
+                  </Center>
                 )}
               </Button>
             </Link>
