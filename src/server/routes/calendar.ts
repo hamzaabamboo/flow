@@ -7,6 +7,7 @@ import { tasks, boards, taskCompletions, habits, columns, subtasks } from '../..
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
+import { getVtimezoneComponent } from '@touch4it/ical-timezones';
 
 // Public iCal route (no auth required)
 export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
@@ -28,7 +29,10 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
     const calendar = ical({
       name: 'HamFlow Tasks & Habits',
       description: 'Your tasks and habits from HamFlow',
-      timezone: 'Asia/Tokyo',
+      timezone: {
+        name: 'Asia/Tokyo',
+        generator: getVtimezoneComponent
+      },
       prodId: {
         company: 'HamFlow',
         product: 'Tasks Calendar'
