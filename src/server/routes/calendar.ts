@@ -28,7 +28,7 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
     const calendar = ical({
       name: 'HamFlow Tasks & Habits',
       description: 'Your tasks and habits from HamFlow',
-      timezone: 'UTC',
+      timezone: 'Asia/Tokyo',
       prodId: {
         company: 'HamFlow',
         product: 'Tasks Calendar'
