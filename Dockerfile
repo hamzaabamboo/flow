@@ -10,9 +10,10 @@ ENV NODE_ENV=production
 COPY . .
 
 # Install and build both frontend and server
-RUN bun install --frozen-lockfile && \
-    bun run build:ssr && \
-    bun build src/server/index.ts --outfile=./build/server --compile --target=bun-linux-x64
+RUN bun install --frozen-lockfile
+RUN bun run build:ssr
+RUN bun build src/server/index.ts --outfile=./build/server --compile --minify-whitespace --target=bun-linux-x64 && \
+    chmod +x ./build/server
 
 # Production stage
 FROM gcr.io/distroless/base
