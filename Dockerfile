@@ -12,11 +12,11 @@ COPY . .
 # Install and build both frontend and server
 RUN bun install --frozen-lockfile
 RUN bun run build:ssr
-RUN bun build src/server/index.ts --outfile=./build/server --compile --minify-whitespace --target=bun-linux-x64 && \
+RUN bun build src/server/index.ts --outfile=./build/server --compile --minify-whitespace --target=bun && \
     chmod +x ./build/server
 
 # Production stage
-FROM gcr.io/distroless/base
+FROM oven/bun:alpine
 
 WORKDIR /app
 

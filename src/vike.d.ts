@@ -10,4 +10,4 @@ declare global {
   }
 }
 
-export {};
+declare module 'pino-http-print';

@@ -1,17 +1,17 @@
 import { pino } from 'pino';
+import { httpPrintFactory } from 'pino-http-print';
 
-export const logger = pino({
-  transport: {
-    target: 'pino-http-print',
-    options: {
-      destination: 1, // optional (default stdout)
-      all: true,
-      colorize: true,
-      translateTime: 'yyyy-mm-dd HH:MM:ss',
-      prettyOptions: {
-        colorize: true,
-        ignore: 'pid,hostname'
-      }
-    }
+const printer = httpPrintFactory(
+  {
+    destination: 1, // optional (default stdout)
+    all: true,
+    colorize: true,
+    translateTime: 'yyyy-mm-dd HH:MM:ss'
+  },
+  {
+    colorize: true,
+    ignore: 'pid,hostname'
   }
-});
+);
+
+export const logger = pino(printer());
