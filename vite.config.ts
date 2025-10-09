@@ -47,6 +47,41 @@ export default defineConfig({
     outDir: 'dist/client',
     commonjsOptions: {
       exclude: ['react/cjs', 'react-dom/cjs']
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Core React libraries
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-vendor';
+          }
+
+          // TanStack Query
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'react-query';
+          }
+
+          // Ark UI components (heavy - 80KB+)
+          if (id.includes('node_modules/@ark-ui/react')) {
+            return 'ark-ui';
+          }
+
+          // AI SDK
+          if (id.includes('node_modules/@ai-sdk/') || id.includes('node_modules/ai/')) {
+            return 'ai-vendor';
+          }
+
+          // Icons
+          if (id.includes('node_modules/lucide-react')) {
+            return 'lucide';
+          }
+
+          // Other node_modules
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
     }
   }
 });

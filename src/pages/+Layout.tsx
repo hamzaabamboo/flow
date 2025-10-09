@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Menu, Search, Sparkles } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -10,10 +10,6 @@ import { DialogProvider } from '../utils/useDialogs';
 import { Sidebar } from '../components/Layout/Sidebar';
 import { SidebarContent } from '../components/Layout/SidebarContent';
 import { ColorModeToggle } from '../components/Layout/ColorModeToggle';
-import { CommandBar } from '../components/CommandBar/CommandBar';
-import { QuickAddDialog } from '../components/QuickAdd/QuickAddDialog';
-import { PomodoroTimer } from '../components/Pomodoro/PomodoroTimer';
-import { NotificationDropdown } from '../components/Layout/NotificationDropdown';
 import { useWebSocket } from '../hooks/useWebSocket';
 import ErrorBoundary from '../components/utils/ErrorBoundary';
 import { Text } from '../components/ui/text';
@@ -24,6 +20,22 @@ import { Kbd } from '../components/ui/kbd';
 import { Box, Center, HStack } from 'styled-system/jsx';
 // oxlint-disable-next-line import/no-unassigned-import
 import '../index.css';
+
+// Lazy load heavy components
+const CommandBar = lazy(() =>
+  import('../components/CommandBar/CommandBar').then((m) => ({ default: m.CommandBar }))
+);
+const QuickAddDialog = lazy(() =>
+  import('../components/QuickAdd/QuickAddDialog').then((m) => ({ default: m.QuickAddDialog }))
+);
+const PomodoroTimer = lazy(() =>
+  import('../components/Pomodoro/PomodoroTimer').then((m) => ({ default: m.PomodoroTimer }))
+);
+const NotificationDropdown = lazy(() =>
+  import('../components/Layout/NotificationDropdown').then((m) => ({
+    default: m.NotificationDropdown
+  }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,7 +137,9 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <HStack gap="2">
             <ColorModeToggle />
 
-            <NotificationDropdown />
+            <Suspense fallback={<Box w="10" h="10" />}>
+              <NotificationDropdown />
+            </Suspense>
 
             <Button
               variant="solid"
@@ -154,10 +168,14 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       </Box>
 
       {/* Command Bar Dialog */}
-      <CommandBar open={showCommandBar} onOpenChange={setShowCommandBar} />
+      <Suspense fallback={null}>
+        <CommandBar open={showCommandBar} onOpenChange={setShowCommandBar} />
+      </Suspense>
 
       {/* Quick Add Dialog */}
-      <QuickAddDialog open={showQuickAdd} onOpenChange={setShowQuickAdd} />
+      <Suspense fallback={null}>
+        <QuickAddDialog open={showQuickAdd} onOpenChange={setShowQuickAdd} />
+      </Suspense>
     </>
   );
 }
@@ -253,7 +271,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
       {/* Floating Pomodoro Timer */}
       <Box zIndex="30" position="fixed" right="6" bottom="6">
-        <PomodoroTimer />
+        <Suspense fallback={null}>
+          <PomodoroTimer />
+        </Suspense>
       </Box>
     </Box>
   ) : (
@@ -305,7 +325,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
       {/* Floating Pomodoro Timer */}
       <Box zIndex="30" position="fixed" right="6" bottom="6">
-        <PomodoroTimer />
+        <Suspense fallback={null}>
+          <PomodoroTimer />
+        </Suspense>
       </Box>
     </Box>
   );
