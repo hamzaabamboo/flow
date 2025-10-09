@@ -8,235 +8,234 @@ import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
 
-export const calendarRoutes = new Elysia({ prefix: '/calendar' })
-  .decorate('db', db)
+// Public iCal route (no auth required)
+export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
+  '/ical/:userId/:token',
+  async ({ params, db, set }) => {
+    const { userId, token } = params;
 
-  // Public iCal route (token-based auth)
-  .get(
-    '/ical/:userId/:token',
-    async ({ params, db, set }) => {
-      const { userId, token } = params;
+    // Verify token
+    const expectedToken = createHash('sha256')
+      .update(`${userId}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
+      .digest('hex');
 
-      // Verify token
-      const expectedToken = createHash('sha256')
-        .update(`${userId}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
-        .digest('hex');
+    if (token !== expectedToken) {
+      set.status = 401;
+      return 'Unauthorized';
+    }
 
-      if (token !== expectedToken) {
-        set.status = 401;
-        return 'Unauthorized';
+    // Create calendar
+    const calendar = ical({
+      name: 'HamFlow Tasks & Habits',
+      description: 'Your tasks and habits from HamFlow',
+      timezone: 'UTC',
+      prodId: {
+        company: 'HamFlow',
+        product: 'Tasks Calendar'
+      }
+    });
+
+    // Fetch user's tasks with due dates
+    const userTasks = await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        dueDate: tasks.dueDate,
+        priority: tasks.priority,
+        columnName: columns.name,
+        recurringPattern: tasks.recurringPattern,
+        recurringEndDate: tasks.recurringEndDate,
+        metadata: tasks.metadata,
+        boardId: boards.id,
+        boardName: boards.name,
+        space: boards.space
+      })
+      .from(tasks)
+      .leftJoin(columns, eq(tasks.columnId, columns.id))
+      .leftJoin(boards, eq(columns.boardId, boards.id))
+      .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
+
+    // Add tasks as events
+    for (const task of userTasks) {
+      if (!task.dueDate) continue;
+
+      const dueDate = new Date(task.dueDate);
+      const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const taskUrl = task.boardId
+        ? `${frontendUrl}/board/${task.boardId}`
+        : `${frontendUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
+
+      // Build description with metadata link if available
+      let eventDescription = task.description || '';
+      if (task.metadata?.link) {
+        eventDescription = eventDescription
+          ? `${eventDescription}\n\nLink: ${task.metadata.link}`
+          : `Link: ${task.metadata.link}`;
       }
 
-      // Create calendar
-      const calendar = ical({
-        name: 'HamFlow Tasks & Habits',
-        description: 'Your tasks and habits from HamFlow',
-        timezone: 'UTC',
-        prodId: {
-          company: 'HamFlow',
-          product: 'Tasks Calendar'
-        }
+      const event = calendar.createEvent({
+        id: task.id,
+        start: dueDate,
+        end: endDate,
+        summary: `[${task.space || 'work'}] ${task.title}`,
+        description: eventDescription || undefined,
+        categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
+        url: taskUrl
       });
 
-      // Fetch user's tasks with due dates
-      const userTasks = await db
-        .select({
-          id: tasks.id,
-          title: tasks.title,
-          description: tasks.description,
-          dueDate: tasks.dueDate,
-          priority: tasks.priority,
-          columnName: columns.name,
-          recurringPattern: tasks.recurringPattern,
-          recurringEndDate: tasks.recurringEndDate,
-          metadata: tasks.metadata,
-          boardId: boards.id,
-          boardName: boards.name,
-          space: boards.space
-        })
-        .from(tasks)
-        .leftJoin(columns, eq(tasks.columnId, columns.id))
-        .leftJoin(boards, eq(columns.boardId, boards.id))
-        .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
+      // Set status - CANCELLED if in Done column, otherwise CONFIRMED
+      const isCompleted = task.columnName?.toLowerCase() === 'done';
+      event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
 
-      // Add tasks as events
-      for (const task of userTasks) {
-        if (!task.dueDate) continue;
+      // Set priority
+      if (task.priority) {
+        const priorityMap: Record<string, number> = {
+          urgent: 1,
+          high: 3,
+          medium: 5,
+          low: 7
+        };
+        event.priority(priorityMap[task.priority] || 5);
+      }
 
-        const dueDate = new Date(task.dueDate);
-        const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+      // Add RRULE for recurring tasks
+      if (task.recurringPattern) {
+        const pattern = task.recurringPattern.toLowerCase();
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const taskUrl = task.boardId
-          ? `${frontendUrl}/board/${task.boardId}`
-          : `${frontendUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
+        let freq: ICalEventRepeatingFreq | undefined;
+        let interval: number | undefined;
 
-        // Build description with metadata link if available
-        let eventDescription = task.description || '';
-        if (task.metadata?.link) {
-          eventDescription = eventDescription
-            ? `${eventDescription}\n\nLink: ${task.metadata.link}`
-            : `Link: ${task.metadata.link}`;
+        if (pattern === 'daily') {
+          freq = ICalEventRepeatingFreq.DAILY;
+        } else if (pattern === 'weekly') {
+          freq = ICalEventRepeatingFreq.WEEKLY;
+        } else if (pattern === 'biweekly') {
+          freq = ICalEventRepeatingFreq.WEEKLY;
+          interval = 2; // Every 2 weeks
+        } else if (pattern === 'monthly') {
+          freq = ICalEventRepeatingFreq.MONTHLY;
+        } else if (pattern === 'end_of_month') {
+          freq = ICalEventRepeatingFreq.MONTHLY;
+          // Will occur on the last day of each month
+        } else if (pattern === 'yearly') {
+          freq = ICalEventRepeatingFreq.YEARLY;
         }
 
-        const event = calendar.createEvent({
-          id: task.id,
-          start: dueDate,
-          end: endDate,
-          summary: `[${task.space || 'work'}] ${task.title}`,
-          description: eventDescription || undefined,
-          categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
-          url: taskUrl
-        });
-
-        // Set status - CANCELLED if in Done column, otherwise CONFIRMED
-        const isCompleted = task.columnName?.toLowerCase() === 'done';
-        event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
-
-        // Set priority
-        if (task.priority) {
-          const priorityMap: Record<string, number> = {
-            urgent: 1,
-            high: 3,
-            medium: 5,
-            low: 7
+        if (freq) {
+          const repeatOptions: {
+            freq: ICalEventRepeatingFreq;
+            until?: Date;
+            interval?: number;
+            byMonthDay?: number;
+          } = {
+            freq,
+            until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
           };
-          event.priority(priorityMap[task.priority] || 5);
-        }
 
-        // Add RRULE for recurring tasks
-        if (task.recurringPattern) {
-          const pattern = task.recurringPattern.toLowerCase();
-
-          let freq: ICalEventRepeatingFreq | undefined;
-          let interval: number | undefined;
-
-          if (pattern === 'daily') {
-            freq = ICalEventRepeatingFreq.DAILY;
-          } else if (pattern === 'weekly') {
-            freq = ICalEventRepeatingFreq.WEEKLY;
-          } else if (pattern === 'biweekly') {
-            freq = ICalEventRepeatingFreq.WEEKLY;
-            interval = 2; // Every 2 weeks
-          } else if (pattern === 'monthly') {
-            freq = ICalEventRepeatingFreq.MONTHLY;
-          } else if (pattern === 'end_of_month') {
-            freq = ICalEventRepeatingFreq.MONTHLY;
-            // Will occur on the last day of each month
-          } else if (pattern === 'yearly') {
-            freq = ICalEventRepeatingFreq.YEARLY;
+          if (interval) {
+            repeatOptions.interval = interval;
           }
 
-          if (freq) {
-            const repeatOptions: {
-              freq: ICalEventRepeatingFreq;
-              until?: Date;
-              interval?: number;
-              byMonthDay?: number;
-            } = {
-              freq,
-              until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
-            };
-
-            if (interval) {
-              repeatOptions.interval = interval;
-            }
-
-            // For end_of_month, set to last day
-            if (pattern === 'end_of_month') {
-              repeatOptions.byMonthDay = -1; // Last day of month
-            }
-
-            event.repeating(repeatOptions);
+          // For end_of_month, set to last day
+          if (pattern === 'end_of_month') {
+            repeatOptions.byMonthDay = -1; // Last day of month
           }
+
+          event.repeating(repeatOptions);
         }
       }
-
-      // Fetch habits for recurring events (only active habits)
-      const allUserHabits = await db
-        .select()
-        .from(habits)
-        .where(and(eq(habits.userId, userId), eq(habits.active, true)));
-
-      // Add habits as recurring events
-      for (const habit of allUserHabits) {
-        // Parse reminder time or default to 9 AM
-        const [hours = 9, minutes = 0] = habit.reminderTime
-          ? habit.reminderTime.split(':').map(Number)
-          : [9, 0];
-
-        // Use habit creation date as the start date
-        const startDate = new Date(habit.createdAt);
-        startDate.setUTCHours(hours, minutes, 0, 0);
-        const endDate = new Date(startDate);
-        endDate.setUTCMinutes(minutes + 30); // 30 minute duration for habits
-
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
-
-        // Build description with metadata link if available
-        let habitDescription = habit.description || '';
-        if (habit.metadata?.link) {
-          habitDescription = habitDescription
-            ? `${habitDescription}\n\nLink: ${habit.metadata.link}`
-            : `Link: ${habit.metadata.link}`;
-        }
-
-        const event = calendar.createEvent({
-          id: `habit-${habit.id}`,
-          start: startDate,
-          end: endDate,
-          summary: habit.name,
-          description: habitDescription || undefined,
-          categories: [{ name: habit.space || 'personal' }, { name: 'habits' }],
-          allDay: false,
-          url: habitUrl
-        });
-
-        event.status(ICalEventStatus.CONFIRMED);
-        event.priority(5); // Default priority for habits
-
-        // Add recurrence rule based on frequency
-        if (habit.frequency === 'daily') {
-          event.repeating({ freq: ICalEventRepeatingFreq.DAILY });
-        } else if (habit.frequency === 'weekly') {
-          // For weekly habits, specify which days
-          const targetDays = habit.targetDays || [];
-          const dayNames: ICalWeekday[] = [
-            ICalWeekday.SU,
-            ICalWeekday.MO,
-            ICalWeekday.TU,
-            ICalWeekday.WE,
-            ICalWeekday.TH,
-            ICalWeekday.FR,
-            ICalWeekday.SA
-          ];
-          const byDay = targetDays.map((d) => dayNames[d]);
-
-          event.repeating({
-            freq: ICalEventRepeatingFreq.WEEKLY,
-            byDay: byDay.length > 0 ? byDay : undefined
-          });
-        }
-      }
-
-      // Set response headers for iCal
-      set.headers = {
-        'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="hamflow.ics"'
-      };
-
-      return calendar.toString();
-    },
-    {
-      params: t.Object({
-        userId: t.String(),
-        token: t.String()
-      })
     }
-  )
 
-  // Authenticated routes
+    // Fetch habits for recurring events (only active habits)
+    const allUserHabits = await db
+      .select()
+      .from(habits)
+      .where(and(eq(habits.userId, userId), eq(habits.active, true)));
+
+    // Add habits as recurring events
+    for (const habit of allUserHabits) {
+      // Parse reminder time or default to 9 AM
+      const [hours = 9, minutes = 0] = habit.reminderTime
+        ? habit.reminderTime.split(':').map(Number)
+        : [9, 0];
+
+      // Use habit creation date as the start date
+      const startDate = new Date(habit.createdAt);
+      startDate.setUTCHours(hours, minutes, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setUTCMinutes(minutes + 30); // 30 minute duration for habits
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
+
+      // Build description with metadata link if available
+      let habitDescription = habit.description || '';
+      if (habit.metadata?.link) {
+        habitDescription = habitDescription
+          ? `${habitDescription}\n\nLink: ${habit.metadata.link}`
+          : `Link: ${habit.metadata.link}`;
+      }
+
+      const event = calendar.createEvent({
+        id: `habit-${habit.id}`,
+        start: startDate,
+        end: endDate,
+        summary: habit.name,
+        description: habitDescription || undefined,
+        categories: [{ name: habit.space || 'personal' }, { name: 'habits' }],
+        allDay: false,
+        url: habitUrl
+      });
+
+      event.status(ICalEventStatus.CONFIRMED);
+      event.priority(5); // Default priority for habits
+
+      // Add recurrence rule based on frequency
+      if (habit.frequency === 'daily') {
+        event.repeating({ freq: ICalEventRepeatingFreq.DAILY });
+      } else if (habit.frequency === 'weekly') {
+        // For weekly habits, specify which days
+        const targetDays = habit.targetDays || [];
+        const dayNames: ICalWeekday[] = [
+          ICalWeekday.SU,
+          ICalWeekday.MO,
+          ICalWeekday.TU,
+          ICalWeekday.WE,
+          ICalWeekday.TH,
+          ICalWeekday.FR,
+          ICalWeekday.SA
+        ];
+        const byDay = targetDays.map((d) => dayNames[d]);
+
+        event.repeating({
+          freq: ICalEventRepeatingFreq.WEEKLY,
+          byDay: byDay.length > 0 ? byDay : undefined
+        });
+      }
+    }
+
+    // Set response headers for iCal
+    set.headers = {
+      'Content-Type': 'text/calendar; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="hamflow.ics"'
+    };
+
+    return calendar.toString();
+  },
+  {
+    params: t.Object({
+      userId: t.String(),
+      token: t.String()
+    })
+  }
+);
+
+// Authenticated calendar routes
+export const calendarRoutes = new Elysia({ prefix: '/calendar' })
+  .decorate('db', db)
   .group('', (app) =>
     app
       .use(withAuth())

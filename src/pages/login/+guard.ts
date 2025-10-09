@@ -1,7 +1,6 @@
 import { redirect } from 'vike/abort';
-import type { PageContext } from 'vike/types';
 
-export const guard = (pageContext: PageContext) => {
+export const guard = (pageContext: Vike.PageContext) => {
   const { user } = pageContext;
 
   // If already authenticated, redirect to home

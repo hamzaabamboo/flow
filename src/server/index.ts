@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { logger } from './logger';
 import { webhookRoutes } from './routes/webhook';
-import { calendarRoutes } from './routes/calendar';
+import { calendarRoutes, publicCalendarRoutes } from './routes/calendar';
 import { boardRoutes } from './routes/boards';
 import { columnsRoutes } from './routes/columns';
 import { tasksRoutes } from './routes/tasks';
@@ -76,6 +76,8 @@ app
   .use(oidcAuth)
   // Public webhook endpoints
   .use(webhookRoutes)
+  // Public calendar iCal feed
+  .use(publicCalendarRoutes)
   // Cron jobs
   .use(cronJobs)
   // Protected API Routes

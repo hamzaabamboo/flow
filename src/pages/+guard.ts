@@ -1,7 +1,6 @@
 import { redirect } from 'vike/abort';
-import type { PageContext } from 'vike/types';
 
-export const guard = (pageContext: PageContext) => {
+export const guard = (pageContext: Vike.PageContext) => {
   const { urlPathname, user } = pageContext;
 
   // Allow access to login page

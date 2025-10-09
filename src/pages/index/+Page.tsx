@@ -195,10 +195,16 @@ export default function AgendaPage() {
   // Carry over tasks mutation
   const carryOverTasksMutation = useMutation({
     mutationFn: async ({ taskIds, targetDate }: { taskIds: string[]; targetDate: Date }) => {
-      const promises = taskIds.map((taskId) => {
+      // Get unique task IDs since recurring tasks may have duplicate IDs
+      const uniqueTaskIds = Array.from(new Set(taskIds));
+
+      const promises = uniqueTaskIds.map((taskId) => {
         // Preserve time, just update date
         const task = overdueTasks.find((t) => t.id === taskId);
-        if (!task?.dueDate) return Promise.resolve();
+        if (!task?.dueDate) {
+          console.warn(`Task ${taskId} not found in overdue tasks or has no due date`);
+          return Promise.resolve();
+        }
 
         const oldDate = new Date(task.dueDate);
         const newDate = new Date(

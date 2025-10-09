@@ -308,7 +308,6 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
             priority: parsedTask.priority,
             labels: parsedTask.labels,
             columnId: parsedTask.columnId || '',
-            completed: false,
             space: currentSpace,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

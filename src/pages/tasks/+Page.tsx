@@ -66,7 +66,13 @@ export default function TasksPage() {
 
   // Update task mutation
   const updateTaskMutation = useMutation({
-    mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<ExtendedTask> }) => {
+    mutationFn: async ({
+      taskId,
+      updates
+    }: {
+      taskId: string;
+      updates: Partial<ExtendedTask> & { completed?: boolean };
+    }) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

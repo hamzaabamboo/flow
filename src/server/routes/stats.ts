@@ -17,11 +17,15 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
       const { space = 'all' } = query;
       const today = new Date().toISOString().split('T')[0];
 
-      // Fetch inbox count
+      // Fetch inbox count (only unprocessed items)
       const inboxWhere =
         space === 'all'
-          ? eq(inboxItems.userId, user.id)
-          : and(eq(inboxItems.userId, user.id), eq(inboxItems.space, space as 'work' | 'personal'));
+          ? and(eq(inboxItems.userId, user.id), eq(inboxItems.processed, false))
+          : and(
+              eq(inboxItems.userId, user.id),
+              eq(inboxItems.space, space as 'work' | 'personal'),
+              eq(inboxItems.processed, false)
+            );
       const inbox = await db.select().from(inboxItems).where(inboxWhere);
       const inboxCount = inbox.length;
 

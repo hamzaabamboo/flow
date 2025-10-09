@@ -32,6 +32,36 @@ export class SummaryService {
       const sevenDaysLater = new Date(today);
       sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
 
+      // Get overdue tasks (before today)
+      const overdueTasksRaw = await this.db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          priority: tasks.priority,
+          dueDate: tasks.dueDate,
+          boardName: boards.name,
+          space: boards.space,
+          columnName: columns.name
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(
+          and(
+            eq(tasks.userId, userId),
+            spaces.length === 1
+              ? eq(boards.space, spaces[0])
+              : or(...spaces.map((s) => eq(boards.space, s))),
+            lte(tasks.dueDate, today)
+          )
+        )
+        .orderBy(tasks.dueDate, tasks.priority);
+
+      // Filter out completed tasks (those in Done column)
+      const overdueTasks = overdueTasksRaw.filter(
+        (task) => !task.columnName || !isColumnDone(task.columnName)
+      );
+
       // Get tasks due today for all selected spaces
       const todayTasksRaw = await this.db
         .select({
@@ -97,6 +127,23 @@ export class SummaryService {
       // Format message
       const spaceLabel = spaces.length === 2 ? 'work & personal' : spaces[0];
       let message = `Good morning! 🌅\n\nHere's your ${spaceLabel} agenda for today:\n\n`;
+
+      if (overdueTasks.length > 0) {
+        message += `⚠️ Overdue Tasks (${overdueTasks.length}):\n`;
+        overdueTasks.forEach((task) => {
+          const priorityEmoji = this.getPriorityEmoji(task.priority);
+          const dateStr = task.dueDate
+            ? new Date(task.dueDate).toLocaleDateString('ja-JP', {
+                month: 'short',
+                day: 'numeric',
+                timeZone: 'Asia/Tokyo'
+              })
+            : '';
+          const spaceEmoji = task.space === 'work' ? '💼' : '🏠';
+          message += `  ${priorityEmoji} ${task.title} - ${dateStr} ${spaceEmoji}\n`;
+        });
+        message += `\n`;
+      }
 
       if (todayTasks.length > 0) {
         message += `📋 Tasks Due Today (${todayTasks.length}):\n`;
