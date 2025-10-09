@@ -27,7 +27,8 @@
     "test:coverage": "vitest run --coverage",
     "test:endpoints": "bun run scripts/test-endpoints.ts",
     "test:integration": "vitest run src/__tests__/integration",
-    "seed": "bun run scripts/seed-db.ts"
+    "seed": "bun run scripts/seed-db.ts",
+    "analyze": "bunx vite-bundle-visualizer"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.17",

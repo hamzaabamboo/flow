@@ -11,4 +11,4 @@ declare global {
   }
 }
 
-declare module 'pino-http-print';
+export {};
