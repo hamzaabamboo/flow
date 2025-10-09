@@ -8,6 +8,7 @@ import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
 import { getVtimezoneComponent } from '@touch4it/ical-timezones';
+import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 
 // Public iCal route (no auth required)
 export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
@@ -161,16 +162,21 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
 
     // Add habits as recurring events
     for (const habit of allUserHabits) {
-      // Parse reminder time or default to 9 AM
+      // Parse reminder time or default to 9 AM JST
       const [hours = 9, minutes = 0] = habit.reminderTime
         ? habit.reminderTime.split(':').map(Number)
         : [9, 0];
 
-      // Use habit creation date as the start date
-      const startDate = new Date(habit.createdAt);
-      startDate.setUTCHours(hours, minutes, 0, 0);
-      const endDate = new Date(startDate);
-      endDate.setUTCMinutes(minutes + 30); // 30 minute duration for habits
+      // reminderTime is stored as JST time (e.g., "09:00" = 9 AM JST)
+      // Get date components from habit creation date in JST
+      const createdComponents = getJstDateComponents(new Date(habit.createdAt));
+
+      // Build JST date string with reminder time
+      const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-${String(createdComponents.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+
+      // Convert JST to UTC for storage/calendar
+      const startDate = jstToUtc(jstDateString);
+      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 minute duration
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;

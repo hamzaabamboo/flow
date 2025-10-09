@@ -41,6 +41,7 @@
     "@mastra/core": "^0.18.0",
     "@touch4it/ical-timezones": "^1.9.0",
     "ai": "^5.0.59",
+    "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.44.5",
     "elysia": "^1.4.9",
     "elysia-connect-middleware": "^0.0.6",

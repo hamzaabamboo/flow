@@ -2,6 +2,178 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-09 - Timezone Utilities & Habit Reminder System
+
+### The Problem: Calendar & Habits Had 9-Hour Offset
+
+**User Feedback**:
+- "can you like test the calendar timezone ah, still have 9 hours offset for some reason la"
+- "also carryover feature time is all wonky, fix it"
+- "why is daily reminder not pinging properly?"
+
+**Root Cause**: Three separate timezone issues:
+1. **Calendar iCal habit times** - Used `setUTCHours()` which treated JST as UTC (9-hour offset)
+2. **CarryOver feature** - Used browser local timezone instead of JST
+3. **No habit reminders** - Missing cron job to create reminder records
+
+### Solution: Centralized Timezone Utilities
+
+**Created** `src/shared/utils/timezone.ts` (works on both server and client):
+```typescript
+// Clean utility functions
+export function utcToJst(date: Date): Date;
+export function jstToUtc(date: Date | string): Date;
+export function nowInJst(): Date;
+export function createJstDate(year, month, day, hours, minutes, seconds): Date;
+export function getJstDateComponents(date: Date): { year, month, day, hours, minutes, seconds, dayOfWeek };
+```
+
+**Benefits**:
+- No more manual date math
+- Single source of truth for timezone conversions
+- Consistent JST ↔ UTC handling everywhere
+- Works on both server and client (no duplication)
+- Much cleaner code
+
+### Habit Reminder Service Architecture
+
+**Created** `src/server/services/habit-reminder-service.ts`:
+```typescript
+export class HabitReminderService {
+  async createDailyReminders(): Promise<number> {
+    // 1. Get all active habits with reminder times
+    // 2. Check if habit should run today (daily/weekly logic)
+    // 3. Convert JST reminder time to UTC
+    // 4. Prevent duplicates
+    // 5. Create reminder record
+  }
+}
+```
+
+**Cron Job** (runs every hour):
+```typescript
+// src/server/cron.ts
+cron({
+  pattern: '0 * * * *',
+  async run() {
+    const service = new HabitReminderService(db);
+    await service.createDailyReminders();
+  }
+})
+```
+
+**Data Flow**:
+1. Habit has `reminderTime: "09:00"` (JST)
+2. Cron runs hourly → creates reminder for today's instances
+3. Reminder stored with UTC time in database
+4. Reminder checker (runs every minute) → sends when time comes
+
+### Calendar iCal Fix
+
+**Before**:
+```typescript
+// ❌ WRONG - Treated JST time as UTC
+startDate.setUTCHours(hours, minutes, 0, 0);
+```
+
+**After**:
+```typescript
+// ✅ CORRECT - Use timezone utility
+const createdComponents = getJstDateComponents(new Date(habit.createdAt));
+const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-...T${hours}:${minutes}:00`;
+const startDate = jstToUtc(jstDateString);
+```
+
+### CarryOver Feature Fix
+
+**Before**:
+```typescript
+// ❌ WRONG - Used browser local timezone
+const nowUtc = new Date();
+const nowJst = toZonedTime(nowUtc, APP_TIMEZONE);
+```
+
+**After**:
+```typescript
+// ✅ CORRECT - Use utility
+const jst = nowInJst();
+return endOfDay(jst);
+```
+
+### Carryover Mutation Fix
+
+**Before**:
+```typescript
+// ❌ WRONG - Complex timezone conversion with date-fns-tz
+const oldJstDate = toZonedTime(oldUtcDate, APP_TIMEZONE);
+const newJstDate = new Date(targetJst.getFullYear(), ...);
+const newUtcDate = fromZonedTime(newJstDate, APP_TIMEZONE);
+```
+
+**After**:
+```typescript
+// ✅ CORRECT - Use utility functions
+const oldJstComponents = getJstDateComponents(oldUtcDate);
+const targetJstComponents = getJstDateComponents(targetDate);
+const newJstDate = new Date(targetJstComponents.year, targetJstComponents.month - 1, ...);
+const newUtcDate = jstToUtc(newJstDate);
+```
+
+### Files Modified
+
+**New Files**:
+- `src/shared/utils/timezone.ts` - Timezone utilities (works server & client)
+- `src/server/services/habit-reminder-service.ts` - Habit reminder creation logic
+
+**Updated Files**:
+- `src/server/cron.ts` - Added cron job, removed inline habit reminder code (90+ lines → 4 lines)
+- `src/server/routes/calendar.ts` - Uses timezone utilities for habit times
+- `src/components/Agenda/CarryOverControls.tsx` - Uses timezone utilities
+- `src/pages/index/+Page.tsx` - Uses timezone utilities in carryover mutation
+
+### Key Learnings
+
+1. **Centralize Timezone Logic**: Don't scatter date-fns-tz calls everywhere. Create utilities.
+2. **Service Classes Over Inline Code**: Extract complex logic (like habit reminders) into dedicated services
+3. **date-fns-tz API**:
+   - `toZonedTime()` = UTC → Timezone
+   - `fromZonedTime()` = Timezone → UTC
+   - NOT `zonedTimeToUtc` (doesn't exist!)
+4. **Cron Job Pattern**:
+   - Habit reminder creation = Runs hourly (fast, prevents missing reminders)
+   - Reminder sending = Runs every minute (checks due reminders)
+5. **Component Extraction**: Use `getJstDateComponents()` instead of manual `.getFullYear()`, `.getMonth()` everywhere
+6. **Testing**: Always verify timezone conversions with actual JST times (09:00 JST should be 00:00 UTC)
+
+### Code Quality Improvements
+
+**Before** (cron.ts):
+- 200 lines
+- Inline habit reminder logic mixed with cron definitions
+- Hard to test
+- Repeated timezone calculations
+
+**After** (cron.ts):
+- 110 lines (90 lines removed!)
+- Clean service calls
+- Easy to test services independently
+- Timezone utils handle all conversions
+
+### The "Why No Reminders?" Discovery
+
+**Critical Missing Piece**: System had:
+- ✅ Cron job to **send** reminders
+- ✅ Reminder UI in frontend
+- ❌ **NO** cron job to **create** habit reminders
+
+**Lesson**: Always trace the full data flow:
+1. Where is data created?
+2. Where is data stored?
+3. Where is data sent?
+4. Are all steps implemented?
+
+In this case, step 1 was missing entirely!
+
 ## 2025-10-08 - Elysia withAuth() and Route Grouping
 
 ### Elysia withAuth Must Be Called as Function

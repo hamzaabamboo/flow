@@ -27,6 +27,7 @@ import { remindersRoutes } from './routes/reminders';
 import { statsRoutes } from './routes/stats';
 import { oidcAuth } from './auth/oidc';
 import { cronJobs } from './cron';
+import { HabitReminderService } from './services/habit-reminder-service';
 import { wsManager } from './websocket';
 import { users } from 'drizzle/schema';
 
@@ -227,12 +228,23 @@ app
     set.status = 500;
     return { error: 'Internal server error' };
   })
+  .onStart(async () => {
+    // Initialize WebSocket manager
+    wsManager.setApp(app);
+
+    // Check for missing habit reminders on startup
+    try {
+      logger.info('🔔 Checking for missing habit reminders...');
+      const reminderService = new HabitReminderService(db);
+      const created = await reminderService.createDailyReminders();
+      logger.info(`✅ Created ${created} habit reminders`);
+    } catch (error) {
+      logger.error(error, 'Failed to check habit reminders on startup');
+    }
+
+    logger.info(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
+  })
   .listen(3000);
-
-// Initialize WebSocket manager with app instance
-wsManager.setApp(app);
-
-logger.info(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
 
 // Graceful shutdown handlers
 const gracefulShutdown = () => {

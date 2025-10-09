@@ -7,6 +7,7 @@ import { Text } from '../ui/text';
 import { Select, createListCollection } from '../ui/select';
 import { SimpleDatePicker } from '../ui/simple-date-picker';
 import * as Dialog from '../ui/styled/dialog';
+import { nowInJst } from '../../shared/utils/timezone';
 
 interface CarryOverControlsProps {
   open: boolean;
@@ -41,15 +42,17 @@ export function CarryOverControls({
   const [customCarryOverDate, setCustomCarryOverDate] = useState<Date>(new Date());
 
   const getTargetDate = (): Date => {
+    const jst = nowInJst();
+
     switch (carryOverTarget) {
       case 'end_of_today':
-        return endOfDay(new Date());
+        return endOfDay(jst);
       case 'tomorrow':
-        return startOfDay(addDays(new Date(), 1));
+        return startOfDay(addDays(jst, 1));
       case 'next_week':
-        return startOfDay(addWeeks(new Date(), 1));
+        return startOfDay(addWeeks(jst, 1));
       case 'end_of_month':
-        return endOfMonth(new Date());
+        return endOfMonth(jst);
       case 'custom':
         return customCarryOverDate;
     }

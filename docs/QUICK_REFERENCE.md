@@ -10,6 +10,8 @@
 6. **Logger Error First**: `logger.error(error, 'message')` not the reverse
 7. **Invalidate Queries**: Always `queryClient.invalidateQueries()` after mutations
 8. **Mastra Structured Output**: Use `generateVNext` with `structuredOutputs: true`
+9. **Timezone Utilities**: Always use `src/shared/utils/timezone.ts` for JST ↔ UTC conversions
+10. **UTC Storage**: Store dates in UTC, convert to JST only for display
 
 ## 🚀 Common Commands
 
@@ -198,6 +200,38 @@ Users can configure in Settings page:
 - Incomplete habits
 - Link to HamFlow instance
 
+## 🌍 Timezone Utilities
+
+**Location**: `src/shared/utils/timezone.ts` (works on server & client)
+
+```typescript
+import { utcToJst, jstToUtc, nowInJst, getJstDateComponents } from '~/shared/utils/timezone';
+
+// Get current time in JST
+const now = nowInJst();
+
+// Convert UTC → JST for display
+const jstDate = utcToJst(utcDate);
+
+// Convert JST → UTC for storage
+const utcDate = jstToUtc('2025-10-09T09:00:00'); // 09:00 JST → 00:00 UTC
+
+// Extract date components in JST
+const { year, month, day, hours, minutes, dayOfWeek } = getJstDateComponents(utcDate);
+```
+
+**When to Use**:
+- ✅ Storing dates in database (convert JST → UTC)
+- ✅ Displaying dates to user (convert UTC → JST)
+- ✅ Calendar operations (use `getJstDateComponents`)
+- ✅ Habit reminder times (stored as JST string like "09:00")
+- ✅ Carryover feature (preserve time in JST)
+
+**Never Do**:
+- ❌ Manual timezone math (`hours - 9`)
+- ❌ Using `setUTCHours()` for JST times
+- ❌ Mixing UTC and JST without conversion
+
 ## ⚡ Common Gotchas
 
 1. **Vite HMR Issues**: Restart dev server if hot reload stops working
@@ -205,6 +239,7 @@ Users can configure in Settings page:
 3. **Database Changes**: Always generate AND apply migrations
 4. **WebSocket Issues**: Check if port 3000 is already in use
 5. **Build Failures**: Clear cache with `rm -rf .vite/ dist/`
+6. **Timezone Issues**: Always use timezone utilities, never manual date math
 
 ## 🎯 Quick Wins
 

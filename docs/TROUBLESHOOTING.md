@@ -4,6 +4,66 @@
 
 ## 🔴 Critical Issues
 
+### Timezone Issues
+
+**Symptom**: Calendar shows wrong times, tasks appear on wrong days, habit reminders don't fire
+
+**Common Causes**:
+1. Mixing UTC and JST without proper conversion
+2. Using `setUTCHours()` on dates meant to be JST
+3. Missing timezone conversion when storing/retrieving dates
+
+**Solution**: Use timezone utilities from `src/shared/utils/timezone.ts`
+
+```typescript
+// ❌ WRONG - Manual timezone math
+const date = new Date();
+date.setUTCHours(hours - 9, minutes, 0, 0); // Brittle!
+
+// ✅ CORRECT - Use utilities
+import { jstToUtc, utcToJst, getJstDateComponents } from '~/shared/utils/timezone';
+
+// Convert JST to UTC for storage
+const utcDate = jstToUtc(jstDateString);
+
+// Convert UTC to JST for display
+const jstDate = utcToJst(utcDate);
+
+// Get JST components for manipulation
+const { year, month, day, hours, minutes } = getJstDateComponents(utcDate);
+```
+
+**Key Principles**:
+- **Store**: Always UTC in database
+- **Display**: Convert to JST for user
+- **Input**: Accept JST, convert to UTC before saving
+- **Never**: Mix timezones without explicit conversion
+
+### Habit Reminders Not Firing
+
+**Symptom**: Habits have reminder times but no notifications sent
+
+**Root Cause**: Cron job creates reminders, another sends them - check both are running
+
+**Debug Steps**:
+```bash
+# 1. Check server logs for cron execution
+grep "Creating daily habit reminders" server.log
+
+# 2. Verify reminders are created in database
+psql $DATABASE_URL -c "SELECT * FROM reminders WHERE sent = false;"
+
+# 3. Check reminder sending cron is running
+grep "Checking for reminders" server.log
+
+# 4. Verify HamBot configuration (if using)
+echo $HAMBOT_API_KEY
+```
+
+**Solution**: Ensure both cron jobs are enabled:
+- **Create reminders**: Runs every hour (`0 * * * *`)
+- **Send reminders**: Runs every minute (`*/1 * * * *`)
+
 ### Wrong Dev Server Port
 
 **Symptom**: Can't access the application

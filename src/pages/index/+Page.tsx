@@ -23,6 +23,7 @@ import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
 import { isTaskCompleted } from '../../shared/utils/taskCompletion';
+import { utcToJst, jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 
 interface CompleteTaskPayload {
   id: string;
@@ -199,27 +200,20 @@ export default function AgendaPage() {
       const uniqueTaskIds = Array.from(new Set(taskIds));
 
       const promises = uniqueTaskIds.map((taskId) => {
-        // Preserve time, just update date
         const task = overdueTasks.find((t) => t.id === taskId);
         if (!task?.dueDate) {
           console.warn(`Task ${taskId} not found in overdue tasks or has no due date`);
           return Promise.resolve();
         }
 
-        const oldDate = new Date(task.dueDate);
-        const newDate = new Date(
-          targetDate.getFullYear(),
-          targetDate.getMonth(),
-          targetDate.getDate(),
-          oldDate.getHours(),
-          oldDate.getMinutes(),
-          oldDate.getSeconds()
-        );
+        // targetDate is a Date object with JST time components
+        // We need to convert it properly to UTC for storage
+        const newUtcDate = jstToUtc(targetDate);
 
         return fetch(`/api/tasks/${taskId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dueDate: newDate.toISOString() })
+          body: JSON.stringify({ dueDate: newUtcDate.toISOString() })
         });
       });
 

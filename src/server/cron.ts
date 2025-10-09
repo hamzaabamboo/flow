@@ -6,6 +6,7 @@ import { MORNING_SUMMARY_HOUR_UTC, EVENING_SUMMARY_HOUR_UTC } from '../shared/co
 import { db, type Database } from './db';
 import { HamBotIntegration } from './integrations/hambot';
 import { SummaryService } from './services/summary-service';
+import { HabitReminderService } from './services/habit-reminder-service';
 import { wsManager } from './websocket';
 import { logger } from './logger';
 
@@ -103,6 +104,7 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
   }
 }
 
+
 export const cronJobs = new Elysia()
   .decorate('db', db)
   // Reminder checker - runs every minute
@@ -158,6 +160,18 @@ export const cronJobs = new Elysia()
       async run() {
         logger.info('Sending evening summaries...');
         await sendDailySummaries('evening');
+      }
+    })
+  )
+  // Create daily habit reminders - runs every hour
+  // This ensures newly added habits get reminders created quickly
+  .use(
+    cron({
+      name: 'create-habit-reminders',
+      pattern: '0 * * * *',
+      async run() {
+        const service = new HabitReminderService(db);
+        await service.createDailyReminders();
       }
     })
   )
