@@ -7,8 +7,8 @@ import { tasks, boards, taskCompletions, habits, columns, subtasks } from '../..
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
+import { utcToJst, jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 import { getVtimezoneComponent } from '@touch4it/ical-timezones';
-import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 
 // Public iCal route (no auth required)
 export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
@@ -26,7 +26,7 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
       return 'Unauthorized';
     }
 
-    // Create calendar
+    // Create calendar with Asia/Tokyo timezone
     const calendar = ical({
       name: 'HamFlow Tasks & Habits',
       description: 'Your tasks and habits from HamFlow',
@@ -65,7 +65,9 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
     for (const task of userTasks) {
       if (!task.dueDate) continue;
 
-      const dueDate = new Date(task.dueDate);
+      // Convert UTC date to JST for calendar
+      const dueDateUtc = new Date(task.dueDate);
+      const dueDate = utcToJst(dueDateUtc);
       const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -174,8 +176,9 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
       // Build JST date string with reminder time
       const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-${String(createdComponents.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 
-      // Convert JST to UTC for storage/calendar
-      const startDate = jstToUtc(jstDateString);
+      // Convert JST to UTC, then back to JST-local date for ical-generator
+      const utcDate = jstToUtc(jstDateString);
+      const startDate = utcToJst(utcDate);
       const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 minute duration
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

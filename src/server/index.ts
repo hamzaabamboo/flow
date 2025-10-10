@@ -243,6 +243,32 @@ app
     }
 
     logger.info(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
+
+    // Send debug webhook on startup (production only)
+    if (isProduction && process.env.HAMBOT_API_KEY && process.env.HAMBOT_API_URL) {
+      try {
+        const startupMessage =
+          `🚀 **HamFlow Server Started**\n\n` +
+          `⏰ Time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })} JST\n` +
+          `🌐 Port: ${app.server?.port}\n` +
+          `💻 Environment: ${process.env.NODE_ENV || 'production'}`;
+
+        await fetch(process.env.HAMBOT_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.HAMBOT_API_KEY}`
+          },
+          body: JSON.stringify({
+            message: startupMessage,
+            channel: 'debug'
+          })
+        });
+        logger.info('📨 Sent startup webhook to debug channel');
+      } catch (error) {
+        logger.error(error, 'Failed to send startup webhook');
+      }
+    }
   })
   .listen(3000);
 

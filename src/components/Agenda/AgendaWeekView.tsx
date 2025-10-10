@@ -127,9 +127,28 @@ export function AgendaWeekView({
                       // Sort by time
                       combined.sort((a, b) => {
                         if (a.time && b.time) {
-                          const aDate = new Date(a.time);
-                          const bDate = new Date(b.time);
-                          return aDate.getTime() - bDate.getTime();
+                          let aTime: number;
+                          let bTime: number;
+
+                          // For habits, reminderTime is "HH:mm" format - convert to minutes since midnight
+                          if (a.type === 'habit') {
+                            const [hours, minutes] = a.time.split(':').map(Number);
+                            aTime = hours * 60 + minutes;
+                          } else {
+                            // For tasks, dueDate is ISO string - extract time
+                            const taskDate = new Date(a.time);
+                            aTime = taskDate.getHours() * 60 + taskDate.getMinutes();
+                          }
+
+                          if (b.type === 'habit') {
+                            const [hours, minutes] = b.time.split(':').map(Number);
+                            bTime = hours * 60 + minutes;
+                          } else {
+                            const taskDate = new Date(b.time);
+                            bTime = taskDate.getHours() * 60 + taskDate.getMinutes();
+                          }
+
+                          return aTime - bTime;
                         }
                         // Items without time go to bottom
                         if (!a.time) return 1;
