@@ -15,10 +15,7 @@ export class HabitReminderService {
       logger.info('Creating daily habit reminders...');
 
       // Get all active habits with reminder times
-      const activeHabits = await this.db
-        .select()
-        .from(habits)
-        .where(eq(habits.active, true));
+      const activeHabits = await this.db.select().from(habits).where(eq(habits.active, true));
 
       const habitsWithReminders = activeHabits.filter(
         (habit) => habit.reminderTime !== null && habit.reminderTime !== ''
@@ -31,14 +28,13 @@ export class HabitReminderService {
       const jstNow = nowInJst();
       const { year, month, day, dayOfWeek } = getJstDateComponents(jstNow);
 
-      let created = 0;
-
-      for (const habit of habitsWithReminders) {
+      // Process habits in parallel to avoid await in loop
+      const reminderPromises = habitsWithReminders.map(async (habit) => {
         try {
           // Check if habit should run today
           const shouldRunToday = this.shouldHabitRunToday(habit, dayOfWeek);
           if (!shouldRunToday) {
-            continue;
+            return { success: false, reason: 'not-scheduled-today' };
           }
 
           // Parse reminder time (stored as JST, e.g., "09:00")
@@ -50,13 +46,13 @@ export class HabitReminderService {
           // Only create if reminder is in the future
           if (reminderTimeUtc <= nowUtc) {
             logger.info(`Reminder time already passed for habit ${habit.id}, skipping`);
-            continue;
+            return { success: false, reason: 'time-passed' };
           }
 
           // Check if reminder already exists
           if (await this.reminderExists(habit.userId, habit.name, reminderTimeUtc)) {
             logger.info(`Reminder already exists for habit ${habit.id}`);
-            continue;
+            return { success: false, reason: 'already-exists' };
           }
 
           // Create reminder
@@ -69,14 +65,20 @@ export class HabitReminderService {
             platform: null
           });
 
-          created++;
           logger.info(
             `Created reminder for habit ${habit.id} (${habit.name}) at ${reminderTimeUtc.toISOString()}`
           );
+          return { success: true };
         } catch (error) {
           logger.error(error, `Failed to create reminder for habit ${habit.id}`);
+          return { success: false, reason: 'error' };
         }
-      }
+      });
+
+      const results = await Promise.allSettled(reminderPromises);
+      const created = results.filter(
+        (result) => result.status === 'fulfilled' && result.value.success
+      ).length;
 
       logger.info(`Created ${created} habit reminders`);
       return created;

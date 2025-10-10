@@ -7,7 +7,7 @@ import { tasks, boards, taskCompletions, habits, columns, subtasks } from '../..
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import type { Task } from '../../shared/types/board';
-import { utcToJst, jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
+import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 import { getVtimezoneComponent } from '@touch4it/ical-timezones';
 
 // Public iCal route (no auth required)
@@ -65,9 +65,8 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
     for (const task of userTasks) {
       if (!task.dueDate) continue;
 
-      // Convert UTC date to JST for calendar
-      const dueDateUtc = new Date(task.dueDate);
-      const dueDate = utcToJst(dueDateUtc);
+      // Use UTC date directly - ical-generator handles timezone conversion
+      const dueDate = new Date(task.dueDate);
       const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -173,12 +172,11 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
       // Get date components from habit creation date in JST
       const createdComponents = getJstDateComponents(new Date(habit.createdAt));
 
-      // Build JST date string with reminder time
+      // Build JST date string with reminder time, then convert to UTC
       const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-${String(createdComponents.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 
-      // Convert JST to UTC, then back to JST-local date for ical-generator
-      const utcDate = jstToUtc(jstDateString);
-      const startDate = utcToJst(utcDate);
+      // Convert JST to UTC for ical-generator
+      const startDate = jstToUtc(jstDateString);
       const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 minute duration
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

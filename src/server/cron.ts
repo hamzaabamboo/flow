@@ -104,7 +104,6 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
   }
 }
 
-
 export const cronJobs = new Elysia()
   .decorate('db', db)
   // Reminder checker - runs every minute
