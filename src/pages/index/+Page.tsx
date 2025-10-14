@@ -221,7 +221,8 @@ export default function AgendaPage() {
     },
     onSuccess: () => {
       refetchEvents();
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar', 'events'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
     }
   });
 

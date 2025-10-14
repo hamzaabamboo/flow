@@ -3,12 +3,20 @@ import { eq, sql } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { subtasks } from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
+import { errorResponse, successResponse } from '../utils/errors';
+import { verifyTaskOwnership, verifySubtaskOwnership } from '../utils/ownership';
 
 export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
   .use(withAuth())
   .get(
     '/task/:taskId',
-    async ({ params, db }) => {
+    async ({ params, db, user, set }) => {
+      // Verify task ownership
+      if (!(await verifyTaskOwnership(db, params.taskId, user.id))) {
+        set.status = 404;
+        return errorResponse('Task not found');
+      }
+
       const taskSubtasks = await db
         .select()
         .from(subtasks)
@@ -22,7 +30,13 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
   )
   .post(
     '/',
-    async ({ body, db }) => {
+    async ({ body, db, user, set }) => {
+      // Verify task ownership
+      if (!(await verifyTaskOwnership(db, body.taskId, user.id))) {
+        set.status = 404;
+        return errorResponse('Task not found');
+      }
+
       // Get the highest order value for this task's subtasks
       const existingSubtasks = await db
         .select({ maxOrder: sql`MAX(${subtasks.order})` })
@@ -42,9 +56,12 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
         .returning();
 
       // Broadcast subtask creation
-      wsManager.broadcastSubtaskUpdate(body.taskId, newSubtask.id, 'created');
+      wsManager.broadcastToUser(user.id, {
+        type: 'subtask-update',
+        data: { taskId: body.taskId, subtaskId: newSubtask.id, action: 'created' }
+      });
 
-      return newSubtask;
+      return successResponse(newSubtask, 'Subtask created');
     },
     {
       body: t.Object({
@@ -55,7 +72,13 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
   )
   .patch(
     '/:id',
-    async ({ params, body, db }) => {
+    async ({ params, body, db, user, set }) => {
+      // Verify subtask ownership
+      if (!(await verifySubtaskOwnership(db, params.id, user.id))) {
+        set.status = 404;
+        return errorResponse('Subtask not found');
+      }
+
       const updateData: Record<string, unknown> = {
         updatedAt: new Date()
       };
@@ -71,9 +94,12 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
         .returning();
 
       // Broadcast subtask update
-      wsManager.broadcastSubtaskUpdate(updated.taskId, updated.id, 'updated');
+      wsManager.broadcastToUser(user.id, {
+        type: 'subtask-update',
+        data: { taskId: updated.taskId, subtaskId: updated.id, action: 'updated' }
+      });
 
-      return updated;
+      return successResponse(updated, 'Subtask updated');
     },
     {
       params: t.Object({ id: t.String() }),
@@ -86,13 +112,22 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
   )
   .delete(
     '/:id',
-    async ({ params, db }) => {
+    async ({ params, db, user, set }) => {
+      // Verify subtask ownership
+      if (!(await verifySubtaskOwnership(db, params.id, user.id))) {
+        set.status = 404;
+        return errorResponse('Subtask not found');
+      }
+
       const [deleted] = await db.delete(subtasks).where(eq(subtasks.id, params.id)).returning();
 
       // Broadcast subtask deletion
-      wsManager.broadcastSubtaskUpdate(deleted.taskId, deleted.id, 'deleted');
+      wsManager.broadcastToUser(user.id, {
+        type: 'subtask-update',
+        data: { taskId: deleted.taskId, subtaskId: deleted.id, action: 'deleted' }
+      });
 
-      return deleted;
+      return successResponse(deleted, 'Subtask deleted');
     },
     {
       params: t.Object({ id: t.String() })
@@ -100,20 +135,31 @@ export const subtasksRoutes = new Elysia({ prefix: '/subtasks' })
   )
   .post(
     '/reorder',
-    async ({ body, db }) => {
+    async ({ body, db, user, set }) => {
       const { taskId, subtaskIds } = body;
 
-      // Update the order of each subtask
-      const updatePromises = subtaskIds.map((id: string, index: number) =>
-        db.update(subtasks).set({ order: index }).where(eq(subtasks.id, id))
-      );
+      // Verify task ownership
+      if (!(await verifyTaskOwnership(db, taskId, user.id))) {
+        set.status = 404;
+        return errorResponse('Task not found');
+      }
 
-      await Promise.all(updatePromises);
+      // Use transaction for atomic reorder
+      await db.transaction(async (tx) => {
+        await Promise.all(
+          subtaskIds.map((id, i) =>
+            tx.update(subtasks).set({ order: i }).where(eq(subtasks.id, id))
+          )
+        );
+      });
 
       // Broadcast reorder
-      wsManager.broadcastSubtaskUpdate(taskId, '', 'reordered');
+      wsManager.broadcastToUser(user.id, {
+        type: 'subtask-update',
+        data: { taskId, subtaskId: '', action: 'reordered' }
+      });
 
-      return { success: true };
+      return successResponse(null, 'Subtasks reordered');
     },
     {
       body: t.Object({

@@ -20,11 +20,13 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }),
-  settings: jsonb('settings').$type<{
-    eveningSummaryEnabled?: boolean;
-    morningSummaryEnabled?: boolean;
-    summarySpaces?: ('work' | 'personal')[];
-  }>().default({}),
+  settings: jsonb('settings')
+    .$type<{
+      eveningSummaryEnabled?: boolean;
+      morningSummaryEnabled?: boolean;
+      summarySpaces?: ('work' | 'personal')[];
+    }>()
+    .default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -39,11 +41,13 @@ export const boards = pgTable('boards', {
   description: text('description'),
   space: spaceEnum('space').notNull(), // 'work' or 'personal'
   columnOrder: jsonb('column_order').notNull().default([]),
-  settings: jsonb('settings').$type<{
-    reminderMinutesBefore?: number;
-    enableAutoReminders?: boolean;
-    dailySummaryEnabled?: boolean;
-  }>().default({}),
+  settings: jsonb('settings')
+    .$type<{
+      reminderMinutesBefore?: number;
+      enableAutoReminders?: boolean;
+      dailySummaryEnabled?: boolean;
+    }>()
+    .default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -83,14 +87,16 @@ export const tasks = pgTable('tasks', {
     onDelete: 'cascade'
   }),
   reminderMinutesBefore: integer('reminder_minutes_before'), // Task-level override (NULL = use board default)
-  metadata: jsonb('metadata').$type<{
-    link?: string;
-    attachments?: string[];
-    estimatedTime?: number;
-    actualTime?: number;
-    tags?: string[];
-    customFields?: Record<string, unknown>;
-  }>().default({}), // Flexible metadata for future extensions
+  metadata: jsonb('metadata')
+    .$type<{
+      link?: string;
+      attachments?: string[];
+      estimatedTime?: number;
+      actualTime?: number;
+      tags?: string[];
+      customFields?: Record<string, unknown>;
+    }>()
+    .default({}), // Flexible metadata for future extensions
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -119,6 +125,7 @@ export const reminders = pgTable('reminders', {
   message: text('message').notNull(),
   sent: boolean('sent').default(false),
   platform: varchar('platform', { length: 50 }), // 'discord', 'slack', 'telegram'
+  link: text('link'), // Link to board (for tasks) or agenda (for habits)
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
@@ -151,10 +158,12 @@ export const habits = pgTable('habits', {
   space: varchar('space', { length: 20 }).notNull(), // 'work' or 'personal'
   color: text('color'),
   active: boolean('active').default(true).notNull(),
-  metadata: jsonb('metadata').$type<{
-    link?: string;
-    customFields?: Record<string, unknown>;
-  }>().default({}), // Flexible metadata including links
+  metadata: jsonb('metadata')
+    .$type<{
+      link?: string;
+      customFields?: Record<string, unknown>;
+    }>()
+    .default({}), // Flexible metadata including links
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -185,6 +194,22 @@ export const pomodoroSessions = pgTable('pomodoro_sessions', {
   endTime: timestamp('end_time'),
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Active Pomodoro timer state (one per user)
+export const pomodoroActiveState = pgTable('pomodoro_active_state', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 20 }).notNull(), // 'work', 'short-break', 'long-break'
+  duration: integer('duration').notNull(), // total duration in seconds
+  timeLeft: integer('time_left').notNull(), // remaining time in seconds
+  isRunning: boolean('is_running').notNull().default(false),
+  startTime: timestamp('start_time'), // when timer was started (for drift correction)
+  completedSessions: integer('completed_sessions').notNull().default(0),
+  taskId: uuid('task_id').references(() => tasks.id),
+  taskTitle: text('task_title'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
 // Calendar integrations table for OAuth tokens

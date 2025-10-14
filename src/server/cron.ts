@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import { cron } from '@elysiajs/cron';
 import { and, eq, lte } from 'drizzle-orm';
-import { reminders, users } from '../../drizzle/schema';
+import { reminders, users, tasks } from '../../drizzle/schema';
 import { MORNING_SUMMARY_HOUR_UTC, EVENING_SUMMARY_HOUR_UTC } from '../shared/constants';
 import { db, type Database } from './db';
 import { HamBotIntegration } from './integrations/hambot';
@@ -15,18 +15,41 @@ interface Reminder {
   message: string;
   userId: string;
   reminderTime: Date;
+  taskId: string | null;
+  link: string | null;
 }
 
 async function sendToHamBot(reminder: Reminder, db: Database) {
   const hambot = new HamBotIntegration(db);
 
+  // If no link yet, generate it from taskId
+  let link = reminder.link;
+  if (!link && reminder.taskId) {
+    const task = await db.query.tasks.findFirst({
+      where: eq(tasks.id, reminder.taskId),
+      with: {
+        column: {
+          with: {
+            board: true
+          }
+        }
+      }
+    });
+
+    if (task?.column?.board) {
+      link = `/boards/${task.column.board.id}`;
+      // Update reminder with link for future use
+      await db.update(reminders).set({ link }).where(eq(reminders.id, reminder.id));
+    }
+  }
+
   // Send via HamBot if configured
   if (hambot.isConfigured()) {
-    await hambot.sendReminder(reminder.userId, reminder.message);
+    await hambot.sendReminder(reminder.userId, reminder.message, link);
   }
 
   // Also send via WebSocket for in-app notification
-  wsManager.sendReminder(reminder.userId, reminder.message);
+  wsManager.sendReminder(reminder.userId, reminder.message, link);
 }
 
 export async function sendDailySummary(

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Minimize2, Maximize2, Timer } from 'lucide-react';
 import type { PomodoroSession } from '../../shared/types';
 import { Text } from '../ui/text';
@@ -21,26 +21,86 @@ const formatTime = (seconds: number) => {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+interface ActivePomodoroState {
+  type: 'work' | 'short-break' | 'long-break';
+  duration: number;
+  timeLeft: number;
+  isRunning: boolean;
+  completedSessions: number;
+  taskId?: string;
+  taskTitle?: string;
+}
+
+function playSound() {
+  // Use Web Audio API for better sound
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // Create a pleasant notification sound
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+
+    // Envelope: fade in and out
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+
+    // Play second beep
+    setTimeout(() => {
+      const oscillator2 = audioContext.createOscillator();
+      const gainNode2 = audioContext.createGain();
+
+      oscillator2.connect(gainNode2);
+      gainNode2.connect(audioContext.destination);
+
+      oscillator2.frequency.value = 1000;
+      oscillator2.type = 'sine';
+
+      gainNode2.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode2.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
+      gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+      oscillator2.start(audioContext.currentTime);
+      oscillator2.stop(audioContext.currentTime + 0.5);
+    }, 200);
+  } catch (error) {
+    console.error('Failed to play sound:', error);
+  }
+}
+
 export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitle?: string }) {
-  const [session, setSession] = useState<PomodoroSession>({
-    taskId,
-    taskTitle,
-    duration: TIMERS.work,
-    type: 'work'
-  });
-  const [timeLeft, setTimeLeft] = useState(TIMERS.work);
-  const [isRunning, setIsRunning] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState(0);
+  const queryClient = useQueryClient();
+  const [localTimeLeft, setLocalTimeLeft] = useState<number | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHidden, setIsHidden] = useState(() => {
-    // Load hidden state from localStorage
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pomodoroHidden') === 'true';
     }
     return false;
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Fetch active timer state from server
+  const { data: serverState } = useQuery<ActivePomodoroState | null>({
+    queryKey: ['pomodoro', 'active'],
+    queryFn: async () => {
+      const response = await fetch('/api/pomodoro/active', {
+        credentials: 'include'
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    // Only poll when timer is running, otherwise rely on WebSocket
+    refetchInterval: (data) => (data?.isRunning ? 5000 : false)
+  });
 
   // Save hidden state to localStorage
   useEffect(() => {
@@ -49,16 +109,41 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     }
   }, [isHidden]);
 
+  // Initialize localTimeLeft from serverState when it first loads
+  useEffect(() => {
+    if (serverState?.isRunning && localTimeLeft === null) {
+      setLocalTimeLeft(serverState.timeLeft);
+    }
+  }, [serverState, localTimeLeft]);
+
+  // Update server state
+  const updateStateMutation = useMutation({
+    mutationFn: async (state: ActivePomodoroState) => {
+      const response = await fetch('/api/pomodoro/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(state)
+      });
+      if (!response.ok) throw new Error('Failed to update state');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pomodoro', 'active'] });
+    }
+  });
+
   // Save completed session
-  const saveSession = useMutation({
+  const saveSessionMutation = useMutation({
     mutationFn: async (session: PomodoroSession) => {
       const response = await fetch('/api/pomodoro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           taskId: session.taskId,
           duration: Math.floor(session.duration / 60),
-          userId: 'temp-user-id' // TODO: Get from auth
+          startTime: new Date().toISOString()
         })
       });
       if (!response.ok) throw new Error('Failed to save session');
@@ -66,41 +151,49 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     }
   });
 
-  const playSound = () => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(
-        'data:audio/wav;base64,UklGRhwMAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQgMAAA='
-      );
-    }
-    audioRef.current.play().catch(console.error);
-  };
-
   const handleComplete = useCallback(() => {
-    playSound();
-    setIsRunning(false);
+    if (!serverState) return;
 
-    if (session.type === 'work') {
-      saveSession.mutate(session);
-      setCompletedSessions((prev) => prev + 1);
+    playSound();
+
+    const isWorkSession = serverState.type === 'work';
+    if (isWorkSession) {
+      saveSessionMutation.mutate({
+        taskId: serverState.taskId,
+        taskTitle: serverState.taskTitle,
+        duration: serverState.duration,
+        type: 'work'
+      });
 
       // Show notification
       if ('Notification' in window && Notification.permission === 'granted') {
         const notification = new Notification('Pomodoro Complete!', {
-          body: `Great work! Time for a ${completedSessions % 4 === 3 ? 'long' : 'short'} break.`,
+          body: `Great work! Time for a ${serverState.completedSessions % 4 === 3 ? 'long' : 'short'} break.`,
           icon: '/favicon.ico'
         });
         void notification;
       }
 
       // Switch to break
-      const breakType = completedSessions % 4 === 3 ? 'long-break' : 'short-break';
+      const breakType = serverState.completedSessions % 4 === 3 ? 'long-break' : 'short-break';
       const breakDuration = TIMERS[breakType];
-      setSession((prev) => ({ ...prev, type: breakType, duration: breakDuration }));
-      setTimeLeft(breakDuration);
+      updateStateMutation.mutate({
+        ...serverState,
+        type: breakType,
+        duration: breakDuration,
+        timeLeft: breakDuration,
+        isRunning: false,
+        completedSessions: serverState.completedSessions + 1
+      });
     } else {
       // Switch back to work
-      setSession((prev) => ({ ...prev, type: 'work', duration: TIMERS.work }));
-      setTimeLeft(TIMERS.work);
+      updateStateMutation.mutate({
+        ...serverState,
+        type: 'work',
+        duration: TIMERS.work,
+        timeLeft: TIMERS.work,
+        isRunning: false
+      });
 
       if ('Notification' in window && Notification.permission === 'granted') {
         const notification = new Notification('Break Complete!', {
@@ -110,14 +203,36 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         void notification;
       }
     }
-  }, [session, completedSessions, saveSession]);
 
+    setLocalTimeLeft(null);
+  }, [serverState, saveSessionMutation, updateStateMutation]);
+
+  // Local timer tick
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
+    if (!serverState?.isRunning) {
+      if (intervalRef.current) {
+        clearTimeout(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    const currentTimeLeft = localTimeLeft ?? serverState.timeLeft;
+
+    if (currentTimeLeft > 0) {
       intervalRef.current = setTimeout(() => {
-        setTimeLeft((prev) => prev - 1);
+        const newTimeLeft = currentTimeLeft - 1;
+        setLocalTimeLeft(newTimeLeft);
+
+        // Sync with server every 10 seconds
+        if (newTimeLeft % 10 === 0) {
+          updateStateMutation.mutate({
+            ...serverState,
+            timeLeft: newTimeLeft
+          });
+        }
       }, 1000);
-    } else if (isRunning && timeLeft === 0) {
+    } else if (currentTimeLeft === 0) {
       handleComplete();
     }
 
@@ -126,22 +241,49 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         clearTimeout(intervalRef.current);
       }
     };
-  }, [isRunning, timeLeft, handleComplete]);
+  }, [serverState, localTimeLeft, handleComplete, updateStateMutation]);
 
   const toggleTimer = () => {
-    setIsRunning((prev) => !prev);
+    if (!serverState) {
+      // Initialize with defaults
+      updateStateMutation.mutate({
+        type: 'work',
+        duration: TIMERS.work,
+        timeLeft: TIMERS.work,
+        isRunning: true,
+        completedSessions: 0,
+        taskId,
+        taskTitle
+      });
+      setLocalTimeLeft(TIMERS.work);
+    } else {
+      updateStateMutation.mutate({
+        ...serverState,
+        timeLeft: localTimeLeft ?? serverState.timeLeft,
+        isRunning: !serverState.isRunning
+      });
+    }
   };
 
   const resetTimer = () => {
-    setIsRunning(false);
-    setTimeLeft(session.duration);
+    if (!serverState) return;
+
+    setLocalTimeLeft(null);
+    updateStateMutation.mutate({
+      ...serverState,
+      timeLeft: serverState.duration,
+      isRunning: false
+    });
   };
 
   const skipSession = () => {
     handleComplete();
   };
 
-  const progress = ((session.duration - timeLeft) / session.duration) * 100;
+  // Use local time if available, otherwise server time
+  const displayTimeLeft = localTimeLeft ?? serverState?.timeLeft ?? TIMERS.work;
+  const displayDuration = serverState?.duration ?? TIMERS.work;
+  const progress = ((displayDuration - displayTimeLeft) / displayDuration) * 100;
 
   // If completely hidden, show a small floating button to restore
   if (isHidden) {
@@ -152,7 +294,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
           variant="solid"
           size="lg"
           aria-label="Show Pomodoro Timer"
-          data-session-type={session.type}
+          data-session-type={serverState?.type || 'work'}
           borderRadius="full"
         >
           <Timer />
@@ -177,20 +319,20 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       >
         <HStack gap="3" alignItems="center">
           <Text color="fg.default" fontFamily="mono" fontSize="2xl" fontWeight="bold">
-            {formatTime(timeLeft)}
+            {formatTime(displayTimeLeft)}
           </Text>
 
-          <Badge size="sm" data-session-type={session.type}>
-            {session.type.replace('-', ' ')}
+          <Badge size="sm" data-session-type={serverState?.type || 'work'}>
+            {(serverState?.type || 'work').replace('-', ' ')}
           </Badge>
 
           <Button
             onClick={toggleTimer}
-            variant={isRunning ? 'ghost' : 'solid'}
+            variant={serverState?.isRunning ? 'ghost' : 'solid'}
             size="sm"
-            data-session-type={!isRunning ? session.type : undefined}
+            data-session-type={!serverState?.isRunning ? serverState?.type || 'work' : undefined}
           >
-            {isRunning ? 'Pause' : 'Start'}
+            {serverState?.isRunning ? 'Pause' : 'Start'}
           </Button>
 
           <IconButton
@@ -234,13 +376,17 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         <Badge
           variant="solid"
           colorPalette={
-            session.type === 'work' ? 'red' : session.type === 'short-break' ? 'green' : 'blue'
+            (serverState?.type || 'work') === 'work'
+              ? 'red'
+              : (serverState?.type || 'work') === 'short-break'
+                ? 'green'
+                : 'blue'
           }
           fontSize="xs"
           letterSpacing="wide"
           textTransform="uppercase"
         >
-          {session.type.replace('-', ' ')}
+          {(serverState?.type || 'work').replace('-', ' ')}
         </Badge>
 
         <HStack gap="1">
@@ -264,9 +410,9 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       </HStack>
 
       {/* Task Title */}
-      {session.taskTitle && (
+      {serverState?.taskTitle && (
         <Text mb="4" color="fg.muted" fontSize="xs" textAlign="center">
-          {session.taskTitle}
+          {serverState.taskTitle}
         </Text>
       )}
 
@@ -278,14 +424,14 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         fontWeight="bold"
         textAlign="center"
       >
-        {formatTime(timeLeft)}
+        {formatTime(displayTimeLeft)}
       </Text>
 
       {/* Progress Bar */}
       <Box borderRadius="xs" height="1" my="4" bg="bg.muted" overflow="hidden">
         <Box
           className={css({ width: 'var(--progress)', transition: 'width 0.5s ease' })}
-          data-session-type={session.type}
+          data-session-type={serverState?.type || 'work'}
           style={{ '--progress': `${progress}%` } as React.CSSProperties}
           height="full"
           bg="colorPalette.solid"
@@ -296,25 +442,25 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       <HStack gap="2" justifyContent="center">
         <Button
           onClick={toggleTimer}
-          variant={isRunning ? 'outline' : 'solid'}
+          variant={serverState?.isRunning ? 'outline' : 'solid'}
           size="sm"
-          data-session-type={!isRunning ? session.type : undefined}
+          data-session-type={!serverState?.isRunning ? serverState?.type || 'work' : undefined}
         >
-          {isRunning ? 'Pause' : 'Start'}
+          {serverState?.isRunning ? 'Pause' : 'Start'}
         </Button>
 
-        <Button onClick={resetTimer} variant="outline" size="sm">
+        <Button onClick={resetTimer} variant="outline" size="sm" disabled={!serverState}>
           Reset
         </Button>
 
-        <Button onClick={skipSession} variant="outline" size="sm">
+        <Button onClick={skipSession} variant="outline" size="sm" disabled={!serverState}>
           Skip
         </Button>
       </HStack>
 
       {/* Session Counter */}
       <Text mt="4" color="fg.subtle" fontSize="xs" textAlign="center">
-        Sessions completed today: {completedSessions}
+        Sessions completed today: {serverState?.completedSessions || 0}
       </Text>
     </Box>
   );

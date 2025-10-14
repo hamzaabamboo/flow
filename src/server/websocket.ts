@@ -26,10 +26,23 @@ class WebSocketManager {
     this.app = app;
   }
 
-  broadcast(message: WSMessage) {
+  // Broadcast to specific user
+  broadcastToUser(userId: string, message: WSMessage) {
     if (this.app?.server?.publish) {
-      this.app.server.publish('hamflow', JSON.stringify(message));
+      this.app.server.publish(`user:${userId}`, JSON.stringify(message));
     }
+  }
+
+  // Broadcast to all users (system-wide messages)
+  broadcastGlobal(message: WSMessage) {
+    if (this.app?.server?.publish) {
+      this.app.server.publish('global', JSON.stringify(message));
+    }
+  }
+
+  // Legacy method - now broadcasts globally (for backward compat)
+  broadcast(message: WSMessage) {
+    this.broadcastGlobal(message);
   }
 
   // Broadcast task updates
@@ -83,12 +96,13 @@ class WebSocketManager {
   }
 
   // Send reminder notification
-  sendReminder(userId: string, message: string) {
+  sendReminder(userId: string, message: string, link?: string | null) {
     this.broadcast({
       type: 'reminder',
       data: {
         userId,
         message,
+        link: link || undefined,
         timestamp: new Date().toISOString()
       }
     });
@@ -101,6 +115,19 @@ class WebSocketManager {
       data: {
         userId,
         event,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  // Broadcast Pomodoro state updates
+  broadcastPomodoroState(userId: string, event: 'started' | 'paused' | 'cleared', state: unknown) {
+    this.broadcast({
+      type: 'pomodoro-state',
+      data: {
+        userId,
+        event,
+        state,
         timestamp: new Date().toISOString()
       }
     });

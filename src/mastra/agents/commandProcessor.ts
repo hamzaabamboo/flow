@@ -24,7 +24,7 @@ export const CommandIntentSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Task deadline in ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ) or YYYY-MM-DD if no time specified'
+      'Task deadline in ISO 8601 format with JST timezone (YYYY-MM-DDTHH:mm:ss+09:00) or YYYY-MM-DD if no time specified'
     ),
   labels: z.array(z.string()).optional().describe('Task labels or tags'),
   message: z.string().optional().describe('Reminder message'),
@@ -100,13 +100,14 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * Use "high" for keywords like: important, high priority, soon
      * Use "medium" for regular tasks (DEFAULT)
      * Use "low" for keywords like: low priority, whenever, someday
-   - **Deadline**: Always suggest a deadline:
+   - **Deadline**: Always suggest a deadline (USER TIMEZONE: Asia/Tokyo / JST):
      * Parse explicit dates and times: "tomorrow at 3pm", "next Monday 10am", "Oct 5th at 2:30pm"
-     * If time is specified, use full ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)
-     * If only date specified, use YYYY-MM-DD format
+     * If time is specified, use full ISO 8601 format with JST offset: YYYY-MM-DDTHH:mm:ss+09:00
+     * If only date specified, use YYYY-MM-DD format (will be interpreted as JST midnight)
      * For urgent tasks without date: tomorrow
      * For regular tasks without date: tomorrow (next day)
-     * Current time: ${new Date().toISOString()}
+     * Current time in JST: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00')}
+     * When user says "tomorrow at 3pm" and current time is Oct 14 11:07 AM JST, output: "2025-10-15T15:00:00+09:00"
    - **Board/Column**: If user mentions a board or column name:
      * Look it up in the provided board context
      * Set directToBoard: true, boardId, and columnId

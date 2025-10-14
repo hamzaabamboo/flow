@@ -2,6 +2,8 @@ import { Elysia, t } from 'elysia';
 import { eq, and, inArray } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { inboxItems, tasks } from '../../../drizzle/schema';
+import { wsManager } from '../websocket';
+import { successResponse } from '../utils/errors';
 
 export const inboxRoutes = new Elysia({ prefix: '/inbox' })
   .use(withAuth())
@@ -37,7 +39,14 @@ export const inboxRoutes = new Elysia({ prefix: '/inbox' })
           description: body.content
         })
         .returning();
-      return newItem;
+
+      // Broadcast inbox update
+      wsManager.broadcastToUser(user.id, {
+        type: 'inbox-update',
+        data: { userId: user.id, space: body.space }
+      });
+
+      return successResponse(newItem, 'Item added to inbox');
     },
     {
       body: t.Object({
@@ -52,31 +61,42 @@ export const inboxRoutes = new Elysia({ prefix: '/inbox' })
     async ({ body, db, user }) => {
       const { itemId, columnId } = body;
 
-      // Get inbox item
-      const [item] = await db
-        .select()
-        .from(inboxItems)
-        .where(and(eq(inboxItems.id, itemId), eq(inboxItems.userId, user.id)));
+      // Use transaction for atomic conversion
+      const result = await db.transaction(async (tx) => {
+        // Get inbox item
+        const [item] = await tx
+          .select()
+          .from(inboxItems)
+          .where(and(eq(inboxItems.id, itemId), eq(inboxItems.userId, user.id)));
 
-      if (!item) {
-        throw new Error('Inbox item not found');
-      }
+        if (!item) {
+          throw new Error('Inbox item not found');
+        }
 
-      // Create task
-      const [task] = await db
-        .insert(tasks)
-        .values({
-          columnId,
-          title: item.title,
-          description: item.description || null,
-          userId: user.id
-        })
-        .returning();
+        // Create task
+        const [task] = await tx
+          .insert(tasks)
+          .values({
+            columnId,
+            title: item.title,
+            description: item.description || null,
+            userId: user.id
+          })
+          .returning();
 
-      // Mark inbox item as processed
-      await db.update(inboxItems).set({ processed: true }).where(eq(inboxItems.id, itemId));
+        // Mark inbox item as processed
+        await tx.update(inboxItems).set({ processed: true }).where(eq(inboxItems.id, itemId));
 
-      return task;
+        return { task, space: item.space };
+      });
+
+      // Broadcast inbox update
+      wsManager.broadcastToUser(user.id, {
+        type: 'inbox-update',
+        data: { userId: user.id, space: result.space }
+      });
+
+      return successResponse(result.task, 'Converted to task');
     },
     {
       body: t.Object({
@@ -91,11 +111,26 @@ export const inboxRoutes = new Elysia({ prefix: '/inbox' })
     async ({ body, db, user }) => {
       const { itemIds } = body;
 
+      // Get items before deletion to know which space to broadcast
+      const itemsToDelete = await db
+        .select()
+        .from(inboxItems)
+        .where(and(inArray(inboxItems.id, itemIds), eq(inboxItems.userId, user.id)));
+
       await db
         .delete(inboxItems)
         .where(and(inArray(inboxItems.id, itemIds), eq(inboxItems.userId, user.id)));
 
-      return { success: true };
+      // Broadcast inbox updates for each affected space
+      const affectedSpaces = new Set(itemsToDelete.map((item) => item.space));
+      for (const space of affectedSpaces) {
+        wsManager.broadcastToUser(user.id, {
+          type: 'inbox-update',
+          data: { userId: user.id, space }
+        });
+      }
+
+      return successResponse(null, `Deleted ${itemIds.length} items`);
     },
     {
       body: t.Object({

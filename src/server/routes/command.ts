@@ -5,6 +5,7 @@ import { withAuth } from '../auth/withAuth';
 import { inboxItems, reminders, boards, columns, tasks } from '../../../drizzle/schema';
 import type { CommandIntentSchema } from '../../mastra/agents/commandProcessor';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
+import { jstToUtc } from '../../shared/utils/timezone';
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
   .use(withAuth())
@@ -214,7 +215,17 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
 
               if (data.description) taskData.description = data.description as string;
               if (data.priority) taskData.priority = data.priority as string;
-              if (data.deadline) taskData.dueDate = new Date(data.deadline as string);
+              if (data.deadline) {
+                // Handle both full datetime (with timezone) and date-only formats
+                const deadlineStr = data.deadline as string;
+                if (deadlineStr.includes('T')) {
+                  // Full datetime - Date constructor handles timezone correctly
+                  taskData.dueDate = new Date(deadlineStr);
+                } else {
+                  // Date only (YYYY-MM-DD) - interpret as JST midnight
+                  taskData.dueDate = jstToUtc(`${deadlineStr}T00:00:00`);
+                }
+              }
               if (data.labels && Array.isArray(data.labels))
                 taskData.labels = data.labels as string[];
 

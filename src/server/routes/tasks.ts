@@ -216,7 +216,15 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         priority: t.Optional(t.String()),
         completed: t.Optional(t.Boolean()),
         labels: t.Optional(t.Array(t.String())),
-        subtasks: t.Optional(t.Any()),
+        subtasks: t.Optional(
+          t.Array(
+            t.Object({
+              title: t.String(),
+              completed: t.Optional(t.Boolean()),
+              order: t.Optional(t.Number())
+            })
+          )
+        ),
         recurringPattern: t.Optional(t.Union([t.String(), t.Null()])),
         recurringEndDate: t.Optional(t.Union([t.String(), t.Null()])),
         parentTaskId: t.Optional(t.String()),
@@ -370,7 +378,15 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         priority: t.Optional(t.String()),
         completed: t.Optional(t.Boolean()),
         labels: t.Optional(t.Array(t.String())),
-        subtasks: t.Optional(t.Any()),
+        subtasks: t.Optional(
+          t.Array(
+            t.Object({
+              title: t.String(),
+              completed: t.Optional(t.Boolean()),
+              order: t.Optional(t.Number())
+            })
+          )
+        ),
         recurringPattern: t.Optional(t.String()),
         recurringEndDate: t.Optional(t.String()),
         reminderMinutesBefore: t.Optional(t.Number()),

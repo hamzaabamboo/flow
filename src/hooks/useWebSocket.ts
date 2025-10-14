@@ -12,6 +12,12 @@ export function setGlobalToast(
   globalToast = toast;
 }
 
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+}
+
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
@@ -66,6 +72,11 @@ export function useWebSocket() {
       case 'pomodoro-event': {
         // Invalidate pomodoro queries
         queryClient.invalidateQueries({ queryKey: ['pomodoro'] });
+        break;
+      }
+      case 'pomodoro-state': {
+        // Invalidate active pomodoro state
+        queryClient.invalidateQueries({ queryKey: ['pomodoro', 'active'] });
         break;
       }
       case 'reminder-update': {
@@ -133,7 +144,10 @@ export function useWebSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+    // Get auth token from cookie
+    const token = getCookie('auth');
+    const wsUrl = `${protocol}//${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
       ws.current = new WebSocket(wsUrl);

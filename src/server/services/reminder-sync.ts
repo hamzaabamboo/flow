@@ -73,41 +73,80 @@ export class ReminderSyncService {
         return;
       }
 
-      // STEP 5: Calculate and create reminder
+      // STEP 5: Calculate and create TWO reminders (15 min before + at due time)
       const now = new Date();
-      const reminderTime = new Date(dueDate);
-      reminderTime.setMinutes(reminderTime.getMinutes() - minutesBefore);
+      const remindersToCreate = [];
 
-      // If reminder time is in the past, but due date is in the future, create reminder for now + 1 minute
-      let actualReminderTime = reminderTime;
-      let actualMinutesBefore = minutesBefore;
+      // First reminder: 15 minutes before (always)
+      const firstReminderTime = new Date(dueDate);
+      firstReminderTime.setMinutes(firstReminderTime.getMinutes() - 15);
 
-      if (reminderTime <= now && dueDate > now) {
-        // Task is due soon, but reminder would be in the past
-        // Set reminder for 1 minute from now
-        actualReminderTime = new Date(now.getTime() + 60 * 1000); // Now + 1 minute
+      if (firstReminderTime > now) {
+        remindersToCreate.push({
+          userId,
+          taskId,
+          reminderTime: firstReminderTime,
+          message: `Task due in 15 minutes: ${taskTitle}`,
+          sent: false,
+          platform: null
+        });
+      }
+
+      // Second reminder: At due time (or use custom minutesBefore if specified)
+      const secondReminderTime = new Date(dueDate);
+      if (minutesBefore !== 15) {
+        // If user specified custom time, use it for second reminder
+        secondReminderTime.setMinutes(secondReminderTime.getMinutes() - minutesBefore);
+      }
+      // Otherwise, second reminder is at due time (no subtraction)
+
+      if (secondReminderTime > now) {
+        const minutesUntilDue = Math.max(
+          0,
+          Math.floor((dueDate.getTime() - secondReminderTime.getTime()) / (60 * 1000))
+        );
+        const message =
+          minutesUntilDue === 0
+            ? `Task is due now: ${taskTitle}`
+            : `Task due in ${minutesUntilDue} minutes: ${taskTitle}`;
+
+        remindersToCreate.push({
+          userId,
+          taskId,
+          reminderTime: secondReminderTime,
+          message,
+          sent: false,
+          platform: null
+        });
+      }
+
+      // If both reminders are in the past but due date is in future, create one for now + 1 minute
+      if (remindersToCreate.length === 0 && dueDate > now) {
+        const immediateReminderTime = new Date(now.getTime() + 60 * 1000);
         const timeUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (60 * 1000));
-        actualMinutesBefore = timeUntilDue;
+
+        remindersToCreate.push({
+          userId,
+          taskId,
+          reminderTime: immediateReminderTime,
+          message: `Task due in ${timeUntilDue} minutes: ${taskTitle}`,
+          sent: false,
+          platform: null
+        });
 
         logger.info(
           `Task ${taskId} due very soon (${timeUntilDue} min), setting reminder for 1 minute from now`
         );
       }
 
-      // Only create if reminder time is in the future
-      if (actualReminderTime > now) {
-        await this.db.insert(reminders).values({
-          userId,
-          taskId,
-          reminderTime: actualReminderTime,
-          message: `Task due in ${actualMinutesBefore} minutes: ${taskTitle}`,
-          sent: false,
-          platform: null
-        });
-
-        logger.info(`Created reminder for task ${taskId} at ${actualReminderTime.toISOString()}`);
+      // Create all reminders
+      if (remindersToCreate.length > 0) {
+        await this.db.insert(reminders).values(remindersToCreate);
+        logger.info(
+          `Created ${remindersToCreate.length} reminder(s) for task ${taskId} at ${remindersToCreate.map((r) => r.reminderTime.toISOString()).join(', ')}`
+        );
       } else {
-        logger.info(`Reminder time is in the past for task ${taskId}, skipping`);
+        logger.info(`No reminders needed for task ${taskId} (all would be in the past)`);
       }
     } catch (error) {
       logger.error(error, `Failed to sync reminders for task ${taskId}`);

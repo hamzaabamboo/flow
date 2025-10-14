@@ -3,6 +3,9 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { boards, columns, tasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { isColumnDone } from '../utils/taskCompletion';
+import { wsManager } from '../websocket';
+import { errorResponse, successResponse } from '../utils/errors';
+import { verifyBoardOwnership } from '../utils/ownership';
 
 export const boardRoutes = new Elysia({ prefix: '/boards' })
   .use(withAuth())
@@ -82,33 +85,44 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .post(
     '/',
     async ({ body, db, user }) => {
-      const [newBoard] = await db
-        .insert(boards)
-        .values({
-          ...body,
-          space: body.space as 'work' | 'personal',
-          userId: user.id
-        })
-        .returning();
+      // Use transaction for atomic board + columns creation
+      const result = await db.transaction(async (tx) => {
+        const [newBoard] = await tx
+          .insert(boards)
+          .values({
+            ...body,
+            space: body.space as 'work' | 'personal',
+            userId: user.id
+          })
+          .returning();
 
-      const defaultColumns = ['To Do', 'In Progress', 'Done'];
-      const newColumns = await db
-        .insert(columns)
-        .values(
-          defaultColumns.map((name) => ({
-            boardId: newBoard.id,
-            name,
-            taskOrder: []
-          }))
-        )
-        .returning();
+        const defaultColumns = ['To Do', 'In Progress', 'Done'];
+        const newColumns = await tx
+          .insert(columns)
+          .values(
+            defaultColumns.map((name) => ({
+              boardId: newBoard.id,
+              name,
+              taskOrder: []
+            }))
+          )
+          .returning();
 
-      await db
-        .update(boards)
-        .set({ columnOrder: newColumns.map((col) => col.id) })
-        .where(eq(boards.id, newBoard.id));
+        await tx
+          .update(boards)
+          .set({ columnOrder: newColumns.map((col) => col.id) })
+          .where(eq(boards.id, newBoard.id));
 
-      return { ...newBoard, columns: newColumns };
+        return { ...newBoard, columns: newColumns };
+      });
+
+      // Broadcast board creation
+      wsManager.broadcastToUser(user.id, {
+        type: 'board-update',
+        data: { boardId: result.id, action: 'created' }
+      });
+
+      return successResponse(result, 'Board created');
     },
     {
       body: t.Object({
@@ -120,26 +134,28 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .patch(
     '/:boardId',
     async ({ params, body, db, user, set }) => {
-      const [board] = await db
-        .select()
-        .from(boards)
-        .where(and(eq(boards.id, params.boardId), eq(boards.userId, user.id)));
-
-      if (!board) {
+      // Verify ownership
+      if (!(await verifyBoardOwnership(db, params.boardId, user.id))) {
         set.status = 404;
-        return { error: 'Board not found' };
+        return errorResponse('Board not found');
       }
 
       const [updated] = await db
         .update(boards)
         .set({
-          name: body.name || board.name,
+          name: body.name,
           updatedAt: new Date()
         })
         .where(eq(boards.id, params.boardId))
         .returning();
 
-      return updated;
+      // Broadcast board update
+      wsManager.broadcastToUser(user.id, {
+        type: 'board-update',
+        data: { boardId: updated.id, action: 'updated' }
+      });
+
+      return successResponse(updated, 'Board updated');
     },
     {
       params: t.Object({ boardId: t.String() }),
@@ -151,23 +167,29 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .delete(
     '/:boardId',
     async ({ params, db, user, set }) => {
-      const [board] = await db
-        .select()
-        .from(boards)
-        .where(and(eq(boards.id, params.boardId), eq(boards.userId, user.id)));
-
-      if (!board) {
+      // Verify ownership
+      if (!(await verifyBoardOwnership(db, params.boardId, user.id))) {
         set.status = 404;
-        return { error: 'Board not found' };
+        return errorResponse('Board not found');
       }
 
-      // Delete all columns and their tasks (cascade delete will handle this)
-      await db.delete(columns).where(eq(columns.boardId, params.boardId));
+      // Use transaction for atomic deletion
+      const deleted = await db.transaction(async (tx) => {
+        // Delete all columns (cascade will handle tasks)
+        await tx.delete(columns).where(eq(columns.boardId, params.boardId));
 
-      // Delete the board
-      const [deleted] = await db.delete(boards).where(eq(boards.id, params.boardId)).returning();
+        // Delete the board
+        const [result] = await tx.delete(boards).where(eq(boards.id, params.boardId)).returning();
+        return result;
+      });
 
-      return deleted;
+      // Broadcast board deletion
+      wsManager.broadcastToUser(user.id, {
+        type: 'board-update',
+        data: { boardId: deleted.id, action: 'deleted' }
+      });
+
+      return successResponse(deleted, 'Board deleted');
     },
     {
       params: t.Object({ boardId: t.String() })

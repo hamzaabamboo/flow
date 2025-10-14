@@ -94,8 +94,13 @@ export class HamBotIntegration {
   }
 
   // Send reminder via HamBot
-  async sendReminder(userId: string, reminderMessage: string): Promise<boolean> {
-    return this.send(`⏰ ${reminderMessage}`);
+  async sendReminder(
+    userId: string,
+    reminderMessage: string,
+    link?: string | null
+  ): Promise<boolean> {
+    const message = link ? `⏰ ${reminderMessage}\n${link}` : `⏰ ${reminderMessage}`;
+    return this.send(message);
   }
 
   // Send daily summary

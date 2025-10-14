@@ -100,9 +100,38 @@ app
   )
   // WebSocket for real-time updates
   .ws('/ws', {
-    open(ws) {
-      logger.info('WebSocket client connected');
-      ws.subscribe('hamflow');
+    async open(ws) {
+      const url = new URL(ws.data.request.url);
+      const token = url.searchParams.get('token');
+
+      let userId: string | null = null;
+
+      // Authenticate user from token
+      if (token) {
+        try {
+          // Simple JWT decode (header.payload.signature)
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload.userId) {
+              userId = payload.userId as string;
+            }
+          }
+        } catch {
+          logger.warn('Invalid WebSocket token');
+        }
+      }
+
+      logger.info(`WebSocket client connected${userId ? ` (user: ${userId})` : ' (anonymous)'}`);
+
+      // Subscribe to user-specific channel if authenticated
+      if (userId) {
+        ws.subscribe(`user:${userId}`);
+        logger.info(`Subscribed to channel: user:${userId}`);
+      }
+
+      // Also subscribe to global channel for system-wide messages
+      ws.subscribe('global');
 
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
@@ -114,23 +143,35 @@ app
         }
       }, 30000);
 
-      // Store interval ID for cleanup
-      (ws as unknown as { data?: { pingInterval: NodeJS.Timeout } }).data = { pingInterval };
+      // Store interval ID and userId for cleanup
+      (ws as unknown as { data?: { pingInterval: NodeJS.Timeout; userId?: string } }).data = {
+        pingInterval,
+        userId: userId || undefined
+      };
     },
     message(ws, message) {
-      // Broadcast updates to all clients
-      ws.publish('hamflow', message);
+      // Echo messages back (optional, can be removed)
+      const wsData = (ws as unknown as { data?: { userId?: string } }).data;
+      if (wsData?.userId) {
+        ws.publish(`user:${wsData.userId}`, message);
+      }
     },
     close(ws, code, reason) {
+      const wsData = (ws as unknown as { data?: { pingInterval: NodeJS.Timeout; userId?: string } })
+        .data;
+
       logger.info(`WebSocket client disconnected (code: ${code}, reason: ${reason})`);
 
       // Clean up ping interval
-      const wsData = (ws as unknown as { data?: { pingInterval: NodeJS.Timeout } }).data;
       if (wsData?.pingInterval) {
         clearInterval(wsData.pingInterval);
       }
 
-      ws.unsubscribe('hamflow');
+      // Unsubscribe from channels
+      if (wsData?.userId) {
+        ws.unsubscribe(`user:${wsData.userId}`);
+      }
+      ws.unsubscribe('global');
     },
     error(ctx) {
       logger.error(ctx, 'WebSocket error');
