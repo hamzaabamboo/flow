@@ -125,7 +125,6 @@ export const reminders = pgTable('reminders', {
   message: text('message').notNull(),
   sent: boolean('sent').default(false),
   platform: varchar('platform', { length: 50 }), // 'discord', 'slack', 'telegram'
-  link: text('link'), // Link to board (for tasks) or agenda (for habits)
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 

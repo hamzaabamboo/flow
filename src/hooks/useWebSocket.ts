@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useEffectEvent } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Global toast callback - will be set by ToasterProvider
@@ -21,67 +21,71 @@ function getCookie(name: string) {
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 10;
   const isIntentionallyClosed = useRef(false);
 
-  const handleMessage = useEffectEvent((message: { type: string; data?: unknown }) => {
+  const handleMessage = useCallback((message: { type: string; data?: unknown }) => {
+    const qc = queryClientRef.current;
+
     // Handle different message types
     switch (message.type) {
       case 'task-update':
-        queryClient.invalidateQueries({ queryKey: ['board'] });
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        qc.invalidateQueries({ queryKey: ['board'] });
+        qc.invalidateQueries({ queryKey: ['tasks'] });
         break;
       case 'column-update': {
         // Invalidate board queries when columns change
         const data = message.data as { boardId?: string };
         if (data?.boardId) {
-          queryClient.invalidateQueries({ queryKey: ['board', data.boardId] });
+          qc.invalidateQueries({ queryKey: ['board', data.boardId] });
         }
-        queryClient.invalidateQueries({ queryKey: ['board'] });
+        qc.invalidateQueries({ queryKey: ['board'] });
         break;
       }
       case 'board-update': {
         const data = message.data as { boardId?: string };
-        queryClient.invalidateQueries({ queryKey: ['boards'] });
+        qc.invalidateQueries({ queryKey: ['boards'] });
         if (data?.boardId) {
-          queryClient.invalidateQueries({ queryKey: ['board', data.boardId] });
+          qc.invalidateQueries({ queryKey: ['board', data.boardId] });
         }
         break;
       }
       case 'subtask-update': {
         // Invalidate task queries when subtasks change
         const data = message.data as { taskId?: string };
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        queryClient.invalidateQueries({ queryKey: ['board'] });
+        qc.invalidateQueries({ queryKey: ['tasks'] });
+        qc.invalidateQueries({ queryKey: ['board'] });
         if (data?.taskId) {
-          queryClient.invalidateQueries({ queryKey: ['subtasks', data.taskId] });
+          qc.invalidateQueries({ queryKey: ['subtasks', data.taskId] });
         }
         break;
       }
       case 'inbox-update': {
         // Invalidate inbox queries
         const data = message.data as { space?: string };
-        queryClient.invalidateQueries({ queryKey: ['inbox'] });
+        qc.invalidateQueries({ queryKey: ['inbox'] });
         if (data?.space) {
-          queryClient.invalidateQueries({ queryKey: ['inbox', data.space] });
+          qc.invalidateQueries({ queryKey: ['inbox', data.space] });
         }
         break;
       }
       case 'pomodoro-event': {
         // Invalidate pomodoro queries
-        queryClient.invalidateQueries({ queryKey: ['pomodoro'] });
+        qc.invalidateQueries({ queryKey: ['pomodoro'] });
         break;
       }
       case 'pomodoro-state': {
         // Invalidate active pomodoro state
-        queryClient.invalidateQueries({ queryKey: ['pomodoro', 'active'] });
+        qc.invalidateQueries({ queryKey: ['pomodoro', 'active'] });
         break;
       }
       case 'reminder-update': {
         // Invalidate reminders
-        queryClient.invalidateQueries({ queryKey: ['reminders'] });
+        qc.invalidateQueries({ queryKey: ['reminders'] });
         break;
       }
       case 'reminder': {
@@ -106,7 +110,7 @@ export function useWebSocket() {
         }
 
         // Invalidate reminders list
-        queryClient.invalidateQueries({ queryKey: ['reminders'] });
+        qc.invalidateQueries({ queryKey: ['reminders'] });
         break;
       }
       case 'server-shutdown':
@@ -122,7 +126,7 @@ export function useWebSocket() {
       default:
         console.log('Unknown message type:', message.type);
     }
-  });
+  }, []);
 
   const connect = useCallback(() => {
     // Don't reconnect if intentionally closed or too many attempts

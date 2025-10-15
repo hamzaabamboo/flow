@@ -48,9 +48,9 @@ export function CarryOverControls({
       case 'end_of_today':
         return endOfDay(jst);
       case 'tomorrow':
-        return startOfDay(addDays(jst, 1));
+        return endOfDay(addDays(jst, 1));
       case 'next_week':
-        return startOfDay(addWeeks(jst, 1));
+        return endOfDay(addWeeks(jst, 1));
       case 'end_of_month':
         return endOfMonth(jst);
       case 'custom':

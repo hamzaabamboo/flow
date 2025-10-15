@@ -31,45 +31,78 @@ interface ActivePomodoroState {
   taskTitle?: string;
 }
 
+// Singleton AudioContext to prevent memory leaks
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    if (!audioContext) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        console.warn('AudioContext not supported');
+        return null;
+      }
+      audioContext = new AudioContextClass();
+    }
+
+    // Resume context if it was suspended (required on mobile)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(err => console.error('Failed to resume audio context:', err));
+    }
+
+    return audioContext;
+  } catch (error) {
+    console.error('Failed to create AudioContext:', error);
+    return null;
+  }
+}
+
 function playSound() {
   // Use Web Audio API for better sound
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
 
     oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(ctx.destination);
 
     // Create a pleasant notification sound
     oscillator.frequency.value = 800;
     oscillator.type = 'sine';
 
     // Envelope: fade in and out
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.5);
 
     // Play second beep
     setTimeout(() => {
-      const oscillator2 = audioContext.createOscillator();
-      const gainNode2 = audioContext.createGain();
+      const ctx2 = getAudioContext();
+      if (!ctx2) return;
+
+      const oscillator2 = ctx2.createOscillator();
+      const gainNode2 = ctx2.createGain();
 
       oscillator2.connect(gainNode2);
-      gainNode2.connect(audioContext.destination);
+      gainNode2.connect(ctx2.destination);
 
       oscillator2.frequency.value = 1000;
       oscillator2.type = 'sine';
 
-      gainNode2.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode2.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
-      gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      gainNode2.gain.setValueAtTime(0, ctx2.currentTime);
+      gainNode2.gain.linearRampToValueAtTime(0.3, ctx2.currentTime + 0.1);
+      gainNode2.gain.exponentialRampToValueAtTime(0.01, ctx2.currentTime + 0.5);
 
-      oscillator2.start(audioContext.currentTime);
-      oscillator2.stop(audioContext.currentTime + 0.5);
+      oscillator2.start(ctx2.currentTime);
+      oscillator2.stop(ctx2.currentTime + 0.5);
     }, 200);
   } catch (error) {
     console.error('Failed to play sound:', error);
@@ -98,8 +131,10 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
       if (!response.ok) return null;
       return response.json();
     },
-    // Only poll when timer is running, otherwise rely on WebSocket
-    refetchInterval: (data) => (data?.isRunning ? 5000 : false)
+    // Disable polling - rely on local timer and WebSocket for updates
+    refetchInterval: false,
+    // Only refetch on mount and when explicitly invalidated
+    staleTime: Infinity
   });
 
   // Save hidden state to localStorage
@@ -205,9 +240,13 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     }
 
     setLocalTimeLeft(null);
-  }, [serverState, saveSessionMutation, updateStateMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverState]);
 
-  // Local timer tick
+  // Local timer tick - use ref for mutation to avoid dependency
+  const updateStateMutationRef = useRef(updateStateMutation);
+  updateStateMutationRef.current = updateStateMutation;
+
   useEffect(() => {
     if (!serverState?.isRunning) {
       if (intervalRef.current) {
@@ -224,9 +263,9 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         const newTimeLeft = currentTimeLeft - 1;
         setLocalTimeLeft(newTimeLeft);
 
-        // Sync with server every 10 seconds
-        if (newTimeLeft % 10 === 0) {
-          updateStateMutation.mutate({
+        // Sync with server every 30 seconds to reduce load
+        if (newTimeLeft % 30 === 0) {
+          updateStateMutationRef.current.mutate({
             ...serverState,
             timeLeft: newTimeLeft
           });
@@ -241,7 +280,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         clearTimeout(intervalRef.current);
       }
     };
-  }, [serverState, localTimeLeft, handleComplete, updateStateMutation]);
+  }, [serverState, localTimeLeft, handleComplete]);
 
   const toggleTimer = () => {
     if (!serverState) {

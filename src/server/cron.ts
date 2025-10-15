@@ -16,15 +16,13 @@ interface Reminder {
   userId: string;
   reminderTime: Date;
   taskId: string | null;
-  link: string | null;
 }
 
 async function sendToHamBot(reminder: Reminder, db: Database) {
   const hambot = new HamBotIntegration(db);
 
-  // If no link yet, generate it from taskId
-  let link = reminder.link;
-  if (!link && reminder.taskId) {
+  let link: string | undefined;
+  if (reminder.taskId) {
     const task = await db.query.tasks.findFirst({
       where: eq(tasks.id, reminder.taskId),
       with: {
@@ -38,8 +36,6 @@ async function sendToHamBot(reminder: Reminder, db: Database) {
 
     if (task?.column?.board) {
       link = `/boards/${task.column.board.id}`;
-      // Update reminder with link for future use
-      await db.update(reminders).set({ link }).where(eq(reminders.id, reminder.id));
     }
   }
 

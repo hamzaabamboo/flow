@@ -6,6 +6,25 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-10-14)
+
+### ✅ Completed This Session - Reminder System Enhancements
+
+- **Double Reminder Firing** - Enhanced reminder scheduling
+  - Reminders now fire TWICE for each task: 15 minutes before due time + at due time
+  - First reminder: Always 15 minutes before (if in future)
+  - Second reminder: At due time (or custom `reminderMinutesBefore` if specified)
+  - Falls back to immediate reminder (1 min) if both would be in past
+  - Updated `ReminderSyncService` to create array of reminders instead of single
+  - Improved user notification timing for better task awareness
+
+- **Code Quality Improvements** - Lint fixes and optimizations
+  - Removed unused imports from routes (tasks.ts, inbox.ts, columns.ts)
+  - Fixed await-in-loop in subtasks.ts (converted to Promise.all)
+  - Moved getCookie function out of useWebSocket to module scope
+  - Moved playSound function out of PomodoroTimer component to module scope
+  - All lint errors resolved (0 warnings, 0 errors)
+
 ## Latest Updates (2025-10-07)
 
 ### ✅ Completed This Session - Bug Fixes & Enhancements
@@ -418,7 +437,7 @@ All core tables implemented:
 - `pomodoro_sessions` - Time tracking
 - `calendar_integrations` - iCal feed support
 
-**Latest Migration**: `0005_fuzzy_selene.sql` - Added board description field
+**Latest Migration**: `0007_faithful_lady_vermin.sql` - Most recent applied migration
 
 ## Known Issues
 
@@ -461,5 +480,5 @@ All core tables implemented:
 
 ---
 
-**Last Updated**: 2025-10-03
+**Last Updated**: 2025-10-14
 **Next Review**: Before starting Productivity Analytics feature
