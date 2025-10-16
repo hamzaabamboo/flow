@@ -2,7 +2,7 @@
  * Authorization & Ownership Verification Helpers
  */
 
-import type { DB } from '../db';
+import type { Database } from '../db';
 import { eq, and } from 'drizzle-orm';
 import { boards, tasks, columns, habits, subtasks } from '../../../drizzle/schema';
 
@@ -10,7 +10,7 @@ import { boards, tasks, columns, habits, subtasks } from '../../../drizzle/schem
  * Verify user owns a board
  */
 export async function verifyBoardOwnership(
-  db: DB,
+  db: Database,
   boardId: string,
   userId: string
 ): Promise<boolean> {
@@ -27,7 +27,7 @@ export async function verifyBoardOwnership(
  * Verify user owns a task
  */
 export async function verifyTaskOwnership(
-  db: DB,
+  db: Database,
   taskId: string,
   userId: string
 ): Promise<boolean> {
@@ -44,7 +44,7 @@ export async function verifyTaskOwnership(
  * Verify user owns a column (via board ownership)
  */
 export async function verifyColumnOwnership(
-  db: DB,
+  db: Database,
   columnId: string,
   userId: string
 ): Promise<boolean> {
@@ -62,7 +62,7 @@ export async function verifyColumnOwnership(
  * Verify user owns a habit
  */
 export async function verifyHabitOwnership(
-  db: DB,
+  db: Database,
   habitId: string,
   userId: string
 ): Promise<boolean> {
@@ -79,7 +79,7 @@ export async function verifyHabitOwnership(
  * Verify user owns a subtask (via task ownership)
  */
 export async function verifySubtaskOwnership(
-  db: DB,
+  db: Database,
   subtaskId: string,
   userId: string
 ): Promise<boolean> {

@@ -9,13 +9,14 @@
 5. **Global Auth Context**: Use `{ as: 'global' }` in derive for auth propagation
 6. **Logger Error First**: `logger.error(error, 'message')` not the reverse
 7. **Invalidate Queries**: Always `queryClient.invalidateQueries()` after mutations
-8. **Mastra Structured Output**: Use `generateVNext` with `structuredOutputs: true`
+8. **Mastra Structured Output**: Use `generate` with `structuredOutputs: true`
 9. **Timezone Utilities**: Always use `src/shared/utils/timezone.ts` for JST ↔ UTC conversions
 10. **UTC Storage**: Store dates in UTC, convert to JST only for display
 
 ## 🚀 Common Commands
 
 ### Development
+
 ```bash
 # Start development (PORT 3000, NOT 5173!)
 bun run dev
@@ -43,6 +44,7 @@ bun test
 ```
 
 ### Database
+
 ```bash
 # ⚠️ NEVER RUN THESE AUTOMATICALLY - ALWAYS ASK USER FIRST
 # Generate migrations (USER MUST RUN THIS)
@@ -61,6 +63,7 @@ bun run db:reset
 **IMPORTANT**: Claude Code should NEVER run `db:generate` or `db:migrate` commands automatically. Always inform the user to run these commands manually after schema changes.
 
 ### Debugging
+
 ```bash
 # Check server logs
 tail -f server.log
@@ -97,11 +100,13 @@ hamflow/
 ## ✨ Quick Add
 
 ### Usage
+
 - **Keyboard**: `Ctrl + N` to open Quick Add
 - **Button**: Click "Quick Add" button in top bar (sparkle icon ✨)
 - **Flow**: Type quick input → AI parses → TaskDialog opens with pre-filled fields
 
 ### How It Works
+
 1. Type something quick like "deploy staging tomorrow high priority"
 2. AI parses and extracts: title, description, dueDate, priority, labels, board/column
 3. TaskDialog opens with all fields pre-filled
@@ -109,6 +114,7 @@ hamflow/
 5. Create task normally through TaskDialog
 
 ### Examples
+
 ```
 "deploy staging tomorrow high priority"       → Opens TaskDialog: title="deploy staging", dueDate=tomorrow, priority=high
 "fix login bug on engineering board"          → Opens TaskDialog on Engineering board, To Do column
@@ -121,11 +127,13 @@ hamflow/
 ## 🤖 AI Command Parser
 
 ### Usage
+
 - **Keyboard**: `Cmd/Ctrl + K` to open command bar
 - **Voice**: Click mic button (toggle to cancel)
 - **Actions**: create_task, create_inbox_item, create_reminder, complete_task, move_task, list_tasks, start_pomodoro, stop_pomodoro
 
 ### Examples
+
 ```
 "Add task deploy staging server"           → Goes to inbox
 "Add task deploy to Engineering board"     → Goes to Engineering → To Do
@@ -136,12 +144,14 @@ hamflow/
 ```
 
 ### Environment Variables
+
 ```bash
 # Required for AI command processing
 GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
 ```
 
 ### Implementation Notes
+
 - Uses Mastra agent with Gemini 2.5 Flash Lite
 - Structured output via Zod schema validation
 - Two-stage flow: parse → confirm → execute
@@ -153,12 +163,14 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
 ## 📥 Inbox System
 
 ### Workflow
+
 1. Items arrive via command bar, HamBot, or API
 2. Click arrow button → modal opens
 3. Select destination board/column (2-column grid)
 4. Item converts to task, navigates to board
 
 ### Batch Operations
+
 - Select multiple items with checkboxes
 - "Move to Board" button → modal for destination
 - "Delete" button → bulk delete with confirmation
@@ -166,6 +178,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
 ## 🔔 HamBot Integration
 
 ### Environment Variables
+
 ```bash
 # Required for HamBot daily summaries
 HAMBOT_API_KEY=your_api_key_here
@@ -173,28 +186,35 @@ HAMBOT_API_URL=https://hambot.ham-san.net/webhook/hambot-push
 ```
 
 ### Reminders
+
 - Cron checks every minute for due reminders
 - Sends via WebSocket → toast notification (⏰ icon)
 - Also tries browser notification if permission granted
 - `requireInteraction: true` - stays until dismissed
 
 ### Summary Schedule (JST/Asia/Tokyo)
+
 - **Morning Summary**: 10:00 AM (01:00 UTC)
 - **Evening Summary**: 10:00 PM (13:00 UTC)
 
 ### User Settings
+
 Users can configure in Settings page:
+
 - Enable/disable morning/evening summaries
 - Choose spaces (work/personal/both)
 - Test summaries via actual HamBot send
 
 ### Summary Content
+
 **Morning** (10:00 AM JST):
+
 - Tasks due today
 - Upcoming tasks (next 7 days)
 - Link to HamFlow instance
 
 **Evening** (10:00 PM JST):
+
 - Completed tasks/habits count
 - Unfinished tasks
 - Incomplete habits
@@ -221,6 +241,7 @@ const { year, month, day, hours, minutes, dayOfWeek } = getJstDateComponents(utc
 ```
 
 **When to Use**:
+
 - ✅ Storing dates in database (convert JST → UTC)
 - ✅ Displaying dates to user (convert UTC → JST)
 - ✅ Calendar operations (use `getJstDateComponents`)
@@ -228,6 +249,7 @@ const { year, month, day, hours, minutes, dayOfWeek } = getJstDateComponents(utc
 - ✅ Carryover feature (preserve time in JST)
 
 **Never Do**:
+
 - ❌ Manual timezone math (`hours - 9`)
 - ❌ Using `setUTCHours()` for JST times
 - ❌ Mixing UTC and JST without conversion

@@ -266,7 +266,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       .get(
         '/events',
         async ({ query, db, user }) => {
-          const { start, end, space = 'all' } = query;
+          const { start, end, space = 'all', includeOverdue = 'false' } = query;
 
           // Convert UNIX timestamps (seconds) to Date objects
           const startDate = new Date(parseInt(start) * 1000);
@@ -301,13 +301,70 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             .leftJoin(columns, eq(tasks.columnId, columns.id))
             .leftJoin(boards, eq(columns.boardId, boards.id));
 
-          // Define conditions
-          const whereConditions = [eq(tasks.userId, user.id)];
+          // Define conditions for main query - only fetch tasks in the date range
+          const whereConditions = [
+            eq(tasks.userId, user.id),
+            isNotNull(tasks.dueDate),
+            gte(tasks.dueDate, startDate),
+            lte(tasks.dueDate, endDate)
+          ];
           if (space !== 'all') {
             whereConditions.push(eq(boards.space, space));
           }
 
-          const allTasks = await queryBuilder.where(and(...whereConditions));
+          let allTasks = await queryBuilder.where(and(...whereConditions));
+
+          // If includeOverdue is true, fetch overdue incomplete tasks separately
+          if (includeOverdue === 'true') {
+            const overdueConditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
+            if (space !== 'all') {
+              overdueConditions.push(eq(boards.space, space));
+            }
+
+            const overdueQueryBuilder = db
+              .select({
+                id: tasks.id,
+                columnId: tasks.columnId,
+                userId: tasks.userId,
+                title: tasks.title,
+                description: tasks.description,
+                dueDate: tasks.dueDate,
+                priority: tasks.priority,
+                noteId: tasks.noteId,
+                labels: tasks.labels,
+                recurringPattern: tasks.recurringPattern,
+                recurringEndDate: tasks.recurringEndDate,
+                parentTaskId: tasks.parentTaskId,
+                metadata: tasks.metadata,
+                createdAt: tasks.createdAt,
+                updatedAt: tasks.updatedAt,
+                space: boards.space,
+                boardId: boards.id,
+                boardName: boards.name,
+                columnName: columns.name
+              })
+              .from(tasks)
+              .leftJoin(columns, eq(tasks.columnId, columns.id))
+              .leftJoin(boards, eq(columns.boardId, boards.id))
+              .where(and(...overdueConditions));
+
+            const overdueTasks = await overdueQueryBuilder;
+
+            // Filter overdue tasks: due date < start date AND not in Done column
+            const filteredOverdueTasks = overdueTasks.filter((task) => {
+              if (!task.dueDate) return false;
+              const dueDate = new Date(task.dueDate);
+              const isOverdue = dueDate < startDate;
+              const isNotDone = task.columnName?.toLowerCase() !== 'done';
+              return isOverdue && isNotDone;
+            });
+
+            // Merge with main tasks, avoiding duplicates
+            const mainTaskIds = new Set(allTasks.map((t) => t.id));
+            const uniqueOverdueTasks = filteredOverdueTasks.filter((t) => !mainTaskIds.has(t.id));
+
+            allTasks = [...allTasks, ...uniqueOverdueTasks];
+          }
 
           // Fetch subtasks separately for the fetched tasks
           const taskIds = allTasks.map((t) => t.id);
@@ -375,8 +432,32 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             completionMap
           );
 
+          // If includeOverdue is true, add overdue tasks that were filtered out by expandRecurringTasks
+          let finalEvents = [...taskEvents];
+          if (includeOverdue === 'true') {
+            const overdueTasksFiltered = tasksWithSubtasks.filter((task) => {
+              if (!task.dueDate || task.recurringPattern) return false;
+              const taskDueDate = new Date(task.dueDate);
+              return taskDueDate < startDate;
+            });
+
+            // Add overdue tasks back to the results
+            for (const overdueTask of overdueTasksFiltered) {
+              finalEvents.push({
+                ...overdueTask,
+                space: overdueTask.space,
+                type: 'task' as const,
+                completed: false,
+                instanceDate: overdueTask.dueDate as string,
+                dueDate: new Date(overdueTask.dueDate as string),
+                priority: overdueTask.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
+                metadata: overdueTask.metadata || undefined
+              });
+            }
+          }
+
           // Combine and sort by date
-          const allEvents = [...taskEvents].toSorted((a, b) => {
+          const allEvents = [...finalEvents].toSorted((a, b) => {
             const aDate = a.dueDate;
             const bDate = b.dueDate;
             if (!aDate || !bDate) return 0;
@@ -392,7 +473,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           query: t.Object({
             start: t.String(),
             end: t.String(),
-            space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')]))
+            space: t.Optional(
+              t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])
+            ),
+            includeOverdue: t.Optional(t.String())
           })
         }
       )

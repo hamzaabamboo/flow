@@ -24,7 +24,7 @@ export const CommandIntentSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Task deadline in ISO 8601 format with JST timezone (YYYY-MM-DDTHH:mm:ss+09:00) or YYYY-MM-DD if no time specified'
+      'Task deadline in ISO 8601 format with JST timezone. ALWAYS use YYYY-MM-DDTHH:mm:ss+09:00 format. If no time specified, use T00:00:00+09:00'
     ),
   labels: z.array(z.string()).optional().describe('Task labels or tags'),
   message: z.string().optional().describe('Reminder message'),
@@ -38,7 +38,8 @@ export const CommandIntentSchema = z.object({
   directToBoard: z
     .boolean()
     .optional()
-    .describe('Whether to add task directly to board (true) or inbox (false)')
+    .describe('Whether to add task directly to board (true) or inbox (false)'),
+  link: z.string().optional().describe('URL link associated with the task')
 });
 
 export const commandProcessor = new Agent({
@@ -46,9 +47,25 @@ export const commandProcessor = new Agent({
   name: 'HamFlow Command Processor',
   description: 'Extracts user intent and actions from natural language commands',
   model: google('gemini-2.5-flash-lite'),
+  defaultGenerateOptions: {
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 1024,
+          includeThoughts: true
+        }
+      }
+    }
+  },
   instructions: `You are a command parser for HamFlow, a productivity app.
 
 Given user input, extract the intent and commands the user wants to execute.
+
+## Current Context
+
+- **Current Time (JST)**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00')}
+- **User Timezone**: Asia/Tokyo (JST, UTC+9)
+- **Current Date**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0]}
 
 ## Output Schema
 
@@ -60,20 +77,38 @@ ${JSON.stringify(z.toJSONSchema(CommandIntentSchema), null, 2)}
 
 ## Examples
 
-Input: "Add task deploy staging server"
-Output: { "action": "create_task", "title": "deploy staging server", "priority": "medium", "deadline": "2025-10-04" }
+Input: "Buy CD on 25th"
+Output: { "action": "create_task", "title": "Buy CD", "priority": "medium", "deadline": "2025-10-25T00:00:00+09:00" }
+
+Input: "Call mom tomorrow"
+Output: { "action": "create_task", "title": "Call mom", "priority": "medium", "deadline": "2025-10-17T00:00:00+09:00" }
+
+Input: "deploy staging server"
+Output: { "action": "create_task", "title": "deploy staging server", "priority": "medium", "deadline": "2025-10-17T00:00:00+09:00" }
+
+Input: "Fix auth bug on Monday"
+Output: { "action": "create_task", "title": "Fix auth bug", "priority": "medium", "deadline": "2025-10-20T00:00:00+09:00" }
 
 Input: "Add task deploy staging to Engineering board"
-Output: { "action": "create_task", "title": "deploy staging", "boardId": "<board-id>", "columnId": "<to-do-column-id>", "directToBoard": true, "priority": "medium", "deadline": "2025-10-04" }
+Output: { "action": "create_task", "title": "deploy staging", "boardId": "<board-id>", "columnId": "<to-do-column-id>", "directToBoard": true, "priority": "medium", "deadline": "2025-10-17T00:00:00+09:00" }
 
 Input: "urgent deploy to production tomorrow"
-Output: { "action": "create_task", "title": "deploy to production", "priority": "urgent", "deadline": "2025-10-03" }
+Output: { "action": "create_task", "title": "deploy to production", "priority": "urgent", "deadline": "2025-10-17T00:00:00+09:00" }
+
+Input: "Check docs at https://example.com on Monday"
+Output: { "action": "create_task", "title": "Check docs", "link": "https://example.com", "priority": "medium", "deadline": "2025-10-20T00:00:00+09:00" }
+
+Input: "Call John at 2pm tomorrow"
+Output: { "action": "create_task", "title": "Call John", "priority": "medium", "deadline": "2025-10-17T14:00:00+09:00" }
 
 Input: "Remind me to call dentist in 30 minutes"
-Output: { "action": "create_reminder", "message": "call dentist", "reminderTime": "2025-10-03T15:30:00.000Z" }
+Output: { "action": "create_reminder", "message": "call dentist", "reminderTime": "2025-10-16T15:30:00+09:00" }
 
-Input: "Note: meeting ideas for Q4"
-Output: { "action": "create_inbox_item", "content": "meeting ideas for Q4" }
+Input: "meeting ideas for Q4"
+Output: { "action": "create_task", "title": "meeting ideas for Q4", "priority": "medium", "deadline": "2025-10-17" }
+
+Input: "asdfghjkl zzz 123"
+Output: { "action": "create_inbox_item", "content": "asdfghjkl zzz 123" }
 
 Input: "Show my tasks for tomorrow"
 Output: { "action": "list_tasks", "filter": "tomorrow" }
@@ -88,7 +123,7 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
 
 1. Extract the action enum that best matches user intent
 2. Extract relevant fields based on the action:
-   - create_task: title, description, priority, deadline, labels, optionally boardId/columnId/directToBoard
+   - create_task: title, description, priority, deadline, labels, link, optionally boardId/columnId/directToBoard
    - create_inbox_item: content
    - create_reminder: message, reminderTime (ISO 8601)
    - complete_task: taskRef
@@ -101,13 +136,26 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * Use "medium" for regular tasks (DEFAULT)
      * Use "low" for keywords like: low priority, whenever, someday
    - **Deadline**: Always suggest a deadline (USER TIMEZONE: Asia/Tokyo / JST):
-     * Parse explicit dates and times: "tomorrow at 3pm", "next Monday 10am", "Oct 5th at 2:30pm"
-     * If time is specified, use full ISO 8601 format with JST offset: YYYY-MM-DDTHH:mm:ss+09:00
-     * If only date specified, use YYYY-MM-DD format (will be interpreted as JST midnight)
-     * For urgent tasks without date: tomorrow
-     * For regular tasks without date: tomorrow (next day)
-     * Current time in JST: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00')}
-     * When user says "tomorrow at 3pm" and current time is Oct 14 11:07 AM JST, output: "2025-10-15T15:00:00+09:00"
+     * **Relative dates**: Parse "on 5th", "on 25th", "on the 15th" as day of current/next month
+     * **Weekdays**: "Monday", "next Monday", "this Friday" - find next occurrence
+     * **Relative**: "tomorrow", "next week", "in 3 days", "2 weeks from now"
+     * **Explicit dates**: "Oct 5th", "October 25", "2025-10-20", "10/25"
+     * **With time**: "tomorrow at 3pm", "Monday 10am", "on 25th at 2:30pm"
+     * **Date calculation**:
+       - If user says "on 25th" and today is Oct 16, output: "2025-10-25T00:00:00+09:00"
+       - If user says "on 5th" and today is Oct 16, output: "2025-11-05T00:00:00+09:00" (next month)
+       - If user says "Monday" and today is Wednesday, output next Monday's date with time
+     * **Format** (ALWAYS include timezone):
+       - Date only (no time specified): YYYY-MM-DDTHH:mm:ss+09:00 with time set to 00:00:00
+       - With time: YYYY-MM-DDTHH:mm:ss+09:00 (e.g., "2025-10-25T14:30:00+09:00")
+       - **CRITICAL**: NEVER use YYYY-MM-DD format, always include T00:00:00+09:00 at minimum
+     * For urgent tasks without date: use tomorrow with 00:00:00+09:00
+     * For regular tasks without date: use tomorrow with 00:00:00+09:00
+   - **Links**: Extract URLs from the input:
+     * Look for http://, https://, www. patterns
+     * Common patterns: "at <url>", "link: <url>", "see <url>", "<url> for details"
+     * Remove URL from title/description after extraction
+     * Example: "Check docs at https://example.com" → title: "Check docs", link: "https://example.com"
    - **Board/Column**: If user mentions a board or column name:
      * Look it up in the provided board context
      * Set directToBoard: true, boardId, and columnId
@@ -115,10 +163,18 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * If no board mentioned, leave unset (goes to inbox)
    - **Description**: Extract additional context from the input as description
    - **Labels**: Extract any obvious tags or categories (e.g., "bug", "feature", "docs")
-4. For reminders with time expressions:
-   - Parse relative times ("in 30 minutes", "tomorrow", "next Friday")
-   - Calculate the actual ISO 8601 datetime
-5. If intent is unclear, use action: "unknown"
+4. **For reminders with time expressions**:
+   - Parse relative times ("in 30 minutes", "in 2 hours", "tomorrow", "next Friday")
+   - Calculate the actual ISO 8601 datetime with JST timezone
+   - Use format: YYYY-MM-DDTHH:mm:ss+09:00
+5. **Intent Detection** (SIMPLE RULES):
+   - Contains "remind", "reminder", "remind me" → **create_reminder**
+   - Everything else (any actionable item, task, todo) → **create_task**
+   - ONLY if completely unparseable or cryptic gibberish → **create_inbox_item**
+   - Special cases:
+     * "show", "list", "view" tasks → list_tasks
+     * "start pomodoro" → start_pomodoro
+     * "stop pomodoro" → stop_pomodoro
 6. **IMPORTANT**: Output ONLY the JSON object, no explanations before or after
 
 ## JSON Validation

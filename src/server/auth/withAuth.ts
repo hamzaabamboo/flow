@@ -52,6 +52,16 @@ export const withAuth = () =>
             path: '/'
           });
 
+          // Set a non-httpOnly cookie for WebSocket authentication
+          cookie.ws_token.set({
+            value: autoToken,
+            httpOnly: false, // Allow JavaScript access for WebSocket
+            secure: false, // Development
+            sameSite: 'lax',
+            maxAge: 30 * 86400, // 30 days
+            path: '/'
+          });
+
           logger.info(`Auto-logged in as: ${firstUser.email}`);
 
           return {
@@ -86,6 +96,18 @@ export const withAuth = () =>
         if (!user) {
           set.status = 401;
           throw new Error('User not found');
+        }
+
+        // Ensure ws_token is set for WebSocket authentication
+        if (!cookie.ws_token.value) {
+          cookie.ws_token.set({
+            value: token as string,
+            httpOnly: false, // Allow JavaScript access for WebSocket
+            secure: false, // Development
+            sameSite: 'lax',
+            maxAge: 30 * 86400, // 30 days
+            path: '/'
+          });
         }
 
         return {

@@ -20,7 +20,7 @@ interface Reminder {
 export function NotificationDropdown() {
   const [open, setOpen] = useState(false);
 
-  // Fetch upcoming reminders (not sent yet, in the future)
+  // Fetch upcoming reminders (API returns only unsent, future reminders)
   const { data: reminders = [], refetch } = useQuery<Reminder[]>({
     queryKey: ['reminders', 'upcoming'],
     queryFn: async () => {
@@ -28,15 +28,13 @@ export function NotificationDropdown() {
       if (!response.ok) throw new Error('Failed to fetch reminders');
       const allReminders = await response.json();
 
-      // Filter to only show unsent reminders in the future
-      const now = new Date();
+      // Sort by time and limit to 10 most recent
       return allReminders
-        .filter((r: Reminder) => !r.sent && new Date(r.reminderTime) > now)
         .toSorted(
           (a: Reminder, b: Reminder) =>
             new Date(a.reminderTime).getTime() - new Date(b.reminderTime).getTime()
         )
-        .slice(0, 10); // Show max 10 upcoming
+        .slice(0, 10);
     },
     refetchInterval: 30000 // Refetch every 30 seconds
   });

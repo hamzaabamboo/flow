@@ -2,6 +2,166 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-16 - WebSocket Authentication & Pomodoro Cross-Tab Sync
+
+### Problem: WebSocket Connections Anonymous
+
+**User Feedback**: "why do i see nothing going through websocket wire?" - Pomodoro timer state wasn't syncing across browser tabs.
+
+**Investigation**: Server logs showed all WebSocket connections as `(anonymous)` instead of authenticated users, meaning broadcasts to user-specific channels weren't reaching clients.
+
+**Root Cause**: The `auth` cookie was set with `httpOnly: true`, preventing JavaScript from accessing it. The WebSocket client's `getCookie('auth')` call returned `null`, so connections were established without authentication.
+
+### Solution: Separate ws_token Cookie
+
+**Implementation**: Created a dedicated non-httpOnly cookie for WebSocket authentication while keeping the main auth cookie secure.
+
+```typescript
+// src/server/auth/withAuth.ts - During auto-login and auth verification
+cookie.ws_token.set({
+  value: token,
+  httpOnly: false, // Allow JavaScript access for WebSocket
+  secure: false, // Development (use true in production)
+  sameSite: 'lax',
+  maxAge: 30 * 86400, // 30 days
+  path: '/'
+});
+```
+
+```typescript
+// src/hooks/useWebSocket.ts - Client reads ws_token
+const token = getCookie('ws_token');
+const wsUrl = `${protocol}//${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+```
+
+**Security Note**: Main `auth` cookie remains `httpOnly: true` for security. Only create `ws_token` for WebSocket connections.
+
+### Problem: Pomodoro Timer Drift Across Tabs
+
+**User Feedback**: "doesn't look sync" - Timer showed different times across tabs (42 seconds apart initially).
+
+**Root Cause**: Each tab ran independent countdown timers that decremented every second. WebSocket only synced on start/pause/complete events, not during countdown.
+
+**Old Approach**:
+```typescript
+// Each tab independently counts down
+setInterval(() => {
+  setLocalTimeLeft(prev => prev - 1);
+}, 1000);
+```
+
+**Problem**:
+- Tab opened at different times show different values
+- Drift accumulates over time
+- No shared reference point
+
+### Solution: Calculation-Based Timer with Server startTime
+
+**Implementation**: Use server's `startTime` as authoritative reference and calculate elapsed time.
+
+```typescript
+// src/components/Pomodoro/PomodoroTimer.tsx
+interface ActivePomodoroState {
+  // ... other fields
+  startTime?: string | null; // ISO timestamp when timer started
+}
+
+// Timer calculation loop
+if (serverState.startTime) {
+  const tick = () => {
+    const startTime = new Date(serverState.startTime!).getTime();
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const newTimeLeft = Math.max(0, serverState.timeLeft - elapsed);
+
+    setLocalTimeLeft(newTimeLeft);
+
+    // Schedule next tick
+    intervalRef.current = setTimeout(tick, 1000);
+  };
+  tick();
+}
+```
+
+**Benefits**:
+- All tabs calculate from same `startTime` reference
+- Perfect synchronization regardless of when tab was opened
+- No drift accumulation
+- Tolerant to network delays
+
+**Verification**:
+- Tab 0: 03:51 at timestamp 1760592149219
+- Tab 1: 03:48 at timestamp 1760592152169
+- Time measured 2.95s apart, times differ by exactly 3 seconds ✅
+
+### Problem: Timer Spamming UI
+
+**User Feedback**: "NOW IT'S SPAMMING LAH" - Initial implementation updated every 100ms.
+
+**Fix**: Changed update interval from 100ms to 1000ms (1 second).
+
+```typescript
+// Schedule next tick every 1 second
+intervalRef.current = setTimeout(tick, 1000);
+```
+
+### Debug Logging Cleanup
+
+Removed all console.log statements added during debugging:
+- `src/server/websocket.ts` - Broadcast execution logs
+- `src/server/index.ts` - WebSocket authentication logs
+- `src/hooks/useWebSocket.ts` - Message reception logs
+- `src/components/Pomodoro/PomodoroTimer.tsx` - Mutation logs
+- `src/server/routes/pomodoro.ts` - Broadcast completion logs
+
+### Key Learnings
+
+1. **httpOnly Cookies & WebSockets**: httpOnly cookies cannot be read by JavaScript. Create separate non-httpOnly cookie for WebSocket authentication if needed.
+
+2. **Timer Synchronization Pattern**: For multi-tab sync, use server-provided reference timestamp and calculate elapsed time rather than independent countdowns:
+   ```typescript
+   timeLeft = initialTime - (Date.now() - startTime)
+   ```
+
+3. **WebSocket Authentication Flow**:
+   - Client reads `ws_token` cookie
+   - Passes as query parameter: `/ws?token=...`
+   - Server decodes JWT, extracts `userId`
+   - Subscribes to `user:${userId}` channel
+   - Broadcasts only reach authenticated users
+
+4. **Performance**: 1-second timer intervals are sufficient for countdown displays. 100ms updates cause unnecessary re-renders.
+
+5. **Debugging Strategy**: Add extensive logging first to understand flow, then remove all debug logs once working.
+
+### Files Modified
+
+**WebSocket Authentication**:
+- `src/server/auth/withAuth.ts` - Added `ws_token` cookie creation
+- `src/hooks/useWebSocket.ts` - Read `ws_token` instead of `auth`
+- `src/server/index.ts` - Fixed unused error variable in catch block
+
+**Timer Synchronization**:
+- `src/components/Pomodoro/PomodoroTimer.tsx` - Calculation-based timer with `startTime`
+- `drizzle/schema.ts` - Already had `startTime` field in schema
+
+**Type Fixes**:
+- `src/server/index.ts` - Removed invalid NOT_FOUND error code check
+- `src/server/routes/calendar.ts` - Fixed overdue task type compatibility
+- `src/server/utils/errors.ts` - Fixed spread operator type issue
+- `src/server/utils/ownership.ts` - Changed `DB` to `Database` type import
+
+### Testing Checklist
+
+- [x] WebSocket connections authenticate correctly
+- [x] Pomodoro timer syncs across multiple tabs
+- [x] Timer doesn't spam/re-render excessively
+- [x] Start/pause/complete events broadcast properly
+- [x] No memory leaks from timer intervals
+- [x] All TypeScript errors resolved
+- [x] Lint passes with no warnings
+
+---
+
 ## 2025-10-15 - Pomodoro Memory Leaks & Mobile Compatibility Fixes
 
 ### Critical Performance Issues Fixed
@@ -9,6 +169,7 @@
 **Problem**: Pomodoro feature causing memory leaks, infinite loops, and "illegal constructor" errors on mobile.
 
 **User Report**:
+
 - "pomodoro feature introduced so much loop and memory leak la"
 - "it also error illegal constructor in my phone too"
 
@@ -62,7 +223,7 @@ function getAudioContext(): AudioContext | null {
 
     // Resume if suspended (required on mobile)
     if (audioContext.state === 'suspended') {
-      audioContext.resume().catch(err => console.error('Failed to resume:', err));
+      audioContext.resume().catch((err) => console.error('Failed to resume:', err));
     }
 
     return audioContext;
@@ -74,6 +235,7 @@ function getAudioContext(): AudioContext | null {
 ```
 
 **Key Points**:
+
 - Single AudioContext reused across all sound plays
 - Graceful fallback if not supported
 - Auto-resume for mobile (contexts start suspended)
@@ -99,6 +261,7 @@ useEffect(() => {
 ```
 
 **Additional Optimizations**:
+
 - Reduced server sync from 10s → 30s intervals
 - Disabled refetchInterval (was every 5s when running)
 - Set `staleTime: Infinity` to prevent unnecessary refetches
@@ -123,6 +286,7 @@ const handleMessage = useCallback((message) => {
 ```
 
 **Why This Works**:
+
 - `useCallback` with empty deps = stable function reference
 - Ref pattern allows access to latest queryClient
 - No experimental APIs = better compatibility
@@ -130,12 +294,14 @@ const handleMessage = useCallback((message) => {
 ### Performance Impact
 
 **Before**:
+
 - Memory leak: ~5-10MB per hour of timer usage
 - Infinite query invalidations every 5 seconds
 - Mobile crashes with "illegal constructor"
 - Excessive re-renders
 
 **After**:
+
 - Zero memory leak (singleton pattern)
 - Query invalidations only on WebSocket events
 - Mobile compatibility with graceful fallbacks
@@ -159,6 +325,7 @@ const handleMessage = useCallback((message) => {
 5. **Reduce polling** - Prefer WebSocket + local state over frequent refetch
 
 ### Related Files
+
 - `src/components/Pomodoro/PomodoroTimer.tsx` - Main timer component
 - `src/hooks/useWebSocket.ts` - WebSocket message handling
 - `src/server/routes/pomodoro.ts` - Backend API
@@ -172,6 +339,7 @@ const handleMessage = useCallback((message) => {
 **Problem**: Users only got ONE reminder at a fixed time before the task was due, which wasn't enough notification lead time.
 
 **User Feedback**:
+
 - "Reminder should fire twice, 15 minutes before and at the time"
 
 **Solution**: Create TWO reminders per task instead of one
@@ -240,6 +408,7 @@ await this.db.insert(reminders).values(remindersToCreate);
 ```
 
 **Key Points**:
+
 - Always create 15-minute warning (if in future)
 - Second reminder uses custom time or defaults to due time
 - Fallback for tasks due very soon (creates reminder for 1 min from now)
@@ -250,12 +419,14 @@ await this.db.insert(reminders).values(remindersToCreate);
 **Problem**: Production broke with SQL error trying to query `link` column that doesn't exist
 
 **User Feedback**:
+
 - "shit broke lah in fucking prod"
 - "i told you to remove existence of reminder.link delete how does this slip through????"
 
 **Root Cause**: Added `link` field to development schema but never applied migration to production. Code was querying a column that doesn't exist in prod database.
 
 **Solution**: Complete removal of link field
+
 ```typescript
 // Removed from schema (drizzle/schema.ts)
 export const reminders = pgTable('reminders', {
@@ -290,6 +461,7 @@ sendReminder(userId: string, message: string) {
 ```
 
 **Key Lessons**:
+
 1. **NEVER add fields to schema without migration** - Schema and database must stay in sync
 2. **Development != Production** - Just because it works locally doesn't mean the migration was applied to prod
 3. **Test migrations** - Always verify migrations are applied before deploying code that uses new fields
@@ -300,6 +472,7 @@ sendReminder(userId: string, message: string) {
 **Patterns Fixed**:
 
 1. **Unused Imports**:
+
 ```typescript
 // ❌ WRONG
 import { errorResponse, successResponse } from '../utils/errors';
@@ -310,6 +483,7 @@ import { errorResponse, successResponse } from '../utils/errors';
 ```
 
 2. **Await in Loop**:
+
 ```typescript
 // ❌ WRONG
 for (let i = 0; i < subtaskIds.length; i++) {
@@ -323,14 +497,19 @@ await Promise.all(
 ```
 
 3. **Function Scope**:
+
 ```typescript
 // ❌ WRONG - Recreated on every render
 export function PomodoroTimer() {
-  const playSound = () => { /* ... */ };
+  const playSound = () => {
+    /* ... */
+  };
 }
 
 // ✅ CORRECT - Defined at module level
-function playSound() { /* ... */ }
+function playSound() {
+  /* ... */
+}
 
 export function PomodoroTimer() {
   // ...
@@ -349,15 +528,18 @@ export function PomodoroTimer() {
 ### Files Modified
 
 **Production Bug Fix**:
+
 - `drizzle/schema.ts` - Removed link field from reminders table
 - `src/server/cron.ts` - Removed link generation logic from sendToHamBot
 - `src/server/integrations/hambot.ts` - Removed link parameter from sendReminder
 - `src/server/websocket.ts` - Removed link parameter from sendReminder
 
 **Reminder System Enhancement**:
+
 - `src/server/services/reminder-sync.ts` - Double reminder creation logic
 
 **Lint Fixes**:
+
 - `src/server/routes/tasks.ts` - Removed unused imports
 - `src/server/routes/inbox.ts` - Removed unused imports and parameter
 - `src/server/routes/columns.ts` - Removed unused import
@@ -370,11 +552,13 @@ export function PomodoroTimer() {
 ### The Problem: Calendar & Habits Had 9-Hour Offset
 
 **User Feedback**:
+
 - "can you like test the calendar timezone ah, still have 9 hours offset for some reason la"
 - "also carryover feature time is all wonky, fix it"
 - "why is daily reminder not pinging properly?"
 
 **Root Cause**: Three separate timezone issues:
+
 1. **Calendar iCal habit times** - Used `setUTCHours()` which treated JST as UTC (9-hour offset)
 2. **CarryOver feature** - Used browser local timezone instead of JST
 3. **No habit reminders** - Missing cron job to create reminder records
@@ -382,16 +566,26 @@ export function PomodoroTimer() {
 ### Solution: Centralized Timezone Utilities
 
 **Created** `src/shared/utils/timezone.ts` (works on both server and client):
+
 ```typescript
 // Clean utility functions
 export function utcToJst(date: Date): Date;
 export function jstToUtc(date: Date | string): Date;
 export function nowInJst(): Date;
 export function createJstDate(year, month, day, hours, minutes, seconds): Date;
-export function getJstDateComponents(date: Date): { year, month, day, hours, minutes, seconds, dayOfWeek };
+export function getJstDateComponents(date: Date): {
+  year;
+  month;
+  day;
+  hours;
+  minutes;
+  seconds;
+  dayOfWeek;
+};
 ```
 
 **Benefits**:
+
 - No more manual date math
 - Single source of truth for timezone conversions
 - Consistent JST ↔ UTC handling everywhere
@@ -401,6 +595,7 @@ export function getJstDateComponents(date: Date): { year, month, day, hours, min
 ### Habit Reminder Service Architecture
 
 **Created** `src/server/services/habit-reminder-service.ts`:
+
 ```typescript
 export class HabitReminderService {
   async createDailyReminders(): Promise<number> {
@@ -414,6 +609,7 @@ export class HabitReminderService {
 ```
 
 **Cron Job** (runs every hour):
+
 ```typescript
 // src/server/cron.ts
 cron({
@@ -422,10 +618,11 @@ cron({
     const service = new HabitReminderService(db);
     await service.createDailyReminders();
   }
-})
+});
 ```
 
 **Data Flow**:
+
 1. Habit has `reminderTime: "09:00"` (JST)
 2. Cron runs hourly → creates reminder for today's instances
 3. Reminder stored with UTC time in database
@@ -434,12 +631,14 @@ cron({
 ### Calendar iCal Fix
 
 **Before**:
+
 ```typescript
 // ❌ WRONG - Treated JST time as UTC
 startDate.setUTCHours(hours, minutes, 0, 0);
 ```
 
 **After**:
+
 ```typescript
 // ✅ CORRECT - Use timezone utility
 const createdComponents = getJstDateComponents(new Date(habit.createdAt));
@@ -450,6 +649,7 @@ const startDate = jstToUtc(jstDateString);
 ### CarryOver Feature Fix
 
 **Before**:
+
 ```typescript
 // ❌ WRONG - Used browser local timezone
 const nowUtc = new Date();
@@ -457,6 +657,7 @@ const nowJst = toZonedTime(nowUtc, APP_TIMEZONE);
 ```
 
 **After**:
+
 ```typescript
 // ✅ CORRECT - Use utility
 const jst = nowInJst();
@@ -466,6 +667,7 @@ return endOfDay(jst);
 ### Carryover Mutation Fix
 
 **Before**:
+
 ```typescript
 // ❌ WRONG - Complex timezone conversion with date-fns-tz
 const oldJstDate = toZonedTime(oldUtcDate, APP_TIMEZONE);
@@ -474,6 +676,7 @@ const newUtcDate = fromZonedTime(newJstDate, APP_TIMEZONE);
 ```
 
 **After**:
+
 ```typescript
 // ✅ CORRECT - Use utility functions
 const oldJstComponents = getJstDateComponents(oldUtcDate);
@@ -485,10 +688,12 @@ const newUtcDate = jstToUtc(newJstDate);
 ### Files Modified
 
 **New Files**:
+
 - `src/shared/utils/timezone.ts` - Timezone utilities (works server & client)
 - `src/server/services/habit-reminder-service.ts` - Habit reminder creation logic
 
 **Updated Files**:
+
 - `src/server/cron.ts` - Added cron job, removed inline habit reminder code (90+ lines → 4 lines)
 - `src/server/routes/calendar.ts` - Uses timezone utilities for habit times
 - `src/components/Agenda/CarryOverControls.tsx` - Uses timezone utilities
@@ -511,12 +716,14 @@ const newUtcDate = jstToUtc(newJstDate);
 ### Code Quality Improvements
 
 **Before** (cron.ts):
+
 - 200 lines
 - Inline habit reminder logic mixed with cron definitions
 - Hard to test
 - Repeated timezone calculations
 
 **After** (cron.ts):
+
 - 110 lines (90 lines removed!)
 - Clean service calls
 - Easy to test services independently
@@ -525,11 +732,13 @@ const newUtcDate = jstToUtc(newJstDate);
 ### The "Why No Reminders?" Discovery
 
 **Critical Missing Piece**: System had:
+
 - ✅ Cron job to **send** reminders
 - ✅ Reminder UI in frontend
 - ❌ **NO** cron job to **create** habit reminders
 
 **Lesson**: Always trace the full data flow:
+
 1. Where is data created?
 2. Where is data stored?
 3. Where is data sent?
@@ -549,12 +758,10 @@ In this case, step 1 was missing entirely!
 
 ```typescript
 // ❌ Wrong - doesn't work
-export const statsRoutes = new Elysia({ prefix: '/stats' })
-  .use(withAuth)
+export const statsRoutes = new Elysia({ prefix: '/stats' }).use(withAuth);
 
 // ✅ Correct
-export const statsRoutes = new Elysia({ prefix: '/stats' })
-  .use(withAuth())
+export const statsRoutes = new Elysia({ prefix: '/stats' }).use(withAuth());
 ```
 
 **Key Lesson**: `withAuth` is a function that returns an Elysia plugin, so it must be invoked with `()`.
@@ -578,8 +785,12 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .group('', (app) =>
     app
       .use(withAuth())
-      .get('/feed-url', ({ user }) => { /* ... */ })
-      .get('/events', async ({ query, db, user }) => { /* ... */ })
+      .get('/feed-url', ({ user }) => {
+        /* ... */
+      })
+      .get('/events', async ({ query, db, user }) => {
+        /* ... */
+      })
   );
 ```
 
@@ -607,11 +818,14 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 **Problem**: Duplicating tasks resulted in validation errors when optional fields (description, dueDate, priority) were null.
 
 **User Feedback**: "error when tryin gto duplicate ah" with validation error showing:
+
 ```json
 {
   "status": 400,
   "value": {
-    "description": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] },
+    "description": {
+      "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }]
+    },
     "dueDate": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] },
     "priority": { "issues": [{ "code": "invalid_type", "expected": "string", "received": "null" }] }
   }
@@ -664,6 +878,7 @@ const duplicateTaskMutation = useMutation({
 **Problem**: Multiple usages of browser's `window.confirm()` and `window.alert()` throughout the codebase - poor UX and inconsistent styling.
 
 **User Feedback**:
+
 - "make delete modal use proper dialog not prompt"
 - "do it for every usage of prompt and confirm in the codebase, create a shared component /utils or sth if need"
 - "no lah i mean like, lazy loaded"
@@ -671,6 +886,7 @@ const duplicateTaskMutation = useMutation({
 **Solution**: Created a global dialog system using React Context with lazy-loaded components:
 
 **Architecture**:
+
 ```typescript
 // src/utils/useDialogs.tsx - Main hook and provider
 import { lazy, Suspense } from 'react';
@@ -712,6 +928,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 ```
 
 **Usage Pattern**:
+
 ```typescript
 import { useDialogs } from '~/utils/useDialogs';
 
@@ -736,6 +953,7 @@ onClick={() => {
 ```
 
 **Files Updated**:
+
 - `src/utils/useDialogs.tsx` - Hook and provider with lazy loading
 - `src/utils/DialogComponents.tsx` - Separate file for dialog UI (code splitting)
 - `src/pages/+Layout.tsx` - Added `<DialogProvider>` to provider tree
@@ -745,6 +963,7 @@ onClick={() => {
 - `src/components/Board/KanbanBoard.tsx` - Replaced `alert()` in error handler
 
 **Async Handler Pattern**:
+
 ```typescript
 // ❌ WRONG - Promise-returning function in attribute
 onClick={async () => { await doSomething(); }}
@@ -758,6 +977,7 @@ onClick={() => {
 ```
 
 **Benefits**:
+
 - Lazy loading reduces initial bundle size (dialog UI only loaded when needed)
 - Consistent styling across all dialogs (Park UI components)
 - Promise-based API feels natural in async code
@@ -769,6 +989,7 @@ onClick={() => {
 **Problem**: Dialog looked ugly with wrong import, no Portal, and dynamic styling warnings.
 
 **User Feedback**:
+
 - "dialog looks kinda ugly"
 - "u sure u didn't use wrongly?"
 - "DO NOT USE VAR() INSIDE PROPERTIES, USE TOKEN.VAR OR TOKEN()"
@@ -790,7 +1011,7 @@ import { Dialog } from '~/components/ui/dialog';
       </Box>
     </Dialog.Content>
   </Dialog.Positioner>
-</Dialog.Root>
+</Dialog.Root>;
 
 // ✅ CORRECT - Styled Dialog, Portal, data attribute, proper token
 import { Portal } from '@ark-ui/react/portal';
@@ -801,19 +1022,17 @@ import * as Dialog from '~/components/ui/styled/dialog';
     <Dialog.Backdrop />
     <Dialog.Positioner>
       <Dialog.Content maxW="440px" bg="bg.default" borderColor="border.default">
-        <Box
-          data-variant={variant || 'info'}
-          color="colorPalette.default"
-        >
+        <Box data-variant={variant || 'info'} color="colorPalette.default">
           <AlertTriangle width="20" height="20" />
         </Box>
       </Dialog.Content>
     </Dialog.Positioner>
   </Portal>
-</Dialog.Root>
+</Dialog.Root>;
 ```
 
 **Global CSS Setup** (panda.config.ts):
+
 ```typescript
 globalCss: {
   '[data-variant=danger]': {
@@ -826,6 +1045,7 @@ globalCss: {
 ```
 
 **Key Points**:
+
 - Use `* as Dialog from '~/components/ui/styled/dialog'` not generic Dialog component
 - Wrap everything in `<Portal>` for proper z-index and rendering
 - Use data attributes (`data-variant`) to set colorPalette via global CSS
@@ -839,11 +1059,11 @@ globalCss: {
 
 1. **CSS Props with Dynamic Values**: ❌ NEVER USE DYNAMIC VALUES INSIDE CSS PROPS - Use data attributes + css() instead! `css={{ color: dynamicValue }}` is NOT ALLOWED. Use colorPalette prop or data-attribute + css() pattern.
 2. **Conditional Object Properties**: Use `if (value) obj.key = value` pattern instead of `{ key: value || null }` when working with APIs that have strict validation
-2. **Lazy Loading Pattern**: Split heavy components into separate files and use `React.lazy()` + `Suspense` for code splitting
-3. **Global UI State**: React Context + Promises = clean API for modal/dialog systems
-4. **Async Event Handlers**: Always wrap with `void (async () => { ... })()` to satisfy ESLint rules
-5. **Testing Validation**: Browser-based testing confirmed the fix works for both minimal tasks (no optional fields) and complete tasks (with priority, description, etc.)
-6. **Dialog Styling**: Use styled Dialog import, Portal wrapper, data attributes for variants, and proper semantic tokens (`.default` not `.500`)
+3. **Lazy Loading Pattern**: Split heavy components into separate files and use `React.lazy()` + `Suspense` for code splitting
+4. **Global UI State**: React Context + Promises = clean API for modal/dialog systems
+5. **Async Event Handlers**: Always wrap with `void (async () => { ... })()` to satisfy ESLint rules
+6. **Testing Validation**: Browser-based testing confirmed the fix works for both minimal tasks (no optional fields) and complete tasks (with priority, description, etc.)
+7. **Dialog Styling**: Use styled Dialog import, Portal wrapper, data attributes for variants, and proper semantic tokens (`.default` not `.500`)
 
 ## 2025-10-08 - Calendar Route Auth & Elysia Route Grouping (earlier)
 
@@ -863,8 +1083,8 @@ globalCss: {
 // ❌ WRONG - Tried using .group() but syntax was complex
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .decorate('db', db)
-  .group('', (app) => app.get('/ical/:userId/:token', handler))  // Complex nesting
-  .group('', (app) => app.use(withAuth()).get('/events', handler))
+  .group('', (app) => app.get('/ical/:userId/:token', handler)) // Complex nesting
+  .group('', (app) => app.use(withAuth()).get('/events', handler));
 
 // ✅ CORRECT - Simple sequential route definition
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
@@ -887,23 +1107,30 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .use(withAuth())
 
   // Authenticated routes
-  .get('/feed-url', ({ user }) => { /* ... */ })
-  .get('/events', async ({ query, db, user }) => { /* ... */ })
+  .get('/feed-url', ({ user }) => {
+    /* ... */
+  })
+  .get('/events', async ({ query, db, user }) => {
+    /* ... */
+  });
 ```
 
 ### Key Insights
 
 **Elysia Middleware Order**:
+
 - Middleware applied with `.use()` affects all routes defined AFTER it
 - Public routes must be defined BEFORE `.use(withAuth())`
 - No need for complex `.group()` nesting in most cases
 
 **iCal MIME Type**:
+
 - Must set `Content-Type: text/calendar; charset=utf-8`
 - Use object syntax: `set.headers = { 'Content-Type': '...' }`
 - Elysia properly handles the response
 
 **Calendar Feed Security**:
+
 - Public endpoint: `/api/calendar/ical/:userId/:token`
 - Token generated using: `createHash('sha256').update(userId + secret).digest('hex')`
 - Each user gets unique, stable feed URL
@@ -929,9 +1156,11 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 ```
 
 ### Files Modified
+
 - `src/server/routes/calendar.ts` - Restructured route order, removed `.group()` complexity
 
 ### Testing Checklist
+
 - [x] Public calendar feed accessible without cookies
 - [x] Feed returns valid iCalendar format (VCALENDAR object)
 - [x] Authenticated endpoints still require session
@@ -945,6 +1174,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 **Problem**: Agenda page (index/+Page.tsx) hit 1135 lines with heavy duplication between day/week views
 
 **Solution**: Extract reusable components for habits and stats displays
+
 ```typescript
 // Created src/components/Agenda/HabitsCard.tsx
 interface HabitsCardProps {
@@ -967,6 +1197,7 @@ interface StatsCardProps {
 ```
 
 **Benefits**:
+
 - Reduced index/+Page.tsx from 1135 to ~900 lines
 - Eliminated duplicate Card.Root usage across day/week views
 - Single source of truth for habits/stats rendering
@@ -979,6 +1210,7 @@ interface StatsCardProps {
 **User Feedback**: "shadows are very very inconsistent, get it fixed lah"
 
 **Solution**: Standardize on Park UI default shadows by removing all custom shadow props
+
 ```typescript
 // ❌ WRONG - Custom shadow values
 <Box shadow="sm" />
@@ -991,6 +1223,7 @@ interface StatsCardProps {
 ```
 
 **Files Updated**:
+
 - `src/components/Kanban/TaskCard.tsx` - Removed custom shadows, kept only `shadow="xs"` for subtle card depth
 - `src/components/Pomodoro/PomodoroTimer.tsx` - Removed `shadow="lg"` and `shadow="xl"`
 - All Card components now use Park UI defaults
@@ -1004,6 +1237,7 @@ interface StatsCardProps {
 **User Feedback**: "look at task page and board page can you make the task card same vibe" → "i mean agenda page lah" → "i'm talking about the left color lah"
 
 **Solution**: Add 4px left border with priority color to match Tasks page styling
+
 ```typescript
 // Pattern from TaskItem.tsx (Agenda/Tasks page)
 <Box
@@ -1024,6 +1258,7 @@ interface StatsCardProps {
 ```
 
 **Key Implementation**:
+
 1. Add `data-priority` attribute to enable colorPalette styling
 2. Set `borderLeftWidth="4px"` for accent border
 3. Set `borderLeftColor="colorPalette.default"` (uses global CSS from panda.config.ts)
@@ -1031,6 +1266,7 @@ interface StatsCardProps {
 5. Add `shadow="xs"` for subtle depth
 
 **Color Mapping** (from panda.config.ts globalCss):
+
 - `[data-priority=urgent]` → colorPalette: 'red' (orange left border)
 - `[data-priority=high]` → colorPalette: 'orange'
 - `[data-priority=medium]` → colorPalette: 'yellow'
@@ -1040,6 +1276,7 @@ interface StatsCardProps {
 ### CSS Grid Responsive Positioning
 
 **Technique**: Use gridColumn/gridRow with responsive breakpoints instead of duplicate JSX
+
 ```typescript
 // Day View layout
 <Grid
@@ -1066,6 +1303,7 @@ interface StatsCardProps {
 ```
 
 **Benefits**:
+
 - Single layout definition for both mobile/desktop
 - No display:none hiding (better for a11y)
 - Eliminated ~110 lines of duplicate JSX
@@ -1076,11 +1314,13 @@ interface StatsCardProps {
 **Discovery**: Found that `KanbanColumn.tsx` has its own inline `TaskCard` component (lines 306-419), separate from `Kanban/TaskCard.tsx`
 
 **Why**:
+
 - The Kanban board uses dnd-kit for drag-and-drop
 - The inline TaskCard is tightly coupled with useSortable hook
 - Different layout (has GripVertical drag handle, Edit/Delete buttons)
 
 **Lesson**: Always grep for component usage before assuming there's only one implementation
+
 ```bash
 grep -n "TaskCard" src/components/Board/KanbanColumn.tsx
 # Found both import and inline function definition
@@ -1102,6 +1342,7 @@ grep -n "TaskCard" src/components/Board/KanbanColumn.tsx
 **Problem**: AI has no context about user's boards/columns, sends all tasks to inbox
 
 **Solution**: Fetch and inject board/column context into AI prompts:
+
 ```typescript
 // Fetch user's boards and columns
 const userBoards = await db
@@ -1117,12 +1358,13 @@ const allColumns = await db
 // Build context string and append to user message
 const boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf user mentions board/column, map to ID and set directToBoard: true`;
 
-const result = await agent.generateVNext([
-  { role: 'user', content: command + boardContext }
-], { providerOptions: { google: { structuredOutputs: true } } });
+const result = await agent.generate([{ role: 'user', content: command + boardContext }], {
+  providerOptions: { google: { structuredOutputs: true } }
+});
 ```
 
 **Key Points**:
+
 - Add optional `boardId`, `columnId`, `directToBoard` fields to Zod schema
 - AI maps natural language ("Engineering board", "Done column") to actual IDs
 - Tasks with board/column specified bypass inbox, go directly to board
@@ -1131,6 +1373,7 @@ const result = await agent.generateVNext([
 - Return `boardId` in response for proper navigation
 
 **Example Usage**:
+
 - "Add task deploy staging" → Inbox (no board mentioned)
 - "Add task deploy to Engineering board" → Engineering → To Do
 - "Add fix bug to Done column" → First board → Done
@@ -1139,30 +1382,29 @@ const result = await agent.generateVNext([
 
 **Problem**: AI responses wrapped in markdown code blocks or inconsistent JSON format
 
-**Solution**: Use `generateVNext` with structured output:
+**Solution**: Use `generate` with structured output:
+
 ```typescript
-const result = await agent.generateVNext(
-  [{ role: 'user', content: command }],
-  {
-    providerOptions: {
-      google: {
-        structuredOutputs: true
-      }
+const result = await agent.generate([{ role: 'user', content: command }], {
+  providerOptions: {
+    google: {
+      structuredOutputs: true
     }
   }
-);
+});
 ```
 
 **Key Points**:
+
 - Use Zod schemas to define output structure
 - Add defensive JSON parsing to strip markdown:
-  ```typescript
+  ````typescript
   const cleanedText = result.text
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/, '')
     .replace(/```\s*$/, '')
     .trim();
-  ```
+  ````
 - Explicitly tell AI in prompt: "DO NOT wrap in \`\`\`json blocks"
 
 ### React Query Cache Invalidation Pattern
@@ -1170,6 +1412,7 @@ const result = await agent.generateVNext(
 **Problem**: CommandBar creates items but UI doesn't update until manual refresh
 
 **Solution**: Invalidate relevant queries after mutations:
+
 ```typescript
 // After successful command execution
 switch (action) {
@@ -1191,6 +1434,7 @@ switch (action) {
 **Problem**: Browser notifications require permission and might be missed
 
 **Solution**: Use global toast function with WebSocket:
+
 ```typescript
 // In hook
 let globalToast: ((message: string, options?) => void) | null = null;
@@ -1210,6 +1454,7 @@ case 'reminder':
 ```
 
 **Key Points**:
+
 - Toast notifications always visible (no permission needed)
 - Browser notifications as backup if permitted
 - Longer duration for important messages (8000ms for reminders)
@@ -1219,6 +1464,7 @@ case 'reminder':
 **Problem**: Voice recognition couldn't be stopped once started
 
 **Solution**: Store recognition in ref and toggle on button click:
+
 ```typescript
 const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -1235,6 +1481,7 @@ const handleVoiceInput = () => {
 ```
 
 **Key Points**:
+
 - Clean up ref on completion/error: `recognitionRef.current = null`
 - Stop on dialog close to prevent leaks
 - Same button toggles start/stop (good UX)
@@ -1244,6 +1491,7 @@ const handleVoiceInput = () => {
 **Problem**: Heavy Card components felt different from rest of app
 
 **Solution**: Use lightweight HStack with border:
+
 ```typescript
 <HStack
   p="4"
@@ -1256,14 +1504,19 @@ const handleVoiceInput = () => {
   <Checkbox />
   <Icon />
   <VStack flex="1">
-    <Text fontSize="sm" fontWeight="medium">{title}</Text>
-    <Text fontSize="xs" color="fg.muted">{description}</Text>
+    <Text fontSize="sm" fontWeight="medium">
+      {title}
+    </Text>
+    <Text fontSize="xs" color="fg.muted">
+      {description}
+    </Text>
   </VStack>
   <IconButton />
 </HStack>
 ```
 
 **Key Points**:
+
 - Flatter design = easier to scan
 - Smaller gaps (gap="2" instead of "3")
 - No nested Card.Header/Body components
@@ -1274,15 +1527,18 @@ const handleVoiceInput = () => {
 ### Dual Linter Setup: oxc + ESLint
 
 **Why Both?**
+
 - **oxc**: Fast Rust-based linter for core correctness checks (~35ms for 214 files)
 - **ESLint**: Plugin ecosystem for framework-specific rules (Panda CSS, React Compiler, etc.)
 
 **Installation**:
+
 ```bash
 bun add -d oxlint eslint-plugin-oxlint
 ```
 
 **Configuration** (`.oxlintrc.json`):
+
 ```json
 {
   "$schema": "https://oxc.rs/schemas/oxlint/v1.json",
@@ -1306,6 +1562,7 @@ bun add -d oxlint eslint-plugin-oxlint
 ```
 
 **ESLint Integration** (`eslint.config.mjs`):
+
 ```javascript
 import oxlint from 'eslint-plugin-oxlint';
 
@@ -1317,6 +1574,7 @@ const config = tseslint.config(
 ```
 
 **Script Updates**:
+
 ```json
 {
   "lint": "oxlint src && eslint src",
@@ -1327,16 +1585,19 @@ const config = tseslint.config(
 ```
 
 **Benefits**:
+
 - 10-100x faster linting with oxc
 - Keep ESLint plugins for framework-specific rules
 - Run oxc first (fast), then ESLint (comprehensive)
 - Both linters run in sequence - if oxc fails, ESLint won't run
 
 **Issues Found by oxc**:
+
 - Empty object destructuring: `const {} = useSpace()` → Removed unused destructuring
 - Useless fallback in spread: `...(obj || {})` → `...obj` (spreading falsy values is safe)
 
 ### Key Learnings
+
 1. **Performance**: oxc is significantly faster than ESLint for core checks
 2. **Complementary**: Use both linters for best of both worlds
 3. **Sequential Execution**: `&&` ensures oxc passes before ESLint runs
@@ -1346,6 +1607,7 @@ const config = tseslint.config(
 ## 2025-10-02 - iCal Feed & Complete Dynamic Styling Elimination
 
 ### iCal Feed Enhancements
+
 - **Task Status**: Completed tasks now show as `STATUS:CANCELLED`
 - **Habit Timing**: Use `habit.createdAt` as start date with `reminderTime` for daily occurrence
 - **Metadata Links**: Append `metadata.link` to event descriptions for both tasks and habits
@@ -1354,6 +1616,7 @@ const config = tseslint.config(
 - **Color Support**: Attempted but ical-generator doesn't support color property on events
 
 ### Dynamic Styling Migration (Panda CSS) - ZERO TOLERANCE
+
 **Problem**: ESLint warnings about dynamic values - "Remove dynamic value. Prefer static styles"
 
 **Root Cause**: Panda CSS performs static analysis at build time and cannot optimize runtime values.
@@ -1361,6 +1624,7 @@ const config = tseslint.config(
 #### Solution Patterns
 
 **1. Use `colorPalette` Prop for Color Variants**
+
 ```typescript
 // ❌ WRONG - Dynamic bg value
 <Box bg={getPriorityColor(task.priority)} />
@@ -1373,12 +1637,13 @@ const config = tseslint.config(
 ```
 
 **2. Data Attributes + Global CSS for Conditional Styles**
+
 ```typescript
 // ❌ WRONG - Ternary in style prop
 <Box
   borderColor={isDragOver ? 'colorPalette.default' : 'transparent'}
   bg={isDragOver ? 'colorPalette.subtle' : 'bg.muted'}
-/>
+/>;
 
 // ✅ CORRECT - Data attribute + CSS
 const dragStyles = css({
@@ -1390,10 +1655,11 @@ const dragStyles = css({
   }
 });
 
-<Box data-drag-over={isDragOver} className={dragStyles} />
+<Box data-drag-over={isDragOver} className={dragStyles} />;
 ```
 
 **3. CSS Custom Properties for Truly Dynamic Values**
+
 ```typescript
 // ❌ WRONG - Inline style with dynamic value
 <Box style={{ width: `${progress}%` }} />
@@ -1406,6 +1672,7 @@ const dragStyles = css({
 ```
 
 **4. Global CSS for Space-Based Color Palettes**
+
 ```typescript
 // panda.config.ts globalCss
 globalCss: {
@@ -1418,6 +1685,7 @@ globalCss: {
 ```
 
 #### Files Modified (Complete List)
+
 - **Agenda/TaskItem.tsx** - Priority colors with data-priority attribute
 - **Kanban/TaskCard.tsx** - Priority indicator with data-priority
 - **Pomodoro/PomodoroTimer.tsx** - Session type colors and progress bar with CSS variables
@@ -1433,6 +1701,7 @@ globalCss: {
   - `[data-session-type]` → colorPalette
 
 #### Critical Pattern: Completion State Styling
+
 ```typescript
 // ❌ WRONG - Dynamic background based on state
 <Box bg={habit.completedToday ? 'green.subtle' : 'bg.muted'} />
@@ -1450,6 +1719,7 @@ globalCss: {
 ```
 
 #### Critical Pattern: Calendar State Styling
+
 ```typescript
 // ❌ WRONG - Ternary operators for conditional styles
 <Box
@@ -1478,14 +1748,17 @@ globalCss: {
 ```
 
 #### User Feedback & Enforcement
+
 - **"dynamic styling warnings are NOT acceptable lah"** - Zero tolerance policy
 - **"you can overcome that by several technique we discussed already"** - Must use data attributes
 - **Final Result**: Zero dynamic styling warnings, all lint and TypeScript errors resolved
 
 ### TypeScript Error Fixes
+
 **Problem**: Lucide icons don't accept Panda CSS props
 
 **Solution**: Wrap in Box when needing Panda styles
+
 ```typescript
 // ❌ WRONG
 <Clock flexShrink="0" width="16" height="16" />
@@ -1497,9 +1770,11 @@ globalCss: {
 ```
 
 ### Async Handler Fixes
+
 **Problem**: `Promise-returning function provided to attribute where a void return was expected`
 
 **Solution**: Wrap with void operator
+
 ```typescript
 // ❌ WRONG
 onClick={() => handleDismiss(id)}
@@ -1509,6 +1784,7 @@ onClick={() => { void handleDismiss(id); }}
 ```
 
 ### Key Learnings
+
 1. **Panda CSS Philosophy**: Prefer compile-time generation over runtime styling
 2. **Data Attributes**: Powerful pattern for state-based styling without dynamic values
 3. **CSS Custom Properties**: Bridge between dynamic JavaScript values and static CSS
@@ -1518,12 +1794,14 @@ onClick={() => { void handleDismiss(id); }}
 ## 2025-10-02 - Habit Links & UI Improvements
 
 ### Features Implemented
+
 - **Habit Links**: Added link support to habits (similar to tasks)
   - Database: Added `metadata` JSONB field to habits table
   - API: Updated all habit endpoints (GET, POST, PATCH) to handle links
   - UI: Added link input in habit form, display with ExternalLink icon in cards/agenda
 
 ### UX Improvements
+
 - **Dialog Animations**: Fixed TaskDialog flash on close by delaying state reset (200ms)
   - Applied to agenda, tasks, kanban board, and all boards pages
 - **Countdown Timer**: Hide countdown for completed tasks or tasks in "Done" column
@@ -1533,6 +1811,7 @@ onClick={() => { void handleDismiss(id); }}
 - **Clickable Habits**: Made entire habit card clickable in agenda day view sidebar
 
 ### Technical Notes
+
 - Checkbox component accepts children for labels - no need for separate label elements
 - Dialog animation delay prevents flash of reset state when closing dialogs
 - Always check `column.name.toLowerCase() === 'done'` when hiding UI for done tasks
@@ -1542,6 +1821,7 @@ onClick={() => { void handleDismiss(id); }}
 ### The Problem: Timezone Inconsistency
 
 **User Feedback**:
+
 - "this cutting timezone ain't it lah, when i updated a task it goes back 7 hr for some fucking reason, PICK ONE AND STICK WITH IT"
 - "EVERYTHING IS NOT IN THEIR RIGHT COLUMN LAH"
 - "WHEN I OPEN THE TASK DIALOG ON 27 IT SHOWS UP AT 28 2:00"
@@ -1549,6 +1829,7 @@ onClick={() => { void handleDismiss(id); }}
 - "EVERYTHING PASSED TO THE SERVER MUST BE IN UNIX IN UTC"
 
 **Root Cause**: Three separate issues causing timezone chaos:
+
 1. Frontend was using `instanceDate` (UTC format) to group tasks by day
 2. TaskDialog was not consistently converting between UTC and local
 3. Mixed date format handling throughout the codebase
@@ -1558,6 +1839,7 @@ onClick={() => { void handleDismiss(id); }}
 **Core Principle**: Server stores UTC, display shows local time, proper conversion both ways.
 
 #### 1. TaskDialog Display (TaskDialog.tsx:484-500)
+
 ```typescript
 // Convert UTC from server to local for datetime-local input
 defaultValue={
@@ -1581,6 +1863,7 @@ defaultValue={
 **Key**: `new Date()` constructor automatically converts UTC to local timezone. Extract components with local methods.
 
 #### 2. TaskDialog Submission (TaskDialog.tsx:147-221)
+
 ```typescript
 // Convert datetime-local to UTC ISO string before submitting
 const dueDateInput = form.querySelector('input[name="dueDate"]') as HTMLInputElement;
@@ -1601,6 +1884,7 @@ if (dueDateInput && dueDateInput.value) {
 **Key**: `datetime-local` input interprets its value as local time. Use `.toISOString()` to convert to UTC.
 
 #### 3. Agenda Page Submission (+Page.tsx:201-212)
+
 ```typescript
 if (data.dueDate) {
   const dateStr = data.dueDate as string;
@@ -1616,7 +1900,9 @@ if (data.dueDate) {
 ```
 
 #### 4. Event Grouping Fix (+Page.tsx:272-288)
+
 **The Critical Fix**: Stop using `instanceDate` for display grouping
+
 ```typescript
 // Group events by LOCAL date, not UTC instanceDate
 events?.forEach((event) => {
@@ -1638,6 +1924,7 @@ events?.forEach((event) => {
 ```
 
 **Why This Matters**:
+
 - `instanceDate` is set server-side using `.toISOString().split('T')[0]` which extracts UTC date
 - A task at `2025-09-27T17:00:00.000Z` (UTC) is actually `2025-09-28T02:00` in JST (+9)
 - Old code: Grouped by `instanceDate: "2025-09-27"` → appeared on Saturday
@@ -1646,11 +1933,13 @@ events?.forEach((event) => {
 ### The instanceDate Dilemma
 
 **What is instanceDate?**
+
 - Used for tracking specific instances of recurring tasks
 - Stored as UTC date string (YYYY-MM-DD) in `recurring.ts:77,84,102`
 - Purpose: Completion tracking for recurring tasks
 
 **Why Not Fix It Server-Side?**
+
 - `instanceDate` is for **backend logic** (tracking which instance was completed)
 - Display grouping should use **local timezone** (what user sees)
 - Separation of concerns: backend tracking vs frontend display
@@ -1695,11 +1984,13 @@ events?.forEach((event) => {
 **Problem**: Simple cookie-based auth not sufficient for production use.
 
 **User Feedback**:
+
 - "how do it set up oauth lah"
 - "where is google from???? I am trying to use my custom auth"
 - "why are we not logging out via oidc"
 
 **Solution**: Full OIDC integration with Keycloak
+
 ```typescript
 // Key endpoints for Keycloak
 const authUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/auth`;
@@ -1715,6 +2006,7 @@ const logoutUrl = `${OIDC_CONFIG.issuer}/protocol/openid-connect/logout`;
 **Problem**: `set.redirect = url` doesn't work in Elysia.
 
 **Solution**: Use explicit status code and Location header
+
 ```typescript
 set.status = 302;
 set.headers['Location'] = authUrl;
@@ -1726,6 +2018,7 @@ return;
 **User Guidance**: "have a look at server.ts in renderPage, you can pass in user and stuff that will go into the guard"
 
 **Solution**: Pass user data from renderPage to pageContext
+
 ```typescript
 // server/index.ts - renderPage handler
 .get('/*', async ({ request, cookie, jwt }) => {
@@ -1770,6 +2063,7 @@ export const guard = (pageContext: PageContext) => {
 **Problem**: TypeScript doesn't know about custom pageContext properties.
 
 **Solution**: Extend Vike namespace globally
+
 ```typescript
 // src/vike.d.ts
 declare global {
@@ -1796,6 +2090,7 @@ export {};
 **Root Cause**: Using `new Date()` constructor with string causes UTC interpretation vs local timezone.
 
 **Solution**: Treat dates as calendar dates (year-month-day), not timestamps
+
 ```typescript
 // Client - use local timezone formatting
 const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -1811,6 +2106,7 @@ const checkDate = new Date(`${query.date}T00:00:00.000Z`);
 **Problem**: Just clearing cookie doesn't end session on auth server.
 
 **Solution**: Redirect to OIDC logout endpoint
+
 ```typescript
 .post('/api/auth/logout', ({ cookie, set }) => {
   const token = cookie.auth.value;
@@ -1829,6 +2125,7 @@ const checkDate = new Date(`${query.date}T00:00:00.000Z`);
 ```
 
 Client simplifies to just navigate:
+
 ```typescript
 const logout = async () => {
   queryClient.clear();
@@ -1843,17 +2140,19 @@ const logout = async () => {
 **Problem**: Interfaces scattered across component files causing maintenance issues.
 
 **User Feedback**:
+
 - "what about type Task in +Page.tsx???"
 - "I WANT ALL interface away from Page"
 - "especially if it's tied to database entities"
 
 **Solution**:
+
 ```typescript
 // Created src/shared/types/ directory with modular files:
-- board.ts    // Board, Column interfaces
-- task.ts     // Task, Subtask interfaces
-- user.ts     // User, AuthUser interfaces
-- calendar.ts // CalendarEvent, Habit interfaces
+-board.ts - // Board, Column interfaces
+  task.ts - // Task, Subtask interfaces
+  user.ts - // User, AuthUser interfaces
+  calendar.ts; // CalendarEvent, Habit interfaces
 ```
 
 **Key Rule**: Props interfaces stay in components, data models move to shared types.
@@ -1863,6 +2162,7 @@ const logout = async () => {
 **Problem**: Couldn't uncheck tasks in week view - recurring tasks creating duplicates.
 
 **Solution**:
+
 1. Created `task_completions` table with (task_id, date) unique constraint
 2. Pass `instanceDate` when toggling recurring tasks
 3. Match specific instances using date comparison:
@@ -1888,6 +2188,7 @@ const completeTask = (taskId: string, dueDate?: string | Date) => {
 **Iteration 3**: Grid layout → "use the whole width lah"
 
 **Final Solution**:
+
 ```typescript
 // Full-width CSS Grid
 <Box w="full" px="4" py="4">
@@ -1907,6 +2208,7 @@ const completeTask = (taskId: string, dueDate?: string | Date) => {
 ### Recurring Pattern Expansion
 
 **Pattern**: Server-side expansion in API, not database storage
+
 ```typescript
 // Expand recurring tasks in memory
 for (let currentDay = startDate; currentDay <= endDate; ) {
@@ -1920,6 +2222,7 @@ for (let currentDay = startDate; currentDay <= endDate; ) {
 ### Conditional API Behavior
 
 **Pattern**: Use query parameters to determine API logic
+
 ```typescript
 // Different behavior with/without date parameter
 if (query.date) {
@@ -1933,16 +2236,18 @@ if (query.date) {
 ### Space Filtering Strategy
 
 **Always include space in React Query keys**:
+
 ```typescript
 queryKey: ['habits', selectedDate, currentSpace]
 // Pass to API
-`/api/habits?date=${date}&space=${currentSpace}`
+`/api/habits?date=${date}&space=${currentSpace}`;
 ```
 
 ### Visual State vs Text Labels
 
 **User Feedback**: "no need disabled badge"
 **Solution**: Use opacity and color changes instead of text labels
+
 ```typescript
 opacity={disabled ? 0.5 : 1}
 color={disabled ? 'fg.subtle' : 'fg.default'}
@@ -1956,17 +2261,17 @@ color={disabled ? 'fg.subtle' : 'fg.default'}
 **After**: 10 separate route files ~150-200 lines each
 
 **Pattern**:
+
 ```typescript
 // Each route file
-export const tasksRoutes = new Elysia({ prefix: '/tasks' })
-  .use(withAuth())
-  .get('/', handler)
+export const tasksRoutes = new Elysia({ prefix: '/tasks' }).use(withAuth()).get('/', handler);
 ```
 
 ### ElysiaJS Context Propagation Fix
 
 **Problem**: Auth context not propagating to child instances
 **Solution**: Use `{ as: 'global' }` scope
+
 ```typescript
 .derive({ as: 'global' }, async ({ cookie, jwt, db }) => {
   return { user };
@@ -1976,6 +2281,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
 ### Subtasks Foreign Key Pattern
 
 **Important**: Subtasks are relations, not JSONB
+
 ```typescript
 // Update requires delete + insert
 await db.delete(subtasks).where(eq(subtasks.taskId, id));
@@ -1986,19 +2292,19 @@ await db.insert(subtasks).values(newSubtasks);
 
 ### Park-UI Component Props
 
-| Component | Wrong | Correct |
-|-----------|-------|---------|
-| TaskDialog | `isOpen` | `open` |
-| Badge | `size="xs"` | `size="sm"` |
-| Dialog | Basic import | Styled import |
+| Component  | Wrong        | Correct       |
+| ---------- | ------------ | ------------- |
+| TaskDialog | `isOpen`     | `open`        |
+| Badge      | `size="xs"`  | `size="sm"`   |
+| Dialog     | Basic import | Styled import |
 
 ### TypeScript Errors
 
 **Self-referencing foreign keys**:
+
 ```typescript
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
-parentTaskId: uuid('parent_task_id')
-  .references((): AnyPgColumn => tasks.id)
+parentTaskId: uuid('parent_task_id').references((): AnyPgColumn => tasks.id);
 ```
 
 ### Logger Usage
@@ -2025,7 +2331,7 @@ logger.error('Message', error);
 - Use onSuccess for cache invalidation
 - **`queryKey` and `Date` Objects Issue**:
   - **Problem**: When using `Date` objects directly in `queryKey` (e.g., `['habits', selectedDate, currentSpace]`), `react-query`'s shallow comparison might not trigger a refetch even if the `selectedDate` object instance changes but represents the same date value. This can lead to stale data being displayed in the UI.
-  - **Observed Behavior**: After a successful `POST` to update a habit's completion status for a specific date, the subsequent `GET` request for habits sometimes fetches data for an *incorrect or stale date*, even though `invalidateQueries` was called with the correct date from the mutation variables.
+  - **Observed Behavior**: After a successful `POST` to update a habit's completion status for a specific date, the subsequent `GET` request for habits sometimes fetches data for an _incorrect or stale date_, even though `invalidateQueries` was called with the correct date from the mutation variables.
   - **Potential Solution/Investigation**: Consider formatting `Date` objects into a stable string representation (e.g., `format(selectedDate, 'yyyy-MM-dd')`) when used in `queryKey` to ensure `react-query` correctly identifies changes and triggers refetches.
 
 ### Event Propagation
@@ -2038,16 +2344,19 @@ onClick={(e) => e.stopPropagation()}
 ## Architecture Insights
 
 ### Database Design
+
 - One-to-many for recurring tasks (task → completions)
 - JSONB for simple arrays (labels, tags)
 - Foreign keys for relationships (subtasks)
 
 ### Real-time Updates
+
 - WebSocket for entity changes
 - React Query for cache management
 - Optimistic updates for better UX
 
 ### Build Pipeline
+
 - PandaCSS codegen → Nodemon → Vite
 - HMR with 320ms CSS extraction
 - TypeScript strict mode enabled
@@ -2057,6 +2366,7 @@ onClick={(e) => e.stopPropagation()}
 ## Quick Reference
 
 ### Commands That Work
+
 ```bash
 bun run dev          # Port 3000
 bunx tsc --noEmit    # Type checking
@@ -2065,11 +2375,13 @@ bun run db:push      # Apply migrations
 ```
 
 ### File Size Limits
+
 - Components: Max 400 lines
 - Route files: ~150-200 lines ideal
 - Split when approaching limits
 
 ### Testing Checklist
+
 - [ ] Chrome DevTools on port 3000
 - [ ] Check Network tab for API calls
 - [ ] Verify WebSocket connections

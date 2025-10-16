@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, addDays, addWeeks, endOfDay, startOfDay, endOfMonth } from 'date-fns';
+import { format, addDays, addWeeks, endOfDay, endOfMonth } from 'date-fns';
 import { ArrowRight } from 'lucide-react';
 import { VStack, HStack, Box } from 'styled-system/jsx';
 import { Button } from '../ui/button';

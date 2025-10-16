@@ -63,15 +63,13 @@ export default function AgendaPage() {
       let start: Date, end: Date;
 
       if (viewMode === 'day') {
-        // Get local midnight and end of day
-        // For day view, fetch from 30 days ago to include overdue tasks
+        // Day view: fetch only the selected day
         start = new Date(selectedDate);
-        start.setDate(start.getDate() - 30);
         start.setHours(0, 0, 0, 0);
         end = new Date(selectedDate);
         end.setHours(23, 59, 59, 999);
       } else {
-        // Week view - local timezone boundaries
+        // Week view: fetch the entire week
         const weekStart = startOfWeek(selectedDate);
         const weekEnd = endOfWeek(selectedDate);
         start = new Date(weekStart);
@@ -81,11 +79,15 @@ export default function AgendaPage() {
       }
 
       // Convert to UNIX timestamps (seconds)
+      // Use Math.floor for start, but Math.ceil for end to include tasks at end of day
       const startUnix = Math.floor(start.getTime() / 1000);
-      const endUnix = Math.floor(end.getTime() / 1000);
+      const endUnix = Math.ceil(end.getTime() / 1000);
+
+      // Include overdue tasks for day view
+      const includeOverdueParam = viewMode === 'day' ? '&includeOverdue=true' : '';
 
       const response = await fetch(
-        `/api/calendar/events?start=${startUnix}&end=${endUnix}&space=${currentSpace}`
+        `/api/calendar/events?start=${startUnix}&end=${endUnix}&space=${currentSpace}${includeOverdueParam}`
       );
       if (!response.ok) throw new Error('Failed to fetch events');
       return response.json();

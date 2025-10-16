@@ -1,18 +1,26 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte } from 'drizzle-orm';
 import { reminders } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 
 export const remindersRoutes = new Elysia({ prefix: '/reminders' })
   .use(withAuth())
-  // Get all reminders for the current user
+  // Get upcoming reminders for the current user (not sent, future only)
   .get(
     '/',
     async ({ user, db }) => {
+      const now = new Date();
+
       const userReminders = await db
         .select()
         .from(reminders)
-        .where(eq(reminders.userId, user.id))
+        .where(
+          and(
+            eq(reminders.userId, user.id),
+            eq(reminders.sent, false),
+            gte(reminders.reminderTime, now)
+          )
+        )
         .orderBy(desc(reminders.reminderTime));
 
       return userReminders;
@@ -20,8 +28,8 @@ export const remindersRoutes = new Elysia({ prefix: '/reminders' })
     {
       detail: {
         tags: ['Reminders'],
-        summary: 'Get all reminders',
-        description: 'Get all reminders for the current user'
+        summary: 'Get upcoming reminders',
+        description: 'Get all upcoming reminders for the current user (not sent, future only)'
       }
     }
   )

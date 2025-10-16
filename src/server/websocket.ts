@@ -29,7 +29,9 @@ class WebSocketManager {
   // Broadcast to specific user
   broadcastToUser(userId: string, message: WSMessage) {
     if (this.app?.server?.publish) {
-      this.app.server.publish(`user:${userId}`, JSON.stringify(message));
+      const channel = `user:${userId}`;
+      const payload = JSON.stringify(message);
+      this.app.server.publish(channel, payload);
     }
   }
 

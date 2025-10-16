@@ -26,6 +26,7 @@ interface ActivePomodoroState {
   duration: number;
   timeLeft: number;
   isRunning: boolean;
+  startTime?: string | null; // ISO string timestamp when timer started
   completedSessions: number;
   taskId?: string;
   taskTitle?: string;
@@ -49,7 +50,7 @@ function getAudioContext(): AudioContext | null {
 
     // Resume context if it was suspended (required on mobile)
     if (audioContext.state === 'suspended') {
-      audioContext.resume().catch(err => console.error('Failed to resume audio context:', err));
+      audioContext.resume().catch((err) => console.error('Failed to resume audio context:', err));
     }
 
     return audioContext;
@@ -120,6 +121,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     return false;
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasCompletedRef = useRef(false); // Track if completion was already handled
 
   // Fetch active timer state from server
   const { data: serverState } = useQuery<ActivePomodoroState | null>({
@@ -148,6 +150,10 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   useEffect(() => {
     if (serverState?.isRunning && localTimeLeft === null) {
       setLocalTimeLeft(serverState.timeLeft);
+    }
+    // Reset completion flag when timer is running or has time left
+    if (serverState && (serverState.isRunning || serverState.timeLeft > 0)) {
+      hasCompletedRef.current = false;
     }
   }, [serverState, localTimeLeft]);
 
@@ -187,7 +193,10 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   });
 
   const handleComplete = useCallback(() => {
-    if (!serverState) return;
+    if (!serverState || hasCompletedRef.current) return;
+
+    // Mark as completed to prevent re-triggering
+    hasCompletedRef.current = true;
 
     playSound();
 
@@ -200,50 +209,77 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         type: 'work'
       });
 
-      // Show notification
+      // Show notification safely
       if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('Pomodoro Complete!', {
-          body: `Great work! Time for a ${serverState.completedSessions % 4 === 3 ? 'long' : 'short'} break.`,
-          icon: '/favicon.ico'
-        });
-        void notification;
+        try {
+          // Use navigator.serviceWorker if available, otherwise fall back to Notification API
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            void navigator.serviceWorker.ready
+              .then((registration) => {
+                return registration.showNotification('Pomodoro Complete!', {
+                  body: `Great work! Time for a ${serverState.completedSessions % 4 === 3 ? 'long' : 'short'} break.`,
+                  icon: '/favicon.ico'
+                });
+              })
+              .catch(() => {
+                // Service worker not ready or notification failed
+              });
+          }
+        } catch (error) {
+          // Silently fail if notifications don't work
+          console.warn('Notification failed:', error);
+        }
       }
 
       // Switch to break
       const breakType = serverState.completedSessions % 4 === 3 ? 'long-break' : 'short-break';
       const breakDuration = TIMERS[breakType];
       updateStateMutation.mutate({
-        ...serverState,
         type: breakType,
         duration: breakDuration,
         timeLeft: breakDuration,
         isRunning: false,
-        completedSessions: serverState.completedSessions + 1
+        completedSessions: serverState.completedSessions + 1,
+        ...(serverState.taskId != null && { taskId: serverState.taskId }),
+        ...(serverState.taskTitle != null && { taskTitle: serverState.taskTitle })
       });
     } else {
       // Switch back to work
       updateStateMutation.mutate({
-        ...serverState,
         type: 'work',
         duration: TIMERS.work,
         timeLeft: TIMERS.work,
-        isRunning: false
+        isRunning: false,
+        completedSessions: serverState.completedSessions,
+        ...(serverState.taskId != null && { taskId: serverState.taskId }),
+        ...(serverState.taskTitle != null && { taskTitle: serverState.taskTitle })
       });
 
       if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('Break Complete!', {
-          body: 'Ready to focus again?',
-          icon: '/favicon.ico'
-        });
-        void notification;
+        try {
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            void navigator.serviceWorker.ready
+              .then((registration) => {
+                return registration.showNotification('Break Complete!', {
+                  body: 'Ready to focus again?',
+                  icon: '/favicon.ico'
+                });
+              })
+              .catch(() => {
+                // Service worker not ready
+              });
+          }
+        } catch (error) {
+          console.warn('Notification failed:', error);
+        }
       }
     }
 
     setLocalTimeLeft(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [serverState]);
 
-  // Local timer tick - use ref for mutation to avoid dependency
+  // Local timer tick - calculate from startTime for sync across tabs
   const updateStateMutationRef = useRef(updateStateMutation);
   updateStateMutationRef.current = updateStateMutation;
 
@@ -253,26 +289,43 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         clearTimeout(intervalRef.current);
         intervalRef.current = null;
       }
+      setLocalTimeLeft(null); // Clear local time when paused
       return;
     }
 
-    const currentTimeLeft = localTimeLeft ?? serverState.timeLeft;
+    // Calculate time based on startTime for perfect sync across tabs
+    if (serverState.startTime) {
+      const tick = () => {
+        const startTime = new Date(serverState.startTime!).getTime();
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const newTimeLeft = Math.max(0, serverState.timeLeft - elapsed);
 
-    if (currentTimeLeft > 0) {
-      intervalRef.current = setTimeout(() => {
-        const newTimeLeft = currentTimeLeft - 1;
         setLocalTimeLeft(newTimeLeft);
 
+        if (newTimeLeft === 0) {
+          handleComplete();
+          return;
+        }
+
         // Sync with server every 30 seconds to reduce load
-        if (newTimeLeft % 30 === 0) {
+        if (newTimeLeft % 30 === 0 && newTimeLeft !== serverState.timeLeft) {
           updateStateMutationRef.current.mutate({
-            ...serverState,
-            timeLeft: newTimeLeft
+            type: serverState.type,
+            duration: serverState.duration,
+            timeLeft: newTimeLeft,
+            isRunning: serverState.isRunning,
+            completedSessions: serverState.completedSessions,
+            ...(serverState.taskId != null && { taskId: serverState.taskId }),
+            ...(serverState.taskTitle != null && { taskTitle: serverState.taskTitle })
           });
         }
-      }, 1000);
-    } else if (currentTimeLeft === 0) {
-      handleComplete();
+
+        // Schedule next tick
+        intervalRef.current = setTimeout(tick, 1000);
+      };
+
+      // Start ticking
+      tick();
     }
 
     return () => {
@@ -280,26 +333,36 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
         clearTimeout(intervalRef.current);
       }
     };
-  }, [serverState, localTimeLeft, handleComplete]);
+  }, [serverState, handleComplete]);
 
   const toggleTimer = () => {
     if (!serverState) {
       // Initialize with defaults
+      hasCompletedRef.current = false; // Reset completion flag
       updateStateMutation.mutate({
-        type: 'work',
+        type: 'work' as const,
         duration: TIMERS.work,
         timeLeft: TIMERS.work,
         isRunning: true,
         completedSessions: 0,
-        taskId,
-        taskTitle
+        ...(taskId != null && { taskId }),
+        ...(taskTitle != null && { taskTitle })
       });
       setLocalTimeLeft(TIMERS.work);
     } else {
+      // When resuming, reset completion flag if there's time left
+      const currentTime = localTimeLeft ?? serverState.timeLeft;
+      if (currentTime > 0) {
+        hasCompletedRef.current = false;
+      }
       updateStateMutation.mutate({
-        ...serverState,
-        timeLeft: localTimeLeft ?? serverState.timeLeft,
-        isRunning: !serverState.isRunning
+        type: serverState.type,
+        duration: serverState.duration,
+        timeLeft: currentTime,
+        isRunning: !serverState.isRunning,
+        completedSessions: serverState.completedSessions,
+        ...(serverState.taskId != null && { taskId: serverState.taskId }),
+        ...(serverState.taskTitle != null && { taskTitle: serverState.taskTitle })
       });
     }
   };
@@ -307,11 +370,16 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   const resetTimer = () => {
     if (!serverState) return;
 
+    hasCompletedRef.current = false; // Reset completion flag
     setLocalTimeLeft(null);
     updateStateMutation.mutate({
-      ...serverState,
+      type: serverState.type,
+      duration: serverState.duration,
       timeLeft: serverState.duration,
-      isRunning: false
+      isRunning: false,
+      completedSessions: serverState.completedSessions,
+      ...(serverState.taskId != null && { taskId: serverState.taskId }),
+      ...(serverState.taskTitle != null && { taskTitle: serverState.taskTitle })
     });
   };
 

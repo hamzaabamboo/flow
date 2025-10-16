@@ -149,8 +149,8 @@ export function useWebSocket() {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-    // Get auth token from cookie
-    const token = getCookie('auth');
+    // Get auth token from cookie (use ws_token which is non-httpOnly)
+    const token = getCookie('ws_token');
     const wsUrl = `${protocol}//${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
@@ -206,7 +206,7 @@ export function useWebSocket() {
         console.error('Max reconnection attempts reached. Please refresh the page.');
       }
     };
-  }, [maxReconnectAttempts]);
+  }, [maxReconnectAttempts, handleMessage]);
 
   const sendMessage = useCallback((type: string, data: unknown) => {
     if (ws.current?.readyState === WebSocket.OPEN) {

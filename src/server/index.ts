@@ -260,11 +260,7 @@ app
       headers: headers as HeadersInit
     });
   })
-  .onError(({ code, error, set }) => {
-    if (code === 'NOT_FOUND') {
-      set.status = 404;
-      return { error: 'Not found' };
-    }
+  .onError(({ error, set }) => {
     logger.error(error, 'Server error');
     set.status = 500;
     return { error: 'Internal server error' };

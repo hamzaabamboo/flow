@@ -28,10 +28,13 @@ export const internalError = (message = 'Internal server error') => new HTTPErro
  *   return errorResponse('Resource not found');
  * }
  */
-export const errorResponse = (message: string, details?: unknown) => ({
-  error: message,
-  ...(details && { details })
-});
+export const errorResponse = (message: string, details?: unknown) => {
+  const response: { error: string; details?: unknown } = { error: message };
+  if (details !== undefined) {
+    response.details = details;
+  }
+  return response;
+};
 
 /**
  * Success Response Helper
