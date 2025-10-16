@@ -55,11 +55,11 @@ function DraggableTask({
 
   return (
     <Box
+      key={`${event.id}-${event.instanceDate}`}
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      key={`${event.id}-${event.instanceDate}`}
-      onClick={(e) => {
+      onClick={() => {
         if (!isDragging) {
           onTaskClick(event);
         }

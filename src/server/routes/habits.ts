@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, gte, lte, inArray, count, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, count } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { habits, habitLogs } from '../../../drizzle/schema';
 

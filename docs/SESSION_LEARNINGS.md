@@ -2,6 +2,127 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-16 - Reminder Links & Drag Preview Enhancement
+
+### Problem: Incomplete Notification Links
+
+**User Feedback**:
+- "update reminder link to include domain too lah"
+- "NOW IF IT'S A HABBIT REMINDER PUT THE URL INTO THE MESSAGE TOO"
+- "HABIT LINKS GOES TO THE FUCKING HABIT URL????"
+
+**Issues**:
+1. Task reminder links missing domain (just `/boards/...`)
+2. Habit reminder links missing entirely
+3. UI drag preview going under elements (z-index)
+
+### Solution: Enhanced Reminder System
+
+**Task Reminders** (src/server/cron.ts:38):
+```typescript
+// Add BASE_URL to task reminder links
+if (task?.column?.board) {
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  link = `${baseUrl}/boards/${task.column.board.id}`;
+}
+```
+
+**Habit Reminders** (src/server/services/habit-reminder-service.ts:58-66):
+```typescript
+// Include habit link from metadata in notification
+const metadata = habit.metadata as { link?: string } | null;
+const link = metadata?.link;
+
+let message = `Habit reminder: ${habit.name}`;
+if (link) {
+  message += `\n${link}`;  // Full external URL (e.g., https://youtube.com/...)
+}
+```
+
+**Key Distinction**:
+- Task links: Prepend `BASE_URL` (internal navigation)
+- Habit links: Use as-is (external URLs)
+
+### Drag Preview Z-Index Fix
+
+**Problem**: Week view drag preview appearing under elements
+
+**Solution** (src/components/Agenda/AgendaWeekView.tsx):
+```typescript
+const [activeTask, setActiveTask] = React.useState<CalendarEvent | null>(null);
+
+// Track drag start
+const handleDragStart = (event: DragEndEvent) => {
+  const dragData = event.active.data.current;
+  if (dragData?.event) {
+    setActiveTask(dragData.event as CalendarEvent);
+  }
+};
+
+// Render overlay with proper z-index
+<DragOverlay>
+  {activeTask ? (
+    <Box
+      borderLeftWidth="3px"
+      borderLeftColor="colorPalette.default"
+      borderRadius="sm"
+      p="1.5"
+      bg="bg.muted"
+      boxShadow="lg"
+      opacity={0.9}
+    >
+      {/* Task preview */}
+    </Box>
+  ) : null}
+</DragOverlay>
+```
+
+**Benefits**:
+- DragOverlay renders at root level with high z-index
+- Dragged preview always on top
+- Smooth visual feedback
+
+### Drop Zone Highlight Simplification
+
+**User Feedback**: "highlight looks shit bring it back"
+
+**Solution**: Simplified from complex transform/shadow to just border:
+```typescript
+'&[data-is-over=true]': {
+  borderColor: 'colorPalette.default',
+  borderWidth: '2px'
+}
+```
+
+### Lint Fixes
+
+**Issues Found**:
+1. Unused `sql` import from drizzle-orm
+2. Wrong key prop placement (after spread)
+3. Unused onClick parameter
+
+**Fixes**:
+- Removed unused imports
+- Moved `key` prop before spread operators
+- Changed `onClick={(e) => {...}}` to `onClick={() => {...}}`
+
+### Key Learnings
+
+1. **Environment Variables for URLs**: Always use `process.env.BASE_URL` for internal links
+2. **External vs Internal Links**: Habit links are external (use as-is), task links are internal (prepend domain)
+3. **DragOverlay Pattern**: Use for proper z-index management in drag-and-drop
+4. **Lint Before Commit**: Run `bunx oxlint` to catch unused code
+5. **Key Prop Position**: Must come before spread operators (`{...props}`)
+
+### Files Modified
+
+- `src/server/cron.ts` - Added BASE_URL to task reminder links
+- `src/server/services/habit-reminder-service.ts` - Added habit link to message
+- `src/components/Agenda/AgendaWeekView.tsx` - DragOverlay, simplified highlight
+- `src/server/routes/habits.ts` - Removed unused import
+
+---
+
 ## 2025-10-16 - WebSocket Authentication & Pomodoro Cross-Tab Sync
 
 ### Problem: WebSocket Connections Anonymous
