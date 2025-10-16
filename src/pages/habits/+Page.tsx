@@ -60,6 +60,23 @@ export default function HabitsPage() {
     }
   });
 
+  // Fetch stats for all habits
+  const { data: habitsStats } = useQuery({
+    queryKey: ['habits-stats', currentSpace, habits?.map((h) => h.id)],
+    queryFn: async () => {
+      if (!habits || habits.length === 0) return [];
+
+      const statsPromises = habits.map(async (habit) => {
+        const response = await fetch(`/api/habits/${habit.id}/stats`);
+        if (!response.ok) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
+        return response.json();
+      });
+
+      return Promise.all(statsPromises);
+    },
+    enabled: !!habits && habits.length > 0
+  });
+
   // Create habit
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -273,7 +290,9 @@ export default function HabitsPage() {
               gap: '1rem'
             }}
           >
-            {filteredHabits.map((habit) => (
+            {filteredHabits.map((habit) => {
+              const habitStats = habitsStats?.find((s) => s.habitId === habit.id);
+              return (
               <Card.Root
                 key={habit.id}
                 borderColor={habit.active ? 'border.default' : 'border.subtle'}
@@ -396,7 +415,7 @@ export default function HabitsPage() {
                           </Text>
                         </HStack>
                         <Text fontSize="lg" fontWeight="semibold">
-                          0 times
+                          {habitStats?.totalCompletions || 0} times
                         </Text>
                       </VStack>
 
@@ -408,14 +427,15 @@ export default function HabitsPage() {
                           </Text>
                         </HStack>
                         <Text fontSize="lg" fontWeight="semibold">
-                          0%
+                          {habitStats?.completionRate || 0}%
                         </Text>
                       </VStack>
                     </HStack>
                   </VStack>
                 </Card.Body>
               </Card.Root>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -28,7 +28,7 @@ export function AgendaSidebar({
   statsTitle
 }: AgendaSidebarProps) {
   return (
-    <VStack gap={3}>
+    <VStack gap={6} h="full" justifyContent="space-between">
       {/* Habits Section for Week View */}
       <Card.Root w="full">
         <Card.Header p="3">

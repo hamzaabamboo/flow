@@ -11,23 +11,26 @@ export function isColumnDone(columnName: string): boolean {
  * Check if a task is completed based on its column name or completed flag (for recurring instances)
  */
 export function isTaskCompleted(
-  task: Task | { columnName?: string | null; completed?: boolean; instanceDate?: string }
+  task: Task | { columnName?: string | null; completed?: boolean; instanceDate?: string; recurringPattern?: string | null }
 ): boolean {
-  // First check column name - if in Done column, always consider completed
-  if (task.columnName && isColumnDone(task.columnName)) {
-    return true;
-  }
-
-  // For recurring task instances (not in Done column), check the completed flag for that specific instance
+  // For recurring task instances, check the completed flag for that specific instance FIRST
+  // This allows recurring tasks in Done column to still have incomplete future instances
   if (
     'instanceDate' in task &&
     task.instanceDate &&
     'completed' in task &&
-    task.completed !== undefined
+    task.completed !== undefined &&
+    'recurringPattern' in task &&
+    task.recurringPattern
   ) {
     return task.completed;
   }
 
-  // Not in Done column and not a completed recurring instance
+  // For non-recurring tasks or recurring parent task (no instanceDate), check column name
+  if (task.columnName && isColumnDone(task.columnName)) {
+    return true;
+  }
+
+  // Not completed
   return false;
 }

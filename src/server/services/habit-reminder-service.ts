@@ -55,12 +55,20 @@ export class HabitReminderService {
             return { success: false, reason: 'already-exists' };
           }
 
-          // Create reminder
+          // Create reminder with link if exists
+          const metadata = habit.metadata as { link?: string } | null;
+          const link = metadata?.link;
+
+          let message = `Habit reminder: ${habit.name}`;
+          if (link) {
+            message += `\n${link}`;
+          }
+
           await this.db.insert(reminders).values({
             userId: habit.userId,
             taskId: null,
             reminderTime: reminderTimeUtc,
-            message: `Habit reminder: ${habit.name}`,
+            message,
             sent: false,
             platform: null
           });

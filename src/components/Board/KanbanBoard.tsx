@@ -409,7 +409,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
       title: formData.get('title') as string,
       description: formData.get('description') as string,
       priority: formData.get('priority') as Task['priority'],
-      dueDate: formData.get('dueDate') as string,
+      dueDate: (formData.get('dueDate') as string) || undefined,
       columnId: formData.get('columnId') as string,
       labels: labelsStr ? JSON.parse(labelsStr) : undefined,
       subtasks: subtasksStr ? JSON.parse(subtasksStr) : undefined,

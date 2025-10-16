@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, count, sql } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { habits, habitLogs } from '../../../drizzle/schema';
 
@@ -262,4 +262,61 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
         completed: t.Boolean()
       })
     }
-  );
+  )
+  .get('/:id/stats', async ({ params, db, user }) => {
+    // Verify habit ownership
+    const [habit] = await db
+      .select()
+      .from(habits)
+      .where(and(eq(habits.id, params.id), eq(habits.userId, user.id)));
+
+    if (!habit) {
+      return { error: 'Habit not found' };
+    }
+
+    // Get total completions
+    const [completionCount] = await db
+      .select({ count: count() })
+      .from(habitLogs)
+      .where(and(eq(habitLogs.habitId, params.id), eq(habitLogs.completed, true)));
+
+    const totalCompletions = completionCount?.count || 0;
+
+    // Calculate expected occurrences based on habit frequency
+    // Use creation date to current date as the range
+    const habitCreatedAt = habit.createdAt || new Date();
+    const now = new Date();
+    const daysSinceCreation = Math.floor(
+      (now.getTime() - habitCreatedAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let expectedOccurrences = 0;
+    if (habit.frequency === 'daily') {
+      expectedOccurrences = daysSinceCreation + 1; // +1 to include today
+    } else if (habit.frequency === 'weekly' && habit.targetDays) {
+      // Calculate how many times the target days occurred since creation
+      const weeksSinceCreation = Math.floor(daysSinceCreation / 7);
+      const remainingDays = daysSinceCreation % 7;
+      expectedOccurrences = weeksSinceCreation * habit.targetDays.length;
+
+      // Add remaining days
+      for (let i = 0; i <= remainingDays; i++) {
+        const checkDate = new Date(habitCreatedAt);
+        checkDate.setDate(habitCreatedAt.getDate() + i);
+        if (habit.targetDays.includes(checkDate.getDay())) {
+          expectedOccurrences++;
+        }
+      }
+    }
+
+    const completionRate = expectedOccurrences > 0
+      ? Math.round((totalCompletions / expectedOccurrences) * 100)
+      : 0;
+
+    return {
+      totalCompletions,
+      expectedOccurrences,
+      completionRate,
+      habitId: params.id
+    };
+  });

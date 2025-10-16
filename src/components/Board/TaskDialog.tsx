@@ -13,6 +13,7 @@ import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Checkbox } from '../ui/checkbox';
 import { SimpleDatePicker } from '../ui/simple-date-picker';
+import { QuickDateTimePicker } from '../ui/quick-date-time-picker';
 import * as Dialog from '../ui/styled/dialog';
 import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
 
@@ -59,7 +60,7 @@ export function TaskDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
-  const [dueDateKey, setDueDateKey] = useState(0);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
 
   // Fetch boards to allow moving tasks between boards/columns
   // The API returns boards with columns in a single request - no N+1!
@@ -120,6 +121,7 @@ export function TaskDialog({
       setCreateReminder(task?.createReminder || false);
       setRecurringPattern(task?.recurringPattern || '');
       setRecurringEndDate(task?.recurringEndDate || '');
+      setDueDate(task?.dueDate ? new Date(task.dueDate) : null);
       setNewSubtask('');
       setNewLabel('');
 
@@ -139,6 +141,7 @@ export function TaskDialog({
       setCreateReminder(false);
       setRecurringPattern('');
       setRecurringEndDate('');
+      setDueDate(null);
       setNewSubtask('');
       setNewLabel('');
       setShowAdvanced(false);
@@ -153,23 +156,13 @@ export function TaskDialog({
     // Add hidden fields for enhanced features
     const form = e.currentTarget;
 
-    // Convert datetime-local to UTC ISO string
-    const dueDateInput = form.querySelector('input[name="dueDate"]') as HTMLInputElement;
-    if (dueDateInput && dueDateInput.value) {
-      // datetime-local value is in local timezone (YYYY-MM-DDTHH:mm)
-      // Convert to UTC ISO string for server
-      const localDate = new Date(dueDateInput.value);
-      const utcISOString = localDate.toISOString();
-
-      // Replace the input value with UTC ISO string
-      const utcInput = document.createElement('input');
-      utcInput.type = 'hidden';
-      utcInput.name = 'dueDate';
-      utcInput.value = utcISOString;
-      form.appendChild(utcInput);
-
-      // Hide the original datetime-local input from form submission
-      dueDateInput.name = 'dueDate_local';
+    // Add due date as hidden input if set
+    if (dueDate) {
+      const dueDateInput = document.createElement('input');
+      dueDateInput.type = 'hidden';
+      dueDateInput.name = 'dueDate';
+      dueDateInput.value = dueDate.toISOString(); // Convert to UTC ISO string
+      form.appendChild(dueDateInput);
     }
 
     // Add labels as JSON
@@ -211,11 +204,8 @@ export function TaskDialog({
     originalOnSubmit(e);
 
     // Clean up the added inputs
-    if (dueDateInput && dueDateInput.value) {
-      dueDateInput.name = 'dueDate'; // Restore original name
-      const utcInput = form.querySelector('input[name="dueDate"][type="hidden"]');
-      if (utcInput) form.removeChild(utcInput);
-    }
+    const dueDateInput = form.querySelector('input[name="dueDate"][type="hidden"]');
+    if (dueDateInput) form.removeChild(dueDateInput);
     form.removeChild(labelsInput);
     form.removeChild(subtasksInput);
     form.removeChild(recurringInput);
@@ -503,44 +493,24 @@ export function TaskDialog({
 
                     {/* Due Date */}
                     <Box>
-                      <HStack justifyContent="space-between" mb="1">
+                      <HStack justifyContent="space-between" mb="2">
                         <Text fontSize="sm" fontWeight="medium">
                           <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
                           Due Date
                         </Text>
-                        <IconButton
-                          type="button"
-                          variant="ghost"
-                          size="xs"
-                          aria-label="Clear due date"
-                          onClick={() => {
-                            setDueDateKey((prev) => prev + 1);
-                          }}
-                        >
-                          <XCircle width="14" height="14" />
-                        </IconButton>
+                        {dueDate && (
+                          <IconButton
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            aria-label="Clear due date"
+                            onClick={() => setDueDate(null)}
+                          >
+                            <XCircle width="14" height="14" />
+                          </IconButton>
+                        )}
                       </HStack>
-                      <Input
-                        key={dueDateKey}
-                        type="datetime-local"
-                        name="dueDate"
-                        defaultValue={
-                          task?.dueDate
-                            ? (() => {
-                                // Server sends UTC ISO string, convert to local for display
-                                const date = new Date(task.dueDate);
-                                if (isNaN(date.getTime())) return ''; // Invalid date
-                                // Use local timezone methods to format for datetime-local input
-                                const year = date.getFullYear();
-                                const month = String(date.getMonth() + 1).padStart(2, '0');
-                                const day = String(date.getDate()).padStart(2, '0');
-                                const hours = String(date.getHours()).padStart(2, '0');
-                                const minutes = String(date.getMinutes()).padStart(2, '0');
-                                return `${year}-${month}-${day}T${hours}:${minutes}`;
-                              })()
-                            : ''
-                        }
-                      />
+                      <QuickDateTimePicker value={dueDate} onChange={setDueDate} size="md" />
                     </Box>
 
                     {/* Reminder */}

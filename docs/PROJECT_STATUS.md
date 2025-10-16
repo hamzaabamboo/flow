@@ -6,6 +6,55 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-10-16)
+
+### ✅ Completed This Session - UI/UX Enhancements & Analytics
+
+- **Sort Boards by Activity** - Better board organization
+  - Boards now sort by `updatedAt` in descending order (most recently updated first)
+  - Improves workflow by surfacing active boards at the top
+  - Applied to GET /api/boards endpoint using `.orderBy(desc(boards.updatedAt))`
+
+- **QuickDateTimePicker Component** - Enhanced date/time selection ✨
+  - Created new component combining preset buttons with full Park UI calendar
+  - **Preset Buttons**: Today 9 AM, Tonight 8 PM, Tomorrow 9 AM, Next Week
+  - **Full Calendar UI**: Park UI DatePicker with day/month/year views
+  - **Separate Time Input**: Clean time selection interface
+  - Maintains Date type internally for consistency
+  - Works with both preset quick-select and custom date/time combinations
+  - Fixed z-index issue: Calendar now appears above dialog modal (z-index: 1400 > 1300)
+
+- **TaskDialog Date Picker Upgrade** - Replaced native datetime-local
+  - Integrated QuickDateTimePicker into TaskDialog
+  - Better UX with visual calendar instead of native browser picker
+  - Preset shortcuts for common time selections
+  - State management with proper Date handling
+
+- **Drag-and-Drop Week View** - Interactive task scheduling 🎯
+  - Tasks can now be dragged between days in week view
+  - Preserves task time when changing dates
+  - Visual feedback with hover effects and opacity changes
+  - Uses @dnd-kit/core for smooth drag interactions
+  - Automatic optimistic updates via updateTaskMutation
+  - Created DraggableTask and DroppableDay components
+  - Full DndContext integration with handleDragEnd logic
+
+- **Habit Statistics Endpoint** - Real-time habit tracking data
+  - New GET /api/habits/:id/stats endpoint
+  - Calculates total completions from habit_logs table
+  - Computes expected occurrences based on:
+    - Daily habits: Days since creation
+    - Weekly habits: Occurrences of target days since creation
+  - Returns completion rate as percentage
+  - Ownership verification for security
+
+- **Habits Page Analytics Display** - Live stats integration
+  - Replaced hardcoded "0 times" and "0%" with real data
+  - Fetches stats for all habits via parallel queries
+  - Displays total completions and completion rate per habit
+  - Loading states and fallback to 0 when no data
+  - Efficient querying with Promise.all for multiple habits
+
 ## Latest Updates (2025-10-14)
 
 ### ✅ Completed This Session - Reminder System Enhancements

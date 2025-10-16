@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { boards, columns, tasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { isColumnDone } from '../utils/taskCompletion';
@@ -26,7 +26,8 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         .from(boards)
         .where(
           and(eq(boards.userId, user.id), eq(boards.space, query.space as 'work' | 'personal'))
-        );
+        )
+        .orderBy(desc(boards.updatedAt));
 
       // Fetch all columns for these boards in one query
       if (userBoards.length > 0) {

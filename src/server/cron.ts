@@ -35,7 +35,8 @@ async function sendToHamBot(reminder: Reminder, db: Database) {
     });
 
     if (task?.column?.board) {
-      link = `/boards/${task.column.board.id}`;
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+      link = `${baseUrl}/boards/${task.column.board.id}`;
     }
   }
 

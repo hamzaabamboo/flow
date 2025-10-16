@@ -350,13 +350,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 
             const overdueTasks = await overdueQueryBuilder;
 
-            // Filter overdue tasks: due date < start date AND not in Done column
+            // Filter overdue tasks: due date < start date AND (not in Done column OR is recurring)
             const filteredOverdueTasks = overdueTasks.filter((task) => {
               if (!task.dueDate) return false;
               const dueDate = new Date(task.dueDate);
               const isOverdue = dueDate < startDate;
               const isNotDone = task.columnName?.toLowerCase() !== 'done';
-              return isOverdue && isNotDone;
+              const isRecurring = !!task.recurringPattern;
+              // Include if: (overdue AND not done) OR (overdue AND recurring)
+              return isOverdue && (isNotDone || isRecurring);
             });
 
             // Merge with main tasks, avoiding duplicates
@@ -365,6 +367,47 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 
             allTasks = [...allTasks, ...uniqueOverdueTasks];
           }
+
+          // Fetch recurring tasks without dueDates (so they can still appear in calendar)
+          const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
+          if (space !== 'all') {
+            recurringConditions.push(eq(boards.space, space));
+          }
+
+          const recurringQueryBuilder = db
+            .select({
+              id: tasks.id,
+              columnId: tasks.columnId,
+              userId: tasks.userId,
+              title: tasks.title,
+              description: tasks.description,
+              dueDate: tasks.dueDate,
+              priority: tasks.priority,
+              noteId: tasks.noteId,
+              labels: tasks.labels,
+              recurringPattern: tasks.recurringPattern,
+              recurringEndDate: tasks.recurringEndDate,
+              parentTaskId: tasks.parentTaskId,
+              metadata: tasks.metadata,
+              createdAt: tasks.createdAt,
+              updatedAt: tasks.updatedAt,
+              space: boards.space,
+              boardId: boards.id,
+              boardName: boards.name,
+              columnName: columns.name
+            })
+            .from(tasks)
+            .leftJoin(columns, eq(tasks.columnId, columns.id))
+            .leftJoin(boards, eq(columns.boardId, boards.id))
+            .where(and(...recurringConditions));
+
+          const recurringTasks = await recurringQueryBuilder;
+
+          // Merge recurring tasks, avoiding duplicates
+          const existingTaskIds = new Set(allTasks.map((t) => t.id));
+          const uniqueRecurringTasks = recurringTasks.filter((t) => !existingTaskIds.has(t.id));
+
+          allTasks = [...allTasks, ...uniqueRecurringTasks];
 
           // Fetch subtasks separately for the fetched tasks
           const taskIds = allTasks.map((t) => t.id);

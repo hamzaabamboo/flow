@@ -113,7 +113,7 @@ function playSound() {
 export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitle?: string }) {
   const queryClient = useQueryClient();
   const [localTimeLeft, setLocalTimeLeft] = useState<number | null>(null);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [isHidden, setIsHidden] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pomodoroHidden') === 'true';

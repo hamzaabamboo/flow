@@ -528,7 +528,7 @@ export default function AgendaPage() {
         ) : isErrorEvents ? (
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }} w="full" h="full">
+          <Grid gap={4} gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }} w="full" minH="calc(100vh - 16rem)">
             <AgendaWeekView
               selectedDate={selectedDate}
               viewMode={viewMode}
@@ -537,6 +537,12 @@ export default function AgendaPage() {
               onToggleHabit={(params) => toggleHabitMutation.mutate(params)}
               onTaskClick={handleTaskClick}
               onToggleTask={completeTask}
+              onTaskDrop={(taskId, newDate) => {
+                updateTaskMutation.mutate({
+                  id: taskId,
+                  dueDate: newDate.toISOString()
+                });
+              }}
             />
             <AgendaSidebar
               habits={habits}

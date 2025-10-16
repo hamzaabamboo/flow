@@ -9,9 +9,15 @@ export function expandRecurringTasks(
   const events = [];
 
   for (const task of tasks) {
-    if (!task.dueDate) continue;
+    // For non-recurring tasks, skip if no dueDate
+    if (!task.dueDate && !task.recurringPattern) continue;
 
-    const taskDueDate = new Date(task.dueDate);
+    // For recurring tasks without dueDate, use createdAt or startDate as the start
+    const taskDueDate = task.dueDate
+      ? new Date(task.dueDate)
+      : task.createdAt
+        ? new Date(task.createdAt)
+        : new Date(startDate);
 
     const formattedTask = {
       ...task,
