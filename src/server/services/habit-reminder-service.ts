@@ -1,4 +1,4 @@
-import { eq, and, lte } from 'drizzle-orm';
+import { eq, and, lte, sql } from 'drizzle-orm';
 import { habits, reminders } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { logger } from '../logger';
@@ -122,15 +122,32 @@ export class HabitReminderService {
     habitName: string,
     reminderTime: Date
   ): Promise<boolean> {
-    const existing = await this.db.query.reminders.findFirst({
-      where: and(
-        eq(reminders.userId, userId),
-        eq(reminders.sent, false),
-        lte(reminders.reminderTime, reminderTime),
-        eq(reminders.message, `Habit reminder: ${habitName}`)
-      )
-    });
+    // Get the date string for comparison (YYYY-MM-DD)
+    const targetDateStr = reminderTime.toISOString().split('T')[0];
 
-    return !!existing;
+    // Find ANY reminder (sent or unsent) for this habit on this date
+    // Use LIKE to handle messages with or without links appended
+    const [existing] = await this.db
+      .select()
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.userId, userId),
+          // Match messages starting with "Habit reminder: {habitName}"
+          sql`${reminders.message} LIKE ${'Habit reminder: ' + habitName + '%'}`
+        )
+      )
+      .limit(1);
+
+    // Check if the existing reminder is for the same date
+    if (existing) {
+      const existingDateStr = existing.reminderTime.toISOString().split('T')[0];
+      if (existingDateStr === targetDateStr) {
+        logger.info(`Reminder already exists for habit "${habitName}" on ${targetDateStr}`);
+        return true;
+      }
+    }
+
+    return false;
   }
 }

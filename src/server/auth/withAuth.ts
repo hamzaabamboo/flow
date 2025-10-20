@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { cookie } from '@elysiajs/cookie';
 import { jwt } from '@elysiajs/jwt';
 import { eq, asc } from 'drizzle-orm';
-import { users } from '../../../drizzle/schema';
+import { users, apiTokens } from '../../../drizzle/schema';
 import { db } from '../db';
 import { logger } from '../logger';
 
@@ -10,6 +10,13 @@ interface AuthUser {
   id: string;
   email: string;
   name: string | null;
+}
+
+// Hash function for API token verification
+async function hashToken(token: string): Promise<string> {
+  const hasher = new Bun.CryptoHasher('sha256');
+  hasher.update(token);
+  return hasher.digest('hex');
 }
 
 // Create a function that returns an Elysia instance with auth context
@@ -24,7 +31,55 @@ export const withAuth = () =>
         secret: process.env.JWT_SECRET || 'your-secret-key'
       })
     )
-    .derive({ as: 'global' }, async ({ cookie, jwt, db, set }) => {
+    .derive({ as: 'global' }, async ({ cookie, jwt, db, set, request }) => {
+      // Check for Bearer token in Authorization header first
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const rawToken = authHeader.substring(7);
+        const hashedToken = await hashToken(rawToken);
+
+        // Look up token in database
+        const [tokenRecord] = await db
+          .select()
+          .from(apiTokens)
+          .where(eq(apiTokens.token, hashedToken));
+
+        if (tokenRecord) {
+          // Check if token is expired
+          if (tokenRecord.expiresAt && new Date(tokenRecord.expiresAt) < new Date()) {
+            set.status = 401;
+            throw new Error('API token expired');
+          }
+
+          // Get user
+          const [user] = await db.select().from(users).where(eq(users.id, tokenRecord.userId));
+
+          if (user) {
+            // Update last used timestamp (fire and forget)
+            db.update(apiTokens)
+              .set({ lastUsedAt: new Date() })
+              .where(eq(apiTokens.id, tokenRecord.id))
+              .execute()
+              .catch(() => {
+                // Ignore update failures
+              });
+
+            return {
+              user: {
+                id: user.id,
+                email: user.email,
+                name: user.name
+              } as AuthUser
+            };
+          }
+        }
+
+        // Invalid API token
+        set.status = 401;
+        throw new Error('Invalid API token');
+      }
+
+      // Fall back to JWT cookie authentication
       const token = cookie.auth?.value;
 
       // Auto-login in development if no token

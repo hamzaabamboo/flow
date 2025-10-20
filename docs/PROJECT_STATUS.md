@@ -6,6 +6,45 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-10-17)
+
+### ✅ Completed This Session - Raycast Extension & API Tokens
+
+- **API Token System** - External API access management
+  - New `api_tokens` table in database schema
+  - Token generation with SHA-256 hashing
+  - API token management routes (`/api/api-tokens`)
+  - Create, list, and revoke tokens via Settings page
+  - Tokens shown only once on creation (security best practice)
+  - Last used timestamp tracking
+  - Optional expiration dates
+
+- **Bearer Token Authentication** - Support for external apps
+  - Updated `withAuth` middleware to check `Authorization` header
+  - Supports both JWT cookies (web) and Bearer tokens (API)
+  - Token validation with automatic expiration checks
+  - Last used timestamp updates on each request
+  - Seamless fallback between auth methods
+
+- **Settings Page API Tokens UI** - User-friendly token management
+  - "API Tokens" section with create/delete functionality
+  - Token list showing name, created date, last used
+  - Create token dialog with name input
+  - Copy-to-clipboard for newly created tokens
+  - Security warning to copy token immediately
+  - Delete confirmation with trash icon button
+
+- **Raycast Extension** - Native macOS productivity integration 🚀
+  - Full TypeScript extension with 4 commands
+  - **AI Command**: Natural language task creation using HamFlow's AI
+  - **Today's Agenda**: View tasks/habits grouped by time
+  - **Quick Add Task**: Fast task entry form
+  - **View All Tasks**: Browse/search with filters (space, priority)
+  - API client wrapper with Bearer token auth
+  - Preferences for API token, server URL, default space
+  - Complete documentation in `raycast-hamflow/README.md`
+  - Ready for local development or Raycast Store publication
+
 ## Latest Updates (2025-10-16)
 
 ### ✅ Completed This Session - UI/UX Enhancements & Analytics
@@ -468,6 +507,8 @@ Moving towards Phase 4 - Advanced Features & Integrations
 | HamBot Daily Summaries | ✅ | High - Opt-in morning/evening summaries |
 | AI Command Parser | ✅ | High - Natural language processing |
 | Universal Inbox | ✅ | High - Quick capture and processing |
+| API Tokens & External Access | ✅ | High - Raycast, automation, scripts |
+| Raycast Extension | ✅ | High - Native macOS integration |
 | Productivity Analytics | ⏳ | Medium - Charts and insights |
 | Focus Mode | ⏳ | Medium - Distraction-free UI |
 | Notes Integration | ⏳ | Low - External service |
@@ -477,6 +518,7 @@ Moving towards Phase 4 - Advanced Features & Integrations
 
 All core tables implemented:
 - `users` - Authentication and profiles
+- `api_tokens` - External API access tokens
 - `boards` (with description field), `columns`, `tasks` - Kanban system
 - `subtasks` - Task breakdown
 - `task_completions` - Recurring task tracking
@@ -486,7 +528,7 @@ All core tables implemented:
 - `pomodoro_sessions` - Time tracking
 - `calendar_integrations` - iCal feed support
 
-**Latest Migration**: `0007_faithful_lady_vermin.sql` - Most recent applied migration
+**Latest Migration**: `0008_*.sql` - API tokens table (pending generation)
 
 ## Known Issues
 

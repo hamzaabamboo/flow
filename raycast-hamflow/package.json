@@ -1,0 +1,98 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "hamflow",
+  "title": "HamFlow",
+  "description": "Manage your HamFlow tasks, agenda, and productivity from Raycast",
+  "icon": "command-icon.png",
+  "author": "hamflow",
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "ai-command",
+      "title": "AI Command",
+      "subtitle": "HamFlow",
+      "description": "Create tasks and reminders using natural language",
+      "mode": "view"
+    },
+    {
+      "name": "view-agenda",
+      "title": "Today's Agenda",
+      "subtitle": "HamFlow",
+      "description": "View today's tasks and habits",
+      "mode": "view"
+    },
+    {
+      "name": "quick-add",
+      "title": "Quick Add Task",
+      "subtitle": "HamFlow",
+      "description": "Quickly add a new task",
+      "mode": "view"
+    },
+    {
+      "name": "view-tasks",
+      "title": "View All Tasks",
+      "subtitle": "HamFlow",
+      "description": "Browse and manage all your tasks",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "apiToken",
+      "type": "password",
+      "required": true,
+      "title": "API Token",
+      "description": "Your HamFlow API token from Settings",
+      "placeholder": "Enter your API token"
+    },
+    {
+      "name": "serverUrl",
+      "type": "textfield",
+      "required": true,
+      "title": "Server URL",
+      "description": "Your HamFlow instance URL",
+      "default": "https://hamflow.yourdomain.com",
+      "placeholder": "https://hamflow.yourdomain.com"
+    },
+    {
+      "name": "defaultSpace",
+      "type": "dropdown",
+      "required": false,
+      "title": "Default Space",
+      "description": "Default space for new tasks",
+      "default": "work",
+      "data": [
+        {
+          "title": "Work",
+          "value": "work"
+        },
+        {
+          "title": "Personal",
+          "value": "personal"
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.86.1",
+    "@raycast/utils": "^1.21.0",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "~22.10.0",
+    "@types/react": "^18.3.3",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist -o dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to npm.\\n\\nIf you did intend to publish it to npm, remove the \\`prepublishOnly\\` script and rerun \\`npm publish\\` again.\\nIf you wanted to publish it to the Raycast Store instead, use \\`npm run publish\\` instead.\\n\\n\" && exit 1",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}

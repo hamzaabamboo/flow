@@ -31,6 +31,19 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
+// API Tokens table for external API access
+export const apiTokens = pgTable('api_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: varchar('name', { length: 255 }).notNull(), // User-friendly name
+  token: text('token').notNull().unique(), // Hashed token value
+  lastUsedAt: timestamp('last_used_at'),
+  expiresAt: timestamp('expires_at'), // Optional expiration
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // Boards table
 export const boards = pgTable('boards', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -279,6 +292,13 @@ export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => 
   }),
   user: one(users, {
     fields: [taskCompletions.userId],
+    references: [users.id]
+  })
+}));
+
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [apiTokens.userId],
     references: [users.id]
   })
 }));

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Moon, Keyboard, Download, Upload, Sunrise, Sunset, Calendar } from 'lucide-react';
+import { Bell, Moon, Keyboard, Download, Upload, Sunrise, Sunset, Calendar, Key, Trash2, Copy, Plus } from 'lucide-react';
 import { Box, VStack, HStack, Center } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
 import * as Fieldset from '../../components/ui/styled/fieldset';
@@ -11,6 +12,16 @@ import { Spinner } from '../../components/ui/spinner';
 import { useSpace } from '../../contexts/SpaceContext';
 import { useToaster } from '../../contexts/ToasterContext';
 import { Input } from '../../components/ui/input';
+import * as Dialog from '../../components/ui/styled/dialog';
+import { Label } from '../../components/ui/label';
+
+interface ApiToken {
+  id: string;
+  name: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
 
 interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
@@ -41,6 +52,11 @@ export default function SettingsPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
   const { toast } = useToaster();
+
+  // API Token state
+  const [createTokenDialogOpen, setCreateTokenDialogOpen] = useState(false);
+  const [newTokenName, setNewTokenName] = useState('');
+  const [createdToken, setCreatedToken] = useState<string | null>(null);
 
   // Fetch settings
   const { data: settings, isLoading } = useQuery<UserSettings>({
@@ -75,6 +91,68 @@ export default function SettingsPage() {
       const response = await fetch('/api/calendar/feed-url');
       if (!response.ok) throw new Error('Failed to fetch calendar feed URL');
       return response.json();
+    }
+  });
+
+  // Fetch API tokens
+  const { data: apiTokens = [] } = useQuery<ApiToken[]>({
+    queryKey: ['api-tokens'],
+    queryFn: async () => {
+      const response = await fetch('/api/api-tokens');
+      if (!response.ok) throw new Error('Failed to fetch API tokens');
+      return response.json();
+    }
+  });
+
+  // Create API token
+  const createTokenMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await fetch('/api/api-tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!response.ok) throw new Error('Failed to create token');
+      return response.json();
+    },
+    onSuccess: (data: ApiToken & { token: string }) => {
+      setCreatedToken(data.token);
+      setNewTokenName('');
+      queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
+      toast?.('API token created successfully', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: () => {
+      toast?.('Failed to create API token', {
+        title: 'Error',
+        type: 'error'
+      });
+    }
+  });
+
+  // Delete API token
+  const deleteTokenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/api-tokens/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete token');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
+      toast?.('API token deleted', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: () => {
+      toast?.('Failed to delete API token', {
+        title: 'Error',
+        type: 'error'
+      });
     }
   });
 
@@ -417,6 +495,173 @@ export default function SettingsPage() {
             </VStack>
           </Card.Body>
         </Card.Root>
+
+        {/* API Tokens Section */}
+        <Card.Root>
+          <Card.Header>
+            <HStack gap="2" justifyContent="space-between">
+              <HStack gap="2">
+                <Key width="20" height="20" />
+                <Heading size="lg">API Tokens</Heading>
+              </HStack>
+              <Button
+                size="sm"
+                onClick={() => setCreateTokenDialogOpen(true)}
+                disabled={createTokenMutation.isPending}
+              >
+                <Plus width="16" height="16" />
+                Create Token
+              </Button>
+            </HStack>
+          </Card.Header>
+          <Card.Body>
+            <VStack gap="4" alignItems="stretch">
+              <Fieldset.Root>
+                <Fieldset.Legend>External API Access</Fieldset.Legend>
+                <VStack gap="4" alignItems="stretch" mt="4">
+                  <Fieldset.HelperText>
+                    Use API tokens to access HamFlow from external apps like Raycast, scripts, or automation tools
+                  </Fieldset.HelperText>
+
+                  {apiTokens.length === 0 ? (
+                    <Box p="4" borderRadius="md" bg="bg.subtle" textAlign="center">
+                      <Text color="fg.muted" fontSize="sm">
+                        No API tokens yet. Create one to get started.
+                      </Text>
+                    </Box>
+                  ) : (
+                    <VStack gap="2" alignItems="stretch">
+                      {apiTokens.map((token) => (
+                        <Box
+                          key={token.id}
+                          p="3"
+                          borderRadius="md"
+                          border="1px solid"
+                          borderColor="border.default"
+                        >
+                          <HStack justifyContent="space-between">
+                            <VStack gap="1" alignItems="start">
+                              <Text fontWeight="medium">{token.name}</Text>
+                              <HStack gap="3" fontSize="xs" color="fg.muted">
+                                <Text>
+                                  Created: {new Date(token.createdAt).toLocaleDateString()}
+                                </Text>
+                                {token.lastUsedAt && (
+                                  <Text>
+                                    Last used: {new Date(token.lastUsedAt).toLocaleDateString()}
+                                  </Text>
+                                )}
+                              </HStack>
+                            </VStack>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteTokenMutation.mutate(token.id)}
+                              disabled={deleteTokenMutation.isPending}
+                            >
+                              <Trash2 width="16" height="16" color="red.500" />
+                            </Button>
+                          </HStack>
+                        </Box>
+                      ))}
+                    </VStack>
+                  )}
+                </VStack>
+              </Fieldset.Root>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+
+        {/* Create Token Dialog */}
+        <Dialog.Root
+          open={createTokenDialogOpen || createdToken !== null}
+          onOpenChange={(e) => {
+            setCreateTokenDialogOpen(e.open);
+            if (!e.open) {
+              setCreatedToken(null);
+              setNewTokenName('');
+            }
+          }}
+        >
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="500px">
+              <Dialog.Header>
+                <Dialog.Title>{createdToken ? 'Token Created' : 'Create API Token'}</Dialog.Title>
+                <Dialog.Description>
+                  {createdToken
+                    ? 'Copy this token now - you won\'t be able to see it again!'
+                    : 'Create a new API token for external access'}
+                </Dialog.Description>
+              </Dialog.Header>
+              <Dialog.Body>
+                {createdToken ? (
+                  <VStack gap="4" alignItems="stretch">
+                    <VStack gap="2" alignItems="stretch">
+                      <Label>Your API Token:</Label>
+                      <HStack gap="2">
+                        <Input
+                          value={createdToken}
+                          readOnly
+                          onClick={(e) => e.currentTarget.select()}
+                          fontFamily="mono"
+                          fontSize="sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void copyToClipboard(createdToken);
+                          }}
+                        >
+                          <Copy width="16" height="16" />
+                        </Button>
+                      </HStack>
+                    </VStack>
+                    <Text fontSize="sm" color="orange.500">
+                      ⚠️ Make sure to copy this token now. You won't be able to see it again!
+                    </Text>
+                  </VStack>
+                ) : (
+                  <VStack gap="4" alignItems="stretch">
+                    <VStack gap="2" alignItems="stretch">
+                      <Label>Token Name:</Label>
+                      <Input
+                        placeholder="e.g., Raycast, My Script, etc."
+                        value={newTokenName}
+                        onChange={(e) => setNewTokenName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newTokenName.trim()) {
+                            createTokenMutation.mutate(newTokenName.trim());
+                          }
+                        }}
+                      />
+                    </VStack>
+                  </VStack>
+                )}
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.CloseTrigger asChild>
+                  <Button variant="outline">
+                    {createdToken ? 'Done' : 'Cancel'}
+                  </Button>
+                </Dialog.CloseTrigger>
+                {!createdToken && (
+                  <Button
+                    onClick={() => {
+                      if (newTokenName.trim()) {
+                        createTokenMutation.mutate(newTokenName.trim());
+                      }
+                    }}
+                    disabled={!newTokenName.trim() || createTokenMutation.isPending}
+                  >
+                    Create Token
+                  </Button>
+                )}
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Dialog.Root>
 
         {/* Appearance Section */}
         <Card.Root>
