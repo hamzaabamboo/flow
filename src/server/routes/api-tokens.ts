@@ -71,10 +71,7 @@ export const apiTokensRoutes = new Elysia({ prefix: '/api-tokens' })
   .delete(
     '/:id',
     async ({ params, db, user }) => {
-      const [deleted] = await db
-        .delete(apiTokens)
-        .where(eq(apiTokens.id, params.id))
-        .returning();
+      const [deleted] = await db.delete(apiTokens).where(eq(apiTokens.id, params.id)).returning();
 
       // Verify the token belongs to the user
       if (deleted && deleted.userId !== user.id) {

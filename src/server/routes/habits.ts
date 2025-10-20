@@ -309,9 +309,8 @@ export const habitsRoutes = new Elysia({ prefix: '/habits' })
       }
     }
 
-    const completionRate = expectedOccurrences > 0
-      ? Math.round((totalCompletions / expectedOccurrences) * 100)
-      : 0;
+    const completionRate =
+      expectedOccurrences > 0 ? Math.round((totalCompletions / expectedOccurrences) * 100) : 0;
 
     return {
       totalCompletions,

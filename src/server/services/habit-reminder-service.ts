@@ -1,4 +1,4 @@
-import { eq, and, lte, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { habits, reminders } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { logger } from '../logger';

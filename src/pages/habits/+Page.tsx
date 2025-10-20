@@ -293,147 +293,150 @@ export default function HabitsPage() {
             {filteredHabits.map((habit) => {
               const habitStats = habitsStats?.find((s) => s.habitId === habit.id);
               return (
-              <Card.Root
-                key={habit.id}
-                borderColor={habit.active ? 'border.default' : 'border.subtle'}
-                bg={habit.active ? 'bg.default' : 'bg.muted'}
-                opacity={habit.active ? 1 : 0.5}
-              >
-                <Card.Header>
-                  <HStack justifyContent="space-between">
-                    <Card.Title color={habit.active ? 'fg.default' : 'fg.muted'}>
-                      {habit.name}
-                    </Card.Title>
-                    <HStack gap="1">
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          void toggleActiveMutation.mutate({ id: habit.id, active: !habit.active })
-                        }
-                        aria-label={habit.active ? 'Disable habit' : 'Enable habit'}
-                        colorPalette={habit.active ? 'gray' : 'green'}
-                      >
-                        <Power width="16" height="16" />
-                      </IconButton>
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => startEdit(habit)}
-                        aria-label="Edit habit"
-                      >
-                        <Edit2 width="16" height="16" />
-                      </IconButton>
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void deleteMutation.mutate(habit.id)}
-                        aria-label="Delete habit"
-                        colorPalette="red"
-                      >
-                        <Trash2 width="16" height="16" />
-                      </IconButton>
-                    </HStack>
-                  </HStack>
-                  {habit.description && <Card.Description>{habit.description}</Card.Description>}
-                </Card.Header>
-                <Card.Body>
-                  <VStack gap="4" alignItems="start">
-                    {/* Frequency & Schedule */}
-                    <HStack gap="3" flexWrap="wrap">
-                      <HStack gap="1.5">
-                        <Calendar width="16" height="16" color="fg.muted" />
-                        <Badge
-                          variant="subtle"
-                          colorPalette={habit.frequency === 'daily' ? 'blue' : 'purple'}
+                <Card.Root
+                  key={habit.id}
+                  borderColor={habit.active ? 'border.default' : 'border.subtle'}
+                  bg={habit.active ? 'bg.default' : 'bg.muted'}
+                  opacity={habit.active ? 1 : 0.5}
+                >
+                  <Card.Header>
+                    <HStack justifyContent="space-between">
+                      <Card.Title color={habit.active ? 'fg.default' : 'fg.muted'}>
+                        {habit.name}
+                      </Card.Title>
+                      <HStack gap="1">
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            void toggleActiveMutation.mutate({
+                              id: habit.id,
+                              active: !habit.active
+                            })
+                          }
+                          aria-label={habit.active ? 'Disable habit' : 'Enable habit'}
+                          colorPalette={habit.active ? 'gray' : 'green'}
                         >
-                          {habit.frequency === 'daily' ? 'Daily' : 'Weekly'}
-                        </Badge>
+                          <Power width="16" height="16" />
+                        </IconButton>
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEdit(habit)}
+                          aria-label="Edit habit"
+                        >
+                          <Edit2 width="16" height="16" />
+                        </IconButton>
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void deleteMutation.mutate(habit.id)}
+                          aria-label="Delete habit"
+                          colorPalette="red"
+                        >
+                          <Trash2 width="16" height="16" />
+                        </IconButton>
                       </HStack>
-                      {habit.frequency === 'weekly' &&
-                        habit.targetDays &&
-                        habit.targetDays.length > 0 && (
-                          <HStack gap="1" flexWrap="wrap">
-                            {habit.targetDays.toSorted().map((day) => (
-                              <Badge key={day} size="sm" variant="outline">
-                                {DAYS_OF_WEEK[day].label}
-                              </Badge>
-                            ))}
+                    </HStack>
+                    {habit.description && <Card.Description>{habit.description}</Card.Description>}
+                  </Card.Header>
+                  <Card.Body>
+                    <VStack gap="4" alignItems="start">
+                      {/* Frequency & Schedule */}
+                      <HStack gap="3" flexWrap="wrap">
+                        <HStack gap="1.5">
+                          <Calendar width="16" height="16" color="fg.muted" />
+                          <Badge
+                            variant="subtle"
+                            colorPalette={habit.frequency === 'daily' ? 'blue' : 'purple'}
+                          >
+                            {habit.frequency === 'daily' ? 'Daily' : 'Weekly'}
+                          </Badge>
+                        </HStack>
+                        {habit.frequency === 'weekly' &&
+                          habit.targetDays &&
+                          habit.targetDays.length > 0 && (
+                            <HStack gap="1" flexWrap="wrap">
+                              {habit.targetDays.toSorted().map((day) => (
+                                <Badge key={day} size="sm" variant="outline">
+                                  {DAYS_OF_WEEK[day].label}
+                                </Badge>
+                              ))}
+                            </HStack>
+                          )}
+                      </HStack>
+
+                      {/* Reminder Time */}
+                      {habit.reminderTime && (
+                        <HStack gap="1.5" color="fg.muted" fontSize="sm">
+                          <Clock width="14" height="14" />
+                          <Text>Reminder at {habit.reminderTime}</Text>
+                        </HStack>
+                      )}
+
+                      {/* Link */}
+                      {habit.link && (
+                        <a
+                          href={habit.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <HStack gap="1.5" color="blue.default" fontSize="sm">
+                            <ExternalLink width="14" height="14" />
+                            <Text>Open Link</Text>
                           </HStack>
-                        )}
-                    </HStack>
+                        </a>
+                      )}
 
-                    {/* Reminder Time */}
-                    {habit.reminderTime && (
-                      <HStack gap="1.5" color="fg.muted" fontSize="sm">
-                        <Clock width="14" height="14" />
-                        <Text>Reminder at {habit.reminderTime}</Text>
-                      </HStack>
-                    )}
-
-                    {/* Link */}
-                    {habit.link && (
-                      <a
-                        href={habit.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      {/* Stats Row */}
+                      <HStack
+                        gap="4"
+                        borderColor="border.subtle"
+                        borderTop="1px solid"
+                        w="full"
+                        pt="3"
                       >
-                        <HStack gap="1.5" color="blue.default" fontSize="sm">
-                          <ExternalLink width="14" height="14" />
-                          <Text>Open Link</Text>
-                        </HStack>
-                      </a>
-                    )}
-
-                    {/* Stats Row */}
-                    <HStack
-                      gap="4"
-                      borderColor="border.subtle"
-                      borderTop="1px solid"
-                      w="full"
-                      pt="3"
-                    >
-                      <VStack flex="1" gap="0.5" alignItems="start">
-                        <HStack gap="1">
-                          <TrendingUp width="14" height="14" color="green.default" />
-                          <Text color="fg.muted" fontSize="xs">
-                            Streak
+                        <VStack flex="1" gap="0.5" alignItems="start">
+                          <HStack gap="1">
+                            <TrendingUp width="14" height="14" color="green.default" />
+                            <Text color="fg.muted" fontSize="xs">
+                              Streak
+                            </Text>
+                          </HStack>
+                          <Text color="green.default" fontSize="lg" fontWeight="semibold">
+                            {habit.currentStreak || 0} days
                           </Text>
-                        </HStack>
-                        <Text color="green.default" fontSize="lg" fontWeight="semibold">
-                          {habit.currentStreak || 0} days
-                        </Text>
-                      </VStack>
+                        </VStack>
 
-                      <VStack flex="1" gap="0.5" alignItems="start">
-                        <HStack gap="1">
-                          <Award width="14" height="14" color="blue.default" />
-                          <Text color="fg.muted" fontSize="xs">
-                            Total
+                        <VStack flex="1" gap="0.5" alignItems="start">
+                          <HStack gap="1">
+                            <Award width="14" height="14" color="blue.default" />
+                            <Text color="fg.muted" fontSize="xs">
+                              Total
+                            </Text>
+                          </HStack>
+                          <Text fontSize="lg" fontWeight="semibold">
+                            {habitStats?.totalCompletions || 0} times
                           </Text>
-                        </HStack>
-                        <Text fontSize="lg" fontWeight="semibold">
-                          {habitStats?.totalCompletions || 0} times
-                        </Text>
-                      </VStack>
+                        </VStack>
 
-                      <VStack flex="1" gap="0.5" alignItems="start">
-                        <HStack gap="1">
-                          <Target width="14" height="14" color="purple.default" />
-                          <Text color="fg.muted" fontSize="xs">
-                            Rate
+                        <VStack flex="1" gap="0.5" alignItems="start">
+                          <HStack gap="1">
+                            <Target width="14" height="14" color="purple.default" />
+                            <Text color="fg.muted" fontSize="xs">
+                              Rate
+                            </Text>
+                          </HStack>
+                          <Text fontSize="lg" fontWeight="semibold">
+                            {habitStats?.completionRate || 0}%
                           </Text>
-                        </HStack>
-                        <Text fontSize="lg" fontWeight="semibold">
-                          {habitStats?.completionRate || 0}%
-                        </Text>
-                      </VStack>
-                    </HStack>
-                  </VStack>
-                </Card.Body>
-              </Card.Root>
+                        </VStack>
+                      </HStack>
+                    </VStack>
+                  </Card.Body>
+                </Card.Root>
               );
             })}
           </div>

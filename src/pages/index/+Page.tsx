@@ -528,7 +528,12 @@ export default function AgendaPage() {
         ) : isErrorEvents ? (
           <Center>Error loading events</Center>
         ) : viewMode === 'week' ? (
-          <Grid gap={4} gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }} w="full" minH="calc(100vh - 16rem)">
+          <Grid
+            gap={4}
+            gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }}
+            w="full"
+            minH="calc(100vh - 16rem)"
+          >
             <AgendaWeekView
               selectedDate={selectedDate}
               viewMode={viewMode}

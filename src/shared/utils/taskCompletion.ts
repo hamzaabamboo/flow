@@ -11,7 +11,14 @@ export function isColumnDone(columnName: string): boolean {
  * Check if a task is completed based on its column name or completed flag (for recurring instances)
  */
 export function isTaskCompleted(
-  task: Task | { columnName?: string | null; completed?: boolean; instanceDate?: string; recurringPattern?: string | null }
+  task:
+    | Task
+    | {
+        columnName?: string | null;
+        completed?: boolean;
+        instanceDate?: string;
+        recurringPattern?: string | null;
+      }
 ): boolean {
   // For recurring task instances, check the completed flag for that specific instance FIRST
   // This allows recurring tasks in Done column to still have incomplete future instances

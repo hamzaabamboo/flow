@@ -369,7 +369,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           }
 
           // Fetch recurring tasks without dueDates (so they can still appear in calendar)
-          const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
+          const recurringConditions = [
+            eq(tasks.userId, user.id),
+            isNotNull(tasks.recurringPattern)
+          ];
           if (space !== 'all') {
             recurringConditions.push(eq(boards.space, space));
           }
