@@ -63,9 +63,9 @@ Given user input, extract the intent and commands the user wants to execute.
 
 ## Current Context
 
-- **Current Time (JST)**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00')}
+The user will provide the current date and time in their message. Use that for all date calculations.
+
 - **User Timezone**: Asia/Tokyo (JST, UTC+9)
-- **Current Date**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0]}
 
 ## Output Schema
 
@@ -139,14 +139,20 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * **Relative dates**: Parse "on 5th", "on 25th", "on the 15th" as day of current/next month
      * **Weekdays**: "Monday", "next Monday", "this Friday" - find next occurrence
      * **Relative**: "tomorrow", "next week", "in 3 days", "2 weeks from now"
+     * **End of day**: "end of today", "by end of day", "eod" - use 23:59:00 of current date
+     * **Start of day**: "tomorrow", "start of tomorrow" - use 00:00:00 of next date
      * **Explicit dates**: "Oct 5th", "October 25", "2025-10-20", "10/25"
      * **With time**: "tomorrow at 3pm", "Monday 10am", "on 25th at 2:30pm"
      * **Date calculation**:
+       - Use the current date/time provided in the message context
+       - If user says "end of today" at 1:00 AM Oct 22, output: "2025-10-22T23:59:00+09:00" (same day!)
+       - If user says "tomorrow" at 1:00 AM Oct 22, output: "2025-10-23T00:00:00+09:00"
        - If user says "on 25th" and today is Oct 16, output: "2025-10-25T00:00:00+09:00"
        - If user says "on 5th" and today is Oct 16, output: "2025-11-05T00:00:00+09:00" (next month)
        - If user says "Monday" and today is Wednesday, output next Monday's date with time
      * **Format** (ALWAYS include timezone):
        - Date only (no time specified): YYYY-MM-DDTHH:mm:ss+09:00 with time set to 00:00:00
+       - End of day: YYYY-MM-DDTHH:mm:ss+09:00 with time set to 23:59:00
        - With time: YYYY-MM-DDTHH:mm:ss+09:00 (e.g., "2025-10-25T14:30:00+09:00")
        - **CRITICAL**: NEVER use YYYY-MM-DD format, always include T00:00:00+09:00 at minimum
      * For urgent tasks without date: use tomorrow with 00:00:00+09:00

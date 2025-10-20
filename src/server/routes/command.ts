@@ -5,7 +5,7 @@ import { withAuth } from '../auth/withAuth';
 import { inboxItems, reminders, boards, columns, tasks } from '../../../drizzle/schema';
 import type { CommandIntentSchema } from '../../mastra/agents/commandProcessor';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
-import { jstToUtc } from '../../shared/utils/timezone';
+import { jstToUtc, nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
   .use(withAuth())
@@ -16,6 +16,22 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
       const { command, space } = body;
 
       try {
+        // Get current JST time for date calculations
+        const jstNow = nowInJst();
+        const { year, month, day, hours, minutes, dayOfWeek } = getJstDateComponents(jstNow);
+        const dayNames = [
+          'Sunday',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday'
+        ];
+        const currentTimeJst = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+09:00`;
+
+        const timeContext = `\n\n## Current Date and Time\n- Current time (JST): ${currentTimeJst}\n- Current date: ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}\n- Day of week: ${dayNames[dayOfWeek]}\n\nUse this for calculating all relative dates like "today", "tomorrow", "end of today", "next Monday", etc.`;
+
         // Fetch user's boards and columns for context
         const userBoards = await db
           .select({
@@ -57,7 +73,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           [
             {
               role: 'user',
-              content: command + boardContext
+              content: command + timeContext + boardContext
             }
           ],
           {
