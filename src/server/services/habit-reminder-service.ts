@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gte, lte } from 'drizzle-orm';
 import { habits, reminders } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { logger } from '../logger';
@@ -122,10 +122,15 @@ export class HabitReminderService {
     habitName: string,
     reminderTime: Date
   ): Promise<boolean> {
-    // Get the date string for comparison (YYYY-MM-DD)
-    const targetDateStr = reminderTime.toISOString().split('T')[0];
+    // Get JST date components from the reminder time
+    const { year, month, day } = getJstDateComponents(reminderTime);
 
-    // Find ANY reminder (sent or unsent) for this habit on this date
+    // Calculate JST day boundaries (00:00:00 JST to 23:59:59 JST)
+    // These are converted to UTC for database comparison
+    const startOfDayJst = createJstDate(year, month, day, 0, 0, 0);
+    const endOfDayJst = createJstDate(year, month, day, 23, 59, 59);
+
+    // Find reminder for this habit on this specific JST date
     // Use LIKE to handle messages with or without links appended
     const [existing] = await this.db
       .select()
@@ -134,18 +139,19 @@ export class HabitReminderService {
         and(
           eq(reminders.userId, userId),
           // Match messages starting with "Habit reminder: {habitName}"
-          sql`${reminders.message} LIKE ${'Habit reminder: ' + habitName + '%'}`
+          sql`${reminders.message} LIKE ${'Habit reminder: ' + habitName + '%'}`,
+          // Filter by JST date range
+          gte(reminders.reminderTime, startOfDayJst),
+          lte(reminders.reminderTime, endOfDayJst)
         )
       )
       .limit(1);
 
-    // Check if the existing reminder is for the same date
     if (existing) {
-      const existingDateStr = existing.reminderTime.toISOString().split('T')[0];
-      if (existingDateStr === targetDateStr) {
-        logger.info(`Reminder already exists for habit "${habitName}" on ${targetDateStr}`);
-        return true;
-      }
+      logger.info(
+        `Reminder already exists for habit "${habitName}" on ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} JST`
+      );
+      return true;
     }
 
     return false;
