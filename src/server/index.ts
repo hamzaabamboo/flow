@@ -8,6 +8,9 @@ import { wrap } from '@bogeychan/elysia-logger';
 import { renderPage } from 'vike/server';
 import { connect } from 'elysia-connect-middleware';
 import { eq } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 
 import { db } from './db';
 import { logger } from './logger';
@@ -268,6 +271,25 @@ app
     return { error: 'Internal server error' };
   })
   .onStart(async () => {
+    // Run database migrations
+    if (isProduction) {
+      try {
+        logger.info('🔄 Running database migrations...');
+        const migrationClient = postgres(
+          process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/hamflow',
+          { max: 1 }
+        );
+        const migrationDb = drizzle(migrationClient);
+        const migrationsPath = join(process.cwd(), 'drizzle', 'migrations');
+        await migrate(migrationDb, { migrationsFolder: migrationsPath });
+        await migrationClient.end();
+        logger.info('✅ Migrations completed successfully');
+      } catch (error) {
+        logger.error(error, '❌ Migration failed');
+        process.exit(1);
+      }
+    }
+
     // Initialize WebSocket manager
     wsManager.setApp(app);
 
