@@ -17,7 +17,7 @@ export class HamBotIntegration {
 
   constructor(db: Database) {
     this.webhookUrl =
-      process.env.HAMBOT_WEBHOOK_URL || 'https://hambot.ham-san.net/webhook/hambot-push';
+      process.env.HAMBOT_API_URL || 'https://hambot.ham-san.net/webhook/hambot-push';
     this.apiKey = process.env.HAMBOT_API_KEY || '';
     this.channel = process.env.HAMBOT_CHANNEL || 'hamflow';
     this.db = db;
