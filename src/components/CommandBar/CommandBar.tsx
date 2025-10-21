@@ -26,6 +26,11 @@ interface CommandSuggestion {
   description?: string;
 }
 
+interface ConversationTurn {
+  command: string;
+  response: CommandSuggestion;
+}
+
 const getActionLabel = (action: string): string => {
   switch (action) {
     case 'create_task':
@@ -83,6 +88,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
@@ -129,6 +135,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       setHistoryIndex(-1);
       setSelectedBoardId('');
       setSelectedColumnId('');
+      setConversationHistory([]); // Clear conversation context
       // Stop voice recognition if active
       if (isListening && recognitionRef.current) {
         recognitionRef.current.stop();
@@ -228,7 +235,8 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           command: cmd,
-          space: currentSpace
+          space: currentSpace,
+          conversationHistory: conversationHistory.slice(-5) // Send last 5 turns for context
         })
       });
 
@@ -304,6 +312,15 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         const result = await response.json();
         toast?.(getSuccessMessage(suggestion.action), { type: 'success' });
 
+        // Add to conversation history for follow-up context
+        setConversationHistory([
+          ...conversationHistory,
+          {
+            command,
+            response: suggestion
+          }
+        ]);
+
         // Invalidate relevant queries based on action
         switch (suggestion.action) {
           case 'create_task':
@@ -324,17 +341,25 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
             break;
         }
 
+        // Reset for next command (but keep conversation history)
+        setCommand('');
+        setSuggestion(null);
+        setSelectedBoardId('');
+        setSelectedColumnId('');
+        inputRef.current?.focus();
+
         // Wait a bit for invalidation to trigger before closing
         await new Promise((resolve) => setTimeout(resolve, 100));
-        onOpenChange(false);
 
         // Check if task was added directly to board
         if (result.boardId && suggestion.action === 'create_task') {
+          onOpenChange(false);
           await navigate(`/board/${result.boardId}`);
         } else {
           // Navigate to appropriate page based on action
           const navigateTo = getNavigationPath(suggestion.action);
           if (navigateTo) {
+            onOpenChange(false);
             await navigate(navigateTo);
           }
         }

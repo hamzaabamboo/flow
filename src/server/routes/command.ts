@@ -13,7 +13,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
   .post(
     '/',
     async ({ body, db, user }) => {
-      const { command, space } = body;
+      const { command, space, conversationHistory = [] } = body;
 
       try {
         // Get current JST time for date calculations
@@ -69,11 +69,30 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
           boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf the user specifies a board or column name, map it to the corresponding ID. Use board descriptions to understand what each board is for and intelligently route tasks. For example, if a user says "add deploy task" and the Engineering board has description "Software development and deployments", route it there. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", and "columnId": "<column-id>". Otherwise, tasks will go to the inbox for manual processing.`;
         }
 
+        // Build conversation context from history
+        let conversationContext = '';
+        if (conversationHistory.length > 0) {
+          conversationContext = '\n\n## Previous Commands (for follow-up context)\n';
+          conversationHistory.forEach(
+            (
+              turn: {
+                command: string;
+                response: { action: string; data: Record<string, unknown> };
+              },
+              index: number
+            ) => {
+              conversationContext += `${index + 1}. User: "${turn.command}"\n   Action: ${turn.response.action}\n   Data: ${JSON.stringify(turn.response.data)}\n\n`;
+            }
+          );
+          conversationContext +=
+            'Use this conversation history to understand follow-up commands. For example, if the user says "change it to tomorrow" or "make it high priority", refer to the most recent command.';
+        }
+
         const result = await commandProcessor.generate(
           [
             {
               role: 'user',
-              content: command + timeContext + boardContext
+              content: command + timeContext + boardContext + conversationContext
             }
           ],
           {
@@ -202,7 +221,18 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
     {
       body: t.Object({
         command: t.String(),
-        space: t.String()
+        space: t.String(),
+        conversationHistory: t.Optional(
+          t.Array(
+            t.Object({
+              command: t.String(),
+              response: t.Object({
+                action: t.String(),
+                data: t.Record(t.String(), t.Any())
+              })
+            })
+          )
+        )
       })
     }
   )

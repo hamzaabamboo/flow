@@ -8,7 +8,7 @@ import {
   setMinutes,
   setSeconds
 } from 'date-fns';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, GripVertical } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { VStack, HStack, Grid, Box } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
@@ -48,22 +48,14 @@ function DraggableTask({
   const style = transform
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        opacity: isDragging ? 0.5 : 1,
-        cursor: isDragging ? 'grabbing' : 'grab'
+        opacity: isDragging ? 0.5 : 1
       }
-    : { cursor: 'grab' };
+    : {};
 
   return (
     <Box
       key={`${event.id}-${event.instanceDate}`}
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={() => {
-        if (!isDragging) {
-          onTaskClick(event);
-        }
-      }}
       data-priority={event.priority || 'none'}
       style={style}
       borderLeftWidth="3px"
@@ -73,8 +65,24 @@ function DraggableTask({
       bg="bg.muted"
       transition="all 0.2s"
       _hover={{ bg: 'bg.subtle' }}
+      cursor="pointer"
+      onClick={() => onTaskClick(event)}
     >
       <HStack gap="1.5" justifyContent="space-between" alignItems="center">
+        {/* Drag Handle */}
+        <Box
+          {...attributes}
+          {...listeners}
+          cursor="grab"
+          _active={{ cursor: 'grabbing' }}
+          color="fg.muted"
+          _hover={{ color: 'fg.default' }}
+          transition="color 0.2s"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical size={14} />
+        </Box>
+
         <Checkbox
           checked={isTaskCompleted(event)}
           size="sm"
