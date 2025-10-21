@@ -1,5 +1,6 @@
 import { inboxItems } from '../../../drizzle/schema';
 import type { Database } from '../db';
+import { logger } from '../logger';
 
 interface HamBotMessage {
   id: string;
@@ -23,7 +24,7 @@ export class HamBotIntegration {
     this.db = db;
 
     if (!this.apiKey) {
-      console.warn('HamBot integration not configured. Set HAMBOT_API_KEY environment variable.');
+      logger.warn('HamBot integration not configured. Set HAMBOT_API_KEY environment variable.');
     }
   }
 
@@ -37,11 +38,12 @@ export class HamBotIntegration {
    */
   async send(message: string, channel?: string): Promise<boolean> {
     if (!this.isConfigured()) {
-      console.warn('HamBot not configured, skipping message send');
+      logger.warn('HamBot not configured, skipping message send');
       return false;
     }
 
     try {
+      const targetChannel = channel || this.channel;
       const response = await fetch(this.webhookUrl, {
         method: 'POST',
         headers: {
@@ -52,17 +54,23 @@ export class HamBotIntegration {
           data: {
             message
           },
-          channel: channel || this.channel
+          channel: targetChannel
         })
       });
 
       if (!response.ok) {
-        throw new Error(`HamBot API error: ${response.statusText}`);
+        const errorText = await response.text();
+        logger.error(
+          { status: response.status, statusText: response.statusText, body: errorText },
+          'HamBot API error'
+        );
+        return false;
       }
 
+      logger.debug({ channel: targetChannel }, 'HamBot message sent');
       return true;
     } catch (error) {
-      console.error('Failed to send HamBot message:', error);
+      logger.error(error, 'Failed to send HamBot message');
       return false;
     }
   }
@@ -86,9 +94,9 @@ export class HamBotIntegration {
         createdAt: new Date()
       });
 
-      console.log(`HamBot message received and added to inbox for user ${userId}`);
+      logger.info({ userId, messageId: message.id }, 'HamBot message received and added to inbox');
     } catch (error) {
-      console.error('Failed to process HamBot message:', error);
+      logger.error({ userId, messageId: message.id, error }, 'Failed to process HamBot message');
       throw error;
     }
   }

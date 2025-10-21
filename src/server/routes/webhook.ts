@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Elysia, t } from 'elysia';
 import { db } from '../db';
+import { logger } from '../logger';
 import { HamBotIntegration } from '../integrations/hambot';
 import { wsManager } from '../websocket';
 
@@ -9,7 +10,7 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
   // HamBot webhook endpoint
   .post(
     '/hambot',
-    async ({ body, headers, db }) => {
+    async ({ body, headers, db, set }) => {
       // Verify webhook signature (if configured)
       const expectedSignature = headers['x-hambot-signature'];
       if (expectedSignature && process.env.HAMBOT_WEBHOOK_SECRET) {
@@ -20,20 +21,23 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
           .digest('hex');
 
         if (signature !== expectedSignature) {
+          logger.warn({ signature, expectedSignature }, 'Invalid HamBot webhook signature');
+          set.status = 401;
           return { error: 'Invalid signature' };
         }
       }
 
-      const hambot = new HamBotIntegration(db);
-
-      // Process incoming message
       const { message, userId } = body;
 
       if (!message || !userId) {
+        logger.warn({ body }, 'Missing required fields in HamBot webhook');
+        set.status = 400;
         return { error: 'Missing required fields' };
       }
 
       try {
+        const hambot = new HamBotIntegration(db);
+
         // Add message to user's inbox
         await hambot.receiveMessage(
           {
@@ -49,9 +53,11 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
         // Broadcast inbox update to connected clients
         wsManager.broadcastInboxUpdate(userId, 'personal');
 
+        logger.info({ userId, messageId: message.id }, 'HamBot message processed');
         return { success: true, message: 'Message processed' };
       } catch (error) {
-        console.error('Webhook processing error:', error);
+        logger.error(error, 'HamBot webhook processing error');
+        set.status = 500;
         return { error: 'Failed to process message' };
       }
     },
@@ -70,7 +76,7 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
     }
   )
   // GitHub webhook for task creation from issues
-  .post('/github', async ({ body, headers, db }) => {
+  .post('/github', async ({ body, headers, db, set }) => {
     // Verify GitHub webhook signature
     const signature = headers['x-hub-signature-256'];
     if (signature && process.env.GITHUB_WEBHOOK_SECRET) {
@@ -81,6 +87,8 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
         .digest('hex')}`;
 
       if (signature !== expectedSignature) {
+        logger.warn('Invalid GitHub webhook signature');
+        set.status = 401;
         return { error: 'Invalid signature' };
       }
     }
@@ -110,9 +118,14 @@ export const webhookRoutes = new Elysia({ prefix: '/webhook' })
         // Broadcast update
         wsManager.broadcastInboxUpdate(userId, 'work');
 
+        logger.info(
+          { repository: repository?.full_name, issueNumber: issue.number },
+          'GitHub issue added to inbox'
+        );
         return { success: true, itemId: inboxItem.id };
       } catch (error) {
-        console.error('GitHub webhook error:', error);
+        logger.error(error, 'GitHub webhook error');
+        set.status = 500;
         return { error: 'Failed to create inbox item' };
       }
     }

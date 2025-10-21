@@ -32,6 +32,7 @@ import { apiTokensRoutes } from './routes/api-tokens';
 import { oidcAuth } from './auth/oidc';
 import { cronJobs } from './cron';
 import { HabitReminderService } from './services/habit-reminder-service';
+import { HamBotIntegration } from './integrations/hambot';
 import { wsManager } from './websocket';
 import { users } from 'drizzle/schema';
 
@@ -306,26 +307,23 @@ app
     logger.info(`🚀 HamFlow server running at http://localhost:${app.server?.port}`);
 
     // Send debug webhook on startup (production only)
-    if (isProduction && process.env.HAMBOT_API_KEY && process.env.HAMBOT_API_URL) {
+    if (isProduction) {
       try {
-        const startupMessage =
-          `🚀 **HamFlow Server Started**\n\n` +
-          `⏰ Time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })} JST\n` +
-          `🌐 Port: ${app.server?.port}\n` +
-          `💻 Environment: ${process.env.NODE_ENV || 'production'}`;
+        const hambot = new HamBotIntegration(db);
+        if (hambot.isConfigured()) {
+          const startupMessage =
+            `🚀 **HamFlow Server Started**\n\n` +
+            `⏰ Time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })} JST\n` +
+            `🌐 Port: ${app.server?.port}\n` +
+            `💻 Environment: ${process.env.NODE_ENV || 'production'}`;
 
-        await fetch(process.env.HAMBOT_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.HAMBOT_API_KEY}`
-          },
-          body: JSON.stringify({
-            message: startupMessage,
-            channel: 'debug'
-          })
-        });
-        logger.info('📨 Sent startup webhook to debug channel');
+          const success = await hambot.send(startupMessage, 'debug');
+          if (success) {
+            logger.info('📨 Sent startup webhook to debug channel');
+          } else {
+            logger.warn('Failed to send startup webhook');
+          }
+        }
       } catch (error) {
         logger.error(error, 'Failed to send startup webhook');
       }
