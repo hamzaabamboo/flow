@@ -12,8 +12,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .get(
     '/',
     async ({ query, db, user }) => {
-      // Fetch boards sorted by most recent task activity
-      // This uses a subquery to find the most recent task update per board
+      // Fetch boards sorted by most recent update
       const userBoards = await db
         .select({
           id: boards.id,
@@ -22,19 +21,13 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           space: boards.space,
           columnOrder: boards.columnOrder,
           createdAt: boards.createdAt,
-          updatedAt: boards.updatedAt,
-          lastTaskActivity: sql<Date>`(
-            SELECT MAX(${tasks.updatedAt})
-            FROM ${tasks}
-            INNER JOIN ${columns} ON ${tasks.columnId} = ${columns.id}
-            WHERE ${columns.boardId} = ${boards.id}
-          )`
+          updatedAt: boards.updatedAt
         })
         .from(boards)
         .where(
           and(eq(boards.userId, user.id), eq(boards.space, query.space as 'work' | 'personal'))
         )
-        .orderBy(desc(sql`last_task_activity`), desc(boards.updatedAt));
+        .orderBy(desc(boards.updatedAt));
 
       // Fetch all columns for these boards in one query
       if (userBoards.length > 0) {
@@ -53,14 +46,14 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           columnsMap.get(col.boardId)!.push(col);
         });
 
-        // Return boards with their columns (exclude lastTaskActivity, it's only for sorting)
-        return userBoards.map(({ lastTaskActivity: _lastTaskActivity, ...board }) => ({
+        // Return boards with their columns
+        return userBoards.map((board) => ({
           ...board,
           columns: columnsMap.get(board.id) || []
         }));
       }
 
-      return userBoards.map(({ lastTaskActivity: _lastTaskActivity, ...board }) => board);
+      return userBoards;
     },
     {
       query: t.Object({ space: t.String() })

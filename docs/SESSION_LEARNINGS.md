@@ -2,6 +2,361 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-21 - Raycast Extension, Habit Reminders Fix & AI Date Parsing
+
+### Problem 1: Duplicate Habit Reminders (30+ per habit!)
+
+**User Feedback**: "why are alot of reminders created for my work notifications" → "30+ reminders for a single habit"
+
+**Root Cause**: Two separate bugs in reminder deduplication logic:
+
+1. **Non-deterministic LIMIT 1**: Query found ANY reminder for the habit (could be from any day), then checked if that random reminder's date matched today
+   ```typescript
+   // OLD - BROKEN: No ORDER BY, LIMIT 1 is non-deterministic
+   const [existing] = await db.select()
+     .from(reminders)
+     .where(and(
+       eq(reminders.userId, userId),
+       sql`${reminders.message} LIKE ${'Habit reminder: ' + habitName + '%'}`
+     ))
+     .limit(1);
+
+   // Checked date AFTER fetching - race condition!
+   if (existing && existingDateStr === targetDateStr) return true;
+   ```
+
+2. **UTC vs JST Date Boundaries**: Checked UTC date ranges instead of JST date ranges
+   - Habit at 1:00 AM JST on Oct 21 = Oct 20 16:00 UTC (if JST is UTC+9)
+   - Old code checked Oct 20 00:00 UTC to Oct 20 23:59 UTC
+   - Missed the reminder because it was actually on Oct 21 in JST!
+
+**Solution**: Use JST date boundaries in WHERE clause
+
+```typescript
+// src/server/services/habit-reminder-service.ts
+private async reminderExists(
+  userId: string,
+  habitName: string,
+  reminderTime: Date
+): Promise<boolean> {
+  // Get JST date components from the reminder time
+  const { year, month, day } = getJstDateComponents(reminderTime);
+
+  // Calculate JST day boundaries (00:00:00 JST to 23:59:59 JST)
+  // These are converted to UTC for database comparison
+  const startOfDayJst = createJstDate(year, month, day, 0, 0, 0);
+  const endOfDayJst = createJstDate(year, month, day, 23, 59, 59);
+
+  // Find reminder for this habit on this specific JST date
+  const [existing] = await db.select()
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.userId, userId),
+        sql`${reminders.message} LIKE ${'Habit reminder: ' + habitName + '%'}`,
+        gte(reminders.reminderTime, startOfDayJst),
+        lte(reminders.reminderTime, endOfDayJst)
+      )
+    )
+    .limit(1);
+
+  return !!existing;
+}
+```
+
+**Key Improvements**:
+- Filter by date range in WHERE clause (not application logic)
+- Use JST date boundaries for correct timezone handling
+- LIKE pattern already handled messages with links appended
+- No need for ORDER BY since we're filtering by date range
+
+### Problem 2: AI Command Date Parsing (Stale Timestamps)
+
+**User Feedback**: "sometimes it's fucking dumb when i say end of today it gives me bs like the previous fucking day like i typed at 1am but it sets 1hour ago zzz"
+
+**Root Cause**: Current date/time was calculated ONCE when server started, not per request
+
+```typescript
+// OLD - BROKEN: Evaluated once at server startup
+instructions: `
+## Current Context
+- **Current Time (JST)**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString()}
+- **Current Date**: ${new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0]}
+`
+```
+
+If server started at 2 PM on Oct 20, ALL requests would think "today" is Oct 20 at 2 PM, even hours later!
+
+**Solution**: Calculate current JST time for EACH request
+
+```typescript
+// src/server/routes/command.ts
+async ({ body, db, user }) => {
+  // Get current JST time for THIS request
+  const jstNow = nowInJst();
+  const { year, month, day, hours, minutes, dayOfWeek } = getJstDateComponents(jstNow);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentTimeJst = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+09:00`;
+
+  const timeContext = `
+## Current Date and Time
+- Current time (JST): ${currentTimeJst}
+- Current date: ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}
+- Day of week: ${dayNames[dayOfWeek]}
+
+Use this for calculating all relative dates like "today", "tomorrow", "end of today", "next Monday", etc.`;
+
+  // Append to user message
+  const result = await commandProcessor.generate([
+    { role: 'user', content: command + timeContext + boardContext }
+  ], { ... });
+}
+```
+
+**AI Instructions Update** (src/mastra/agents/commandProcessor.ts):
+
+```typescript
+- **End of day**: "end of today", "by end of day", "eod" - use 23:59:00 of current date
+- **Date calculation**:
+  - Use the current date/time provided in the message context
+  - If user says "end of today" at 1:00 AM Oct 22, output: "2025-10-22T23:59:00+09:00" (same day!)
+  - If user says "tomorrow" at 1:00 AM Oct 22, output: "2025-10-23T00:00:00+09:00"
+```
+
+**Result**: "end of today" at 1 AM now correctly gives 23:59 of the SAME day, not previous day!
+
+### Problem 3: API Tokens for External Integrations
+
+**User Request**: Create Raycast extension that needs to authenticate without browser cookies
+
+**Solution**: Implement Bearer token authentication system
+
+1. **Database Schema** (drizzle/schema.ts):
+```typescript
+export const apiTokens = pgTable('api_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  token: text('token').notNull().unique(), // SHA-256 hashed
+  lastUsedAt: timestamp('last_used_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+```
+
+2. **API Routes** (src/server/routes/api-tokens.ts):
+```typescript
+// Create token - returns unhashed token ONCE
+.post('/', async ({ body, db, user }) => {
+  const rawToken = generateApiToken(); // 64 hex characters
+  const hashedToken = await hashToken(rawToken); // SHA-256
+
+  const [newToken] = await db.insert(apiTokens).values({
+    userId: user.id,
+    name: body.name,
+    token: hashedToken,
+    expiresAt: body.expiresAt ? new Date(body.expiresAt) : null
+  }).returning();
+
+  return { ...newToken, token: rawToken }; // Show unhashed ONCE
+})
+```
+
+3. **Bearer Token Authentication** (src/server/auth/withAuth.ts):
+```typescript
+// Check for Bearer token in Authorization header first
+const authHeader = request.headers.get('authorization');
+if (authHeader?.startsWith('Bearer ')) {
+  const rawToken = authHeader.substring(7);
+  const hashedToken = await hashToken(rawToken);
+
+  const [apiToken] = await db.select()
+    .from(apiTokens)
+    .where(eq(apiTokens.token, hashedToken));
+
+  if (apiToken && (!apiToken.expiresAt || apiToken.expiresAt > new Date())) {
+    // Update last used timestamp
+    await db.update(apiTokens)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiTokens.id, apiToken.id));
+
+    const [user] = await db.select().from(users)
+      .where(eq(users.id, apiToken.userId));
+
+    return { user };
+  }
+}
+
+// Fall back to JWT cookie authentication
+```
+
+4. **Settings UI with Ark UI Dialog** (src/pages/settings/+Page.tsx):
+```typescript
+import * as Dialog from '../../components/ui/styled/dialog';
+import { Portal } from '@ark-ui/react/portal';
+import { FormLabel } from '../../components/ui/form-label';
+
+<Dialog.Root open={isCreateTokenOpen} onOpenChange={(e) => setIsCreateTokenOpen(e.open)}>
+  <Dialog.Trigger asChild>
+    <Button>Create Token</Button>
+  </Dialog.Trigger>
+  <Portal>
+    <Dialog.Backdrop />
+    <Dialog.Positioner>
+      <Dialog.Content>
+        <Dialog.Title>Create API Token</Dialog.Title>
+        <Dialog.Description>
+          Create a new API token for external integrations.
+        </Dialog.Description>
+        {/* Form with FormLabel and Input */}
+      </Dialog.Content>
+    </Dialog.Positioner>
+  </Portal>
+</Dialog.Root>
+```
+
+**Key Points**:
+- Use `Dialog.Root`, `Dialog.Trigger`, `Portal`, `Dialog.Backdrop`, `Dialog.Positioner`, `Dialog.Content`
+- NO `Dialog.Header`, `Dialog.Body`, `Dialog.Footer` - those don't exist!
+- Use `FormLabel` from `form-label.tsx` for labels
+- Show newly created token with copy functionality (only shown once!)
+
+### Raycast Extension Implementation
+
+**Created** `raycast-hamflow/` directory with TypeScript Raycast extension:
+
+1. **API Client** (lib/api.ts):
+```typescript
+class HamFlowAPI {
+  constructor(apiToken: string, serverUrl: string) {
+    this.apiToken = apiToken;
+    this.baseUrl = serverUrl;
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiToken}`,
+      ...options.headers,
+    };
+    const response = await fetch(`${this.baseUrl}${endpoint}`, { ...options, headers });
+    return response.json();
+  }
+}
+```
+
+2. **Commands Implemented**:
+   - `ai-command.tsx` - Natural language task creation (parse → confirm → execute)
+   - `view-agenda.tsx` - Today's tasks/habits grouped by time
+   - `quick-add.tsx` - Quick task creation form
+   - `view-tasks.tsx` - Browse all tasks with filters
+
+3. **Preferences Configuration**:
+```json
+{
+  "apiToken": { "type": "password", "required": true },
+  "serverUrl": { "type": "textfield", "default": "https://hamflow.com" },
+  "defaultSpace": { "type": "dropdown", "data": [{"value": "work"}, {"value": "personal"}] }
+}
+```
+
+### Conversation History Support (Added by User)
+
+**Discovered**: User added conversation history to command processing
+
+```typescript
+// src/server/routes/command.ts
+const { command, space, conversationHistory = [] } = body;
+
+// Build conversation context from history
+let conversationContext = '';
+if (conversationHistory.length > 0) {
+  conversationContext = '\n\n## Previous Commands (for follow-up context)\n';
+  conversationHistory.forEach((turn, index) => {
+    conversationContext += `${index + 1}. User: "${turn.command}"\n   Action: ${turn.response.action}\n   Data: ${JSON.stringify(turn.response.data)}\n\n`;
+  });
+  conversationContext += 'Use this conversation history to understand follow-up commands. For example, if the user says "change it to tomorrow" or "make it high priority", refer to the most recent command.';
+}
+
+const result = await commandProcessor.generate([
+  { role: 'user', content: command + timeContext + boardContext + conversationContext }
+], { ... });
+```
+
+**Benefits**: AI can now handle follow-up commands like "change it to tomorrow" or "make it urgent" by referencing previous context.
+
+### Key Learnings
+
+1. **Timezone Handling is Critical**:
+   - ALWAYS use JST date boundaries when checking for duplicates
+   - NEVER use UTC date ranges for JST-based systems
+   - Use `getJstDateComponents()` and `createJstDate()` utilities
+
+2. **Stale Static Values are Dangerous**:
+   - Template strings with `${}` in static code evaluate ONCE
+   - For dynamic values, calculate per request in the handler
+   - Pass context via message content, not static instructions
+
+3. **LIMIT 1 Without ORDER BY is Non-Deterministic**:
+   - Without ORDER BY, LIMIT 1 returns random row
+   - Filter in WHERE clause instead of checking after fetch
+   - Use date ranges (gte/lte) for date-based deduplication
+
+4. **Ark UI Dialog Pattern**:
+   - Use styled Dialog: `* as Dialog from '~/components/ui/styled/dialog'`
+   - Wrap in `<Portal>` for proper z-index
+   - NO `.Header`, `.Body`, `.Footer` components
+   - Use `Dialog.Title` and `Dialog.Description` directly
+
+5. **API Token Security**:
+   - Hash tokens with SHA-256 before storing
+   - Show raw token only once on creation
+   - Track `lastUsedAt` for security monitoring
+   - Support optional expiration dates
+
+6. **Bearer Token Authentication**:
+   - Check `Authorization: Bearer <token>` header first
+   - Fall back to JWT cookie auth for browser sessions
+   - Update last used timestamp on successful auth
+   - Validate expiration dates
+
+### Files Modified
+
+**Backend**:
+- `drizzle/schema.ts` - Added api_tokens table
+- `src/server/routes/api-tokens.ts` - NEW: CRUD endpoints for tokens
+- `src/server/routes/command.ts` - Added real-time JST context, conversation history
+- `src/server/auth/withAuth.ts` - Added Bearer token support
+- `src/server/services/habit-reminder-service.ts` - Fixed JST date boundaries
+- `src/mastra/agents/commandProcessor.ts` - Updated date parsing instructions
+
+**Frontend**:
+- `src/pages/settings/+Page.tsx` - Added API Tokens UI with Dialog
+- `src/server/index.ts` - Registered apiTokensRoutes
+
+**New Files**:
+- `raycast-hamflow/package.json` - Raycast extension manifest
+- `raycast-hamflow/src/lib/api.ts` - API client wrapper
+- `raycast-hamflow/src/lib/types.ts` - TypeScript interfaces
+- `raycast-hamflow/src/ai-command.tsx` - AI command input
+- `raycast-hamflow/src/view-agenda.tsx` - Today's agenda
+- `raycast-hamflow/src/quick-add.tsx` - Quick task creation
+- `raycast-hamflow/src/view-tasks.tsx` - Task browser
+- `raycast-hamflow/README.md` - Extension documentation
+
+### Testing Checklist
+
+- [x] Habit reminders: No more duplicates (30+ → 1)
+- [x] "end of today" at 1 AM gives correct date
+- [x] API tokens: Create, list, delete functionality
+- [x] Bearer token auth works without cookies
+- [x] Settings Dialog uses correct Ark UI pattern
+- [x] Type checking passes
+- [x] Linting passes
+- [x] Build succeeds
+
+---
+
 ## 2025-10-16 - Reminder Links & Drag Preview Enhancement
 
 ### Problem: Incomplete Notification Links
