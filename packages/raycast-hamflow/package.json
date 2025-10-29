@@ -1,11 +1,15 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
+  "version": "0.1.0",
   "name": "hamflow",
   "title": "HamFlow",
   "description": "Manage your HamFlow tasks, agenda, and productivity from Raycast",
   "icon": "command-icon.png",
-  "author": "hamflow",
-  "categories": ["Productivity"],
+  "author": "tanyawat_vittayapalotai_p",
+  "categories": [
+    "Productivity"
+  ],
+  "owner": "hamproductions",
   "license": "MIT",
   "commands": [
     {
@@ -13,31 +17,85 @@
       "title": "AI Command",
       "subtitle": "HamFlow",
       "description": "Create tasks and reminders using natural language",
-      "mode": "view"
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "command",
+          "type": "text",
+          "placeholder": "e.g., deploy staging tomorrow",
+          "required": false
+        }
+      ],
+      "keywords": [
+        "ai",
+        "create",
+        "task",
+        "reminder",
+        "todo"
+      ]
     },
     {
       "name": "view-agenda",
       "title": "Today's Agenda",
       "subtitle": "HamFlow",
       "description": "View today's tasks and habits",
-      "mode": "view"
+      "mode": "view",
+      "keywords": [
+        "agenda",
+        "today",
+        "tasks",
+        "habits",
+        "schedule"
+      ]
     },
     {
       "name": "quick-add",
       "title": "Quick Add Task",
       "subtitle": "HamFlow",
       "description": "Quickly add a new task",
-      "mode": "view"
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "title",
+          "type": "text",
+          "placeholder": "Task title",
+          "required": false
+        }
+      ],
+      "keywords": [
+        "quick",
+        "add",
+        "task",
+        "create",
+        "new",
+        "todo"
+      ]
     },
     {
       "name": "view-tasks",
       "title": "View All Tasks",
       "subtitle": "HamFlow",
       "description": "Browse and manage all your tasks",
-      "mode": "view"
+      "mode": "view",
+      "keywords": [
+        "tasks",
+        "all",
+        "browse",
+        "search",
+        "filter"
+      ]
     }
   ],
   "preferences": [
+    {
+      "name": "serverUrl",
+      "type": "textfield",
+      "required": true,
+      "title": "Server URL",
+      "description": "Your HamFlow instance URL",
+      "default": "http://localhost:3000",
+      "placeholder": "http://localhost:3000"
+    },
     {
       "name": "apiToken",
       "type": "password",
@@ -45,15 +103,6 @@
       "title": "API Token",
       "description": "Your HamFlow API token from Settings",
       "placeholder": "Enter your API token"
-    },
-    {
-      "name": "serverUrl",
-      "type": "textfield",
-      "required": true,
-      "title": "Server URL",
-      "description": "Your HamFlow instance URL",
-      "default": "https://hamflow.yourdomain.com",
-      "placeholder": "https://hamflow.yourdomain.com"
     },
     {
       "name": "defaultSpace",
@@ -75,17 +124,17 @@
     }
   ],
   "dependencies": {
-    "@raycast/api": "^1.86.1",
-    "@raycast/utils": "^1.21.0",
+    "@raycast/api": "^1.103.5",
+    "@raycast/utils": "^2.2.1",
     "date-fns": "^4.1.0"
   },
   "devDependencies": {
-    "@raycast/eslint-config": "^1.0.11",
-    "@types/node": "~22.10.0",
-    "@types/react": "^18.3.3",
-    "eslint": "^9.17.0",
-    "prettier": "^3.4.2",
-    "typescript": "^5.7.2"
+    "@raycast/eslint-config": "^2.1.1",
+    "@types/node": "~24.9.2",
+    "@types/react": "^19.2.2",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "build": "ray build -e dist -o dist",

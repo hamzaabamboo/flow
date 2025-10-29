@@ -45,3 +45,17 @@ export interface ApiError {
 }
 
 export type Space = 'work' | 'personal';
+
+export interface Board {
+  id: string;
+  name: string;
+  description?: string;
+  space: Space;
+  columns: Column[];
+}
+
+export interface Column {
+  id: string;
+  name: string;
+  boardId: string;
+}

@@ -57,6 +57,13 @@
       "when": 1760408958712,
       "tag": "0007_faithful_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1761718940257,
+      "tag": "0008_special_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

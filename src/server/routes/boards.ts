@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, inArray, desc, sql } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { boards, columns, tasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { isColumnDone } from '../utils/taskCompletion';

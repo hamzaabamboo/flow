@@ -33,6 +33,8 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
         const timeContext = `\n\n## Current Date and Time\n- Current time (JST): ${currentTimeJst}\n- Current date: ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}\n- Day of week: ${dayNames[dayOfWeek]}\n\nUse this for calculating all relative dates like "today", "tomorrow", "end of today", "next Monday", etc.`;
 
         // Fetch user's boards and columns for context
+        // If space is not specified or is "auto", fetch boards from BOTH spaces
+        const shouldFetchBothSpaces = !space || space === 'auto';
         const userBoards = await db
           .select({
             id: boards.id,
@@ -41,7 +43,11 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             space: boards.space
           })
           .from(boards)
-          .where(and(eq(boards.userId, user.id), eq(boards.space, space as 'work' | 'personal')));
+          .where(
+            shouldFetchBothSpaces
+              ? eq(boards.userId, user.id)
+              : and(eq(boards.userId, user.id), eq(boards.space, space as 'work' | 'personal'))
+          );
 
         let boardContext = '';
         if (userBoards.length > 0) {
@@ -66,7 +72,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             };
           });
 
-          boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\nIf the user specifies a board or column name, map it to the corresponding ID. Use board descriptions to understand what each board is for and intelligently route tasks. For example, if a user says "add deploy task" and the Engineering board has description "Software development and deployments", route it there. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", and "columnId": "<column-id>". Otherwise, tasks will go to the inbox for manual processing.`;
+          boardContext = `\n\n## User's Boards and Columns\n${JSON.stringify(boardsWithColumns, null, 2)}\n\n${shouldFetchBothSpaces ? '**IMPORTANT**: You have access to boards from BOTH work and personal spaces. Analyze the task content to determine which space it belongs to:\n- Work tasks: deployment, bugs, features, meetings, projects, work-related items → use "work" boards\n- Personal tasks: shopping, errands, chores, personal projects, hobbies → use "personal" boards\nSet the "space" field to "work" or "personal" based on your analysis.\n\n' : ''}If the user specifies a board or column name, map it to the corresponding ID. Use board descriptions to understand what each board is for and intelligently route tasks. For example, if a user says "add deploy task" and the Engineering board has description "Software development and deployments", route it there. When creating tasks, you can suggest adding them directly to a specific column by setting "directToBoard": true, "boardId": "<board-id>", "columnId": "<column-id>", and "space": "<work-or-personal>". Otherwise, tasks will go to the inbox for manual processing.`;
         }
 
         // Build conversation context from history
@@ -240,7 +246,10 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
   .post(
     '/execute',
     async ({ body, db, user }) => {
-      const { action, data, space } = body;
+      const { action, data, space: requestSpace } = body;
+
+      // Use the space from AI detection if available, otherwise fall back to request space
+      const space = (data.space as 'work' | 'personal' | undefined) || requestSpace;
 
       try {
         switch (action) {
