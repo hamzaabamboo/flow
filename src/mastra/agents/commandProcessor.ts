@@ -43,7 +43,9 @@ export const CommandIntentSchema = z.object({
   space: z
     .enum(['work', 'personal'])
     .optional()
-    .describe('Which space this task belongs to - work or personal. Required when boards from both spaces are available.')
+    .describe(
+      'Which space this task belongs to - work or personal. Required when boards from both spaces are available.'
+    )
 });
 
 export const commandProcessor = new Agent({

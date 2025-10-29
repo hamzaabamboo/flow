@@ -659,9 +659,7 @@ export default function SettingsPage() {
                     <HStack gap="2" justifyContent="space-between">
                       <HStack gap="2">
                         <Key width="16" height="16" />
-                        <Text fontWeight="semibold">
-                          Your new API token
-                        </Text>
+                        <Text fontWeight="semibold">Your new API token</Text>
                       </HStack>
                       <Button
                         variant="ghost"
