@@ -1,6 +1,6 @@
-import { showToast, Toast } from "@raycast/api";
-import type { Task, CalendarEvent, CommandIntent, Space } from "./types";
-import { getPreferences } from "../utils/preferences";
+import { showToast, Toast } from '@raycast/api';
+import type { Task, CalendarEvent, CommandIntent, Space, Board } from './types';
+import { getPreferences } from '../utils/preferences';
 
 class HamFlowAPI {
   private baseUrl: string;
@@ -8,25 +8,22 @@ class HamFlowAPI {
 
   constructor() {
     const prefs = getPreferences();
-    this.baseUrl = prefs.serverUrl.replace(/\/$/, ""); // Remove trailing slash
+    this.baseUrl = prefs.serverUrl.replace(/\/$/, ''); // Remove trailing slash
     this.apiToken = prefs.apiToken;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${this.apiToken}`,
-      ...options.headers,
+      ...options.headers
     };
 
     try {
       const response = await fetch(url, {
         ...options,
-        headers,
+        headers
       });
 
       if (!response.ok) {
@@ -34,33 +31,33 @@ class HamFlowAPI {
         throw new Error(error || `HTTP ${response.status}`);
       }
 
-      return await response.json();
+      return (await response.json()) as unknown as T;
     } catch (error) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "API Error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        title: 'API Error',
+        message: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
   // Command API
-  async sendCommand(command: string, space: Space): Promise<CommandIntent> {
-    return this.request<CommandIntent>("/api/command", {
-      method: "POST",
-      body: JSON.stringify({ command, space }),
+  async sendCommand(command: string, space?: Space | 'auto'): Promise<CommandIntent> {
+    return this.request<CommandIntent>('/api/command', {
+      method: 'POST',
+      body: JSON.stringify({ command, space: space || 'auto' })
     });
   }
 
   async executeCommand(
     action: string,
     data: Record<string, unknown>,
-    space: Space
+    space?: Space | 'auto'
   ): Promise<{ success: boolean; data: unknown; boardId?: string }> {
-    return this.request("/api/command/execute", {
-      method: "POST",
-      body: JSON.stringify({ action, data, space }),
+    return this.request('/api/command/execute', {
+      method: 'POST',
+      body: JSON.stringify({ action, data, space: space || 'auto' })
     });
   }
 
@@ -90,9 +87,9 @@ class HamFlowAPI {
     labels?: string[];
     link?: string;
   }): Promise<Task> {
-    return this.request<Task>("/api/tasks", {
-      method: "POST",
-      body: JSON.stringify(task),
+    return this.request<Task>('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(task)
     });
   }
 
@@ -110,9 +107,7 @@ class HamFlowAPI {
     }
 
     const queryString = params.toString();
-    const endpoint = queryString
-      ? `/api/tasks?${queryString}`
-      : "/api/tasks";
+    const endpoint = queryString ? `/api/tasks?${queryString}` : '/api/tasks';
 
     return this.request<Task[]>(endpoint);
   }
@@ -129,14 +124,14 @@ class HamFlowAPI {
     }
   ): Promise<Task> {
     return this.request<Task>(`/api/tasks/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(updates),
+      method: 'PATCH',
+      body: JSON.stringify(updates)
     });
   }
 
   async deleteTask(id: string): Promise<void> {
     await this.request(`/api/tasks/${id}`, {
-      method: "DELETE",
+      method: 'DELETE'
     });
   }
 
@@ -148,6 +143,11 @@ class HamFlowAPI {
   // Mark task as incomplete
   async uncompleteTask(id: string): Promise<Task> {
     return this.updateTask(id, { completed: false });
+  }
+
+  // Boards API
+  async getBoards(space: Space): Promise<Board[]> {
+    return this.request<Board[]>(`/api/boards?space=${space}`);
   }
 }
 

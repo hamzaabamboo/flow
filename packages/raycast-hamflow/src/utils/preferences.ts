@@ -1,9 +1,9 @@
-import { getPreferenceValues } from "@raycast/api";
+import { getPreferenceValues } from '@raycast/api';
 
 interface Preferences {
-  apiToken: string;
   serverUrl: string;
-  defaultSpace: "work" | "personal";
+  apiToken: string;
+  defaultSpace: 'work' | 'personal';
 }
 
 export function getPreferences(): Preferences {

@@ -1,22 +1,23 @@
-import { List, ActionPanel, Action, Icon, Color, open } from "@raycast/api";
-import { useCachedPromise } from "@raycast/utils";
-import { format } from "date-fns";
-import { api } from "./lib/api";
-import type { CalendarEvent } from "./lib/types";
-import { getPreferences } from "./utils/preferences";
+import { useState } from 'react';
+import { List, ActionPanel, Action, Icon, Color, open } from '@raycast/api';
+import { useCachedPromise } from '@raycast/utils';
+import { format } from 'date-fns';
+import { api } from './lib/api';
+import type { CalendarEvent } from './lib/types';
+import { getPreferences } from './utils/preferences';
 
 function getPriorityIcon(priority?: string): {
   source: Icon;
   tintColor: Color;
 } {
   switch (priority) {
-    case "urgent":
+    case 'urgent':
       return { source: Icon.ExclamationMark, tintColor: Color.Red };
-    case "high":
+    case 'high':
       return { source: Icon.ArrowUp, tintColor: Color.Orange };
-    case "medium":
+    case 'medium':
       return { source: Icon.Minus, tintColor: Color.Yellow };
-    case "low":
+    case 'low':
       return { source: Icon.ArrowDown, tintColor: Color.Green };
     default:
       return { source: Icon.Circle, tintColor: Color.SecondaryText };
@@ -24,14 +25,14 @@ function getPriorityIcon(priority?: string): {
 }
 
 function getSpaceEmoji(space: string): string {
-  return space === "work" ? "💼" : "🏠";
+  return space === 'work' ? '💼' : '🏠';
 }
 
 function getTimeGroup(date: string): string {
   const hour = new Date(date).getHours();
-  if (hour < 12) return "Morning";
-  if (hour < 17) return "Afternoon";
-  return "Evening";
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  return 'Evening';
 }
 
 function groupEventsByTime(events: CalendarEvent[]): Record<string, CalendarEvent[]> {
@@ -40,7 +41,7 @@ function groupEventsByTime(events: CalendarEvent[]): Record<string, CalendarEven
     Overdue: [],
     Morning: [],
     Afternoon: [],
-    Evening: [],
+    Evening: []
   };
 
   events.forEach((event) => {
@@ -56,37 +57,54 @@ function groupEventsByTime(events: CalendarEvent[]): Record<string, CalendarEven
   return groups;
 }
 
-export default function ViewAgenda() {
+function ViewAgenda() {
+  const [spaceFilter, setSpaceFilter] = useState<string>('all');
   const prefs = getPreferences();
 
-  const { data: events, isLoading, revalidate } = useCachedPromise(
+  const {
+    data: allEvents,
+    isLoading,
+    revalidate
+  } = useCachedPromise(
     async () => {
-      return await api.getTodayAgenda(prefs.defaultSpace);
+      // Fetch from both spaces
+      const workEvents = await api.getTodayAgenda('work');
+      const personalEvents = await api.getTodayAgenda('personal');
+      return [...workEvents, ...personalEvents];
     },
     [],
     {
-      initialData: [],
+      initialData: []
     }
   );
 
-  const groupedEvents = groupEventsByTime(events);
+  // Filter by space
+  const events =
+    spaceFilter === 'all' ? allEvents : allEvents.filter((e) => e.space === spaceFilter);
 
-  const handleComplete = async (event: CalendarEvent) => {
-    await api.completeTask(event.id);
-    await revalidate();
-  };
+  const groupedEvents = groupEventsByTime(events);
 
   const handleOpen = async (event: CalendarEvent) => {
     if (event.boardId) {
       await open(`${prefs.serverUrl}/board/${event.boardId}`);
     } else {
-      const dateStr = format(new Date(event.dueDate), "yyyy-MM-dd");
+      const dateStr = format(new Date(event.dueDate), 'yyyy-MM-dd');
       await open(`${prefs.serverUrl}/agenda?date=${dateStr}`);
     }
   };
 
   return (
-    <List isLoading={isLoading} searchBarPlaceholder="Search today's tasks and habits">
+    <List
+      isLoading={isLoading}
+      searchBarPlaceholder="Search today's tasks and habits"
+      searchBarAccessory={
+        <List.Dropdown tooltip="Filter by Space" value={spaceFilter} onChange={setSpaceFilter}>
+          <List.Dropdown.Item title="All Spaces" value="all" />
+          <List.Dropdown.Item title="💼 Work" value="work" />
+          <List.Dropdown.Item title="🏠 Personal" value="personal" />
+        </List.Dropdown>
+      }
+    >
       {Object.entries(groupedEvents).map(([group, groupEvents]) => {
         if (groupEvents.length === 0) return null;
 
@@ -94,14 +112,14 @@ export default function ViewAgenda() {
           <List.Section key={group} title={group}>
             {groupEvents.map((event) => {
               const priorityIcon = getPriorityIcon(event.priority);
-              const time = format(new Date(event.dueDate), "h:mm a");
+              const time = format(new Date(event.dueDate), 'h:mm a');
               const subtitle = [
                 time,
                 event.boardName && `📋 ${event.boardName}`,
-                event.columnName && `→ ${event.columnName}`,
+                event.columnName && `→ ${event.columnName}`
               ]
                 .filter(Boolean)
-                .join(" • ");
+                .join(' • ');
 
               return (
                 <List.Item
@@ -110,22 +128,13 @@ export default function ViewAgenda() {
                   title={`${getSpaceEmoji(event.space)} ${event.title}`}
                   subtitle={subtitle}
                   accessories={[
-                    ...(event.completed
-                      ? [{ icon: Icon.CheckCircle, tintColor: Color.Green }]
-                      : []),
-                    ...(event.type === "habit"
-                      ? [{ tag: { value: "Habit", color: Color.Purple } }]
-                      : []),
+                    ...(event.completed ? [{ icon: Icon.CheckCircle }] : []),
+                    ...(event.type === 'habit'
+                      ? [{ tag: { value: 'Habit', color: Color.Purple } }]
+                      : [])
                   ]}
                   actions={
                     <ActionPanel>
-                      {!event.completed && (
-                        <Action
-                          title="Mark Complete"
-                          icon={Icon.Check}
-                          onAction={() => handleComplete(event)}
-                        />
-                      )}
                       <Action
                         title="Open in HamFlow"
                         icon={Icon.Globe}
@@ -135,7 +144,7 @@ export default function ViewAgenda() {
                         title="Refresh"
                         icon={Icon.ArrowClockwise}
                         onAction={revalidate}
-                        shortcut={{ modifiers: ["cmd"], key: "r" }}
+                        shortcut={{ modifiers: ['cmd'], key: 'r' }}
                       />
                     </ActionPanel>
                   }
@@ -156,3 +165,5 @@ export default function ViewAgenda() {
     </List>
   );
 }
+
+export default ViewAgenda;
