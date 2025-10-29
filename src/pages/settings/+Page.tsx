@@ -530,13 +530,16 @@ export default function SettingsPage() {
                 <Portal>
                   <Dialog.Backdrop />
                   <Dialog.Positioner>
-                    <Dialog.Content>
-                      <Dialog.Title>Create API Token</Dialog.Title>
-                      <Dialog.Description>
-                        Create a new API token for external integrations like Raycast.
-                      </Dialog.Description>
-                      <VStack gap="4" mt="4" alignItems="stretch">
-                        <Box>
+                    <Dialog.Content maxW="md">
+                      <VStack gap="6" p="6">
+                        <VStack gap="1" alignItems="start">
+                          <Dialog.Title>Create API Token</Dialog.Title>
+                          <Dialog.Description>
+                            Create a new API token for external integrations like Raycast.
+                          </Dialog.Description>
+                        </VStack>
+
+                        <Box width="100%">
                           <FormLabel htmlFor="token-name">Token Name</FormLabel>
                           <Input
                             id="token-name"
@@ -545,7 +548,8 @@ export default function SettingsPage() {
                             onChange={(e) => setNewTokenName(e.target.value)}
                           />
                         </Box>
-                        <HStack gap="2" justifyContent="flex-end">
+
+                        <HStack gap="2" justifyContent="flex-end" width="100%">
                           <Dialog.CloseTrigger asChild>
                             <Button variant="outline" size="sm">
                               Cancel
@@ -564,6 +568,7 @@ export default function SettingsPage() {
                           </Button>
                         </HStack>
                       </VStack>
+
                       <Dialog.CloseTrigger asChild>
                         <Button
                           variant="ghost"
@@ -645,16 +650,19 @@ export default function SettingsPage() {
               {createdToken && (
                 <Box
                   p="4"
-                  borderWidth="2px"
-                  borderRadius="md"
-                  borderColor="green.500"
-                  bg="green.50"
+                  borderWidth="1px"
+                  borderRadius="l2"
+                  borderColor="border.emphasized"
+                  bg="bg.emphasized"
                 >
                   <VStack gap="3" alignItems="stretch">
                     <HStack gap="2" justifyContent="space-between">
-                      <Text fontWeight="bold" color="green.900">
-                        ⚠️ Copy your token now!
-                      </Text>
+                      <HStack gap="2">
+                        <Key width="16" height="16" />
+                        <Text fontWeight="semibold">
+                          Your new API token
+                        </Text>
+                      </HStack>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -664,8 +672,8 @@ export default function SettingsPage() {
                         <X width="16" height="16" />
                       </Button>
                     </HStack>
-                    <Text fontSize="sm" color="green.900">
-                      This token will only be shown once. Make sure to copy it now.
+                    <Text fontSize="sm" color="fg.muted">
+                      Copy this token now - it won't be shown again for security reasons.
                     </Text>
                     <HStack gap="2">
                       <Input
@@ -674,7 +682,6 @@ export default function SettingsPage() {
                         onClick={(e) => e.currentTarget.select()}
                         fontFamily="mono"
                         fontSize="sm"
-                        bg="white"
                       />
                       <Button
                         size="sm"
