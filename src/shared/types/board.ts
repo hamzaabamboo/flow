@@ -28,6 +28,7 @@ export interface Task {
   recurringEndDate?: string;
   parentTaskId?: string;
   createReminder?: boolean;
+  noteId?: string | null;
   metadata?: TaskMetadata;
   column?: Column & { board?: Board };
   // Convenience accessors for common metadata fields

@@ -1,4 +1,4 @@
-import { ExternalLink, ArrowRight, Calendar, Copy } from 'lucide-react';
+import { ExternalLink, ArrowRight, Calendar, Copy, FileText } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge } from '../ui/badge';
@@ -130,6 +130,14 @@ export function TaskItem({
                   </Box>
                 )}
                 {event.priority && <PriorityBadge priority={event.priority} size="sm" />}
+                {event.noteId && (
+                  <Badge variant="outline" colorPalette="blue" size="sm">
+                    <HStack gap="1">
+                      <FileText width="12" height="12" />
+                      Note
+                    </HStack>
+                  </Badge>
+                )}
                 {extraBadges}
               </HStack>
               <HStack gap="2" flexWrap="wrap">
