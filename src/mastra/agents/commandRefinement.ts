@@ -5,6 +5,7 @@ import { google } from '@ai-sdk/google';
 // Zod schema for refinement suggestions
 export const RefinementSuggestionSchema = z.object({
   suggestions: z
+    .array(
       z.object({
         type: z
           .enum(['completion', 'detail', 'timing', 'priority', 'board'])
