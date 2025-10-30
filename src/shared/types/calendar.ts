@@ -22,6 +22,7 @@ export interface CalendarEvent {
   subtasks?: Subtask[];
   instanceDate?: string; // For tracking specific instances of recurring tasks
   link?: string;
+  noteId?: string | null; // Linked Outline note
   // External calendar specific fields
   externalCalendarId?: string;
   externalCalendarName?: string;

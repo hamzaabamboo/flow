@@ -14,7 +14,8 @@ import {
   X,
   CalendarPlus,
   Plus,
-  Pencil
+  Pencil,
+  FileText
 } from 'lucide-react';
 import { Box, VStack, HStack, Center } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
@@ -59,6 +60,9 @@ interface UserSettings {
     github: boolean;
     slack: boolean;
   };
+  outlineApiUrl?: string;
+  outlineApiKey?: string;
+  outlineCollectionId?: string;
 }
 
 interface ApiToken {
@@ -97,6 +101,11 @@ export default function SettingsPage() {
   const [editingCalendar, setEditingCalendar] = useState<ExternalCalendar | null>(null);
   const [isEditCalendarOpen, setIsEditCalendarOpen] = useState(false);
 
+  // Outline settings state
+  const [outlineApiUrl, setOutlineApiUrl] = useState('');
+  const [outlineApiKey, setOutlineApiKey] = useState('');
+  const [outlineCollectionId, setOutlineCollectionId] = useState('');
+
   // Space options for Select component
   const spaceOptions = createListCollection({
     items: [
@@ -111,8 +120,27 @@ export default function SettingsPage() {
     queryFn: async () => {
       const response = await fetch('/api/settings');
       if (!response.ok) throw new Error('Failed to fetch settings');
-      return response.json();
+      const data = await response.json();
+
+      // Initialize Outline settings
+      if (data.outlineApiUrl) setOutlineApiUrl(data.outlineApiUrl);
+      if (data.outlineApiKey) setOutlineApiKey(data.outlineApiKey);
+      if (data.outlineCollectionId) setOutlineCollectionId(data.outlineCollectionId);
+
+      return data;
     }
+  });
+
+  // Fetch Outline collections (only when configured)
+  const { data: outlineCollections, isLoading: collectionsLoading } = useQuery({
+    queryKey: ['outline-collections', settings?.outlineApiUrl, settings?.outlineApiKey],
+    queryFn: async () => {
+      const response = await fetch('/api/notes/collections');
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.data || [];
+    },
+    enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
   });
 
   // Update settings mutation
@@ -128,6 +156,17 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['notes', 'enabled'] });
+      toast?.('Settings updated successfully', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: () => {
+      toast?.('Failed to update settings', {
+        title: 'Error',
+        type: 'error'
+      });
     }
   });
 
@@ -1227,6 +1266,149 @@ export default function SettingsPage() {
                   </VStack>
                 </Box>
               )}
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+
+        {/* Outline Integration Section */}
+        <Card.Root>
+          <Card.Header>
+            <HStack gap="2">
+              <FileText width="20" height="20" />
+              <Heading size="lg">Outline Integration</Heading>
+            </HStack>
+          </Card.Header>
+          <Card.Body>
+            <VStack gap="4" alignItems="stretch">
+              <Fieldset.Root>
+                <Fieldset.Legend>Note-Taking Integration</Fieldset.Legend>
+                <VStack gap="4" alignItems="stretch" mt="4">
+                  <Fieldset.HelperText>
+                    Connect your Outline instance to link tasks with detailed notes and
+                    documentation.
+                  </Fieldset.HelperText>
+
+                  <Box>
+                    <FormLabel>Outline API URL</FormLabel>
+                    <Input
+                      placeholder="https://app.getoutline.com or https://your-instance.com"
+                      value={outlineApiUrl}
+                      onChange={(e) => setOutlineApiUrl(e.target.value)}
+                    />
+                    <Text fontSize="xs" color="fg.muted" mt="1">
+                      Your Outline instance URL (e.g., https://app.getoutline.com or
+                      https://outline.yourdomain.com). The /api path will be added automatically.
+                    </Text>
+                  </Box>
+
+                  <Box>
+                    <FormLabel>API Key</FormLabel>
+                    <Input
+                      type="password"
+                      placeholder="Enter your Outline API key"
+                      value={outlineApiKey}
+                      onChange={(e) => setOutlineApiKey(e.target.value)}
+                    />
+                    <Text fontSize="xs" color="fg.muted" mt="1">
+                      Get your API key from Outline Settings → API & Apps
+                    </Text>
+                  </Box>
+
+                  <Box>
+                    <FormLabel>Default Collection (Optional)</FormLabel>
+                    {collectionsLoading ? (
+                      <Center p="4">
+                        <Spinner size="sm" />
+                      </Center>
+                    ) : outlineCollections && outlineCollections.length > 0 ? (
+                      <Select.Root
+                        positioning={{ sameWidth: true }}
+                        collection={createListCollection({
+                          items: outlineCollections.map((c: { id: string; name: string }) => ({
+                            label: c.name,
+                            value: c.id
+                          }))
+                        })}
+                        value={outlineCollectionId ? [outlineCollectionId] : []}
+                        onValueChange={(e) => setOutlineCollectionId(e.value[0] || '')}
+                      >
+                        <Select.Control>
+                          <Select.Trigger>
+                            <Select.ValueText placeholder="Select a collection" />
+                          </Select.Trigger>
+                        </Select.Control>
+                        <Portal>
+                          <Select.Positioner>
+                            <Select.Content>
+                              {outlineCollections.map(
+                                (collection: { id: string; name: string }) => (
+                                  <Select.Item key={collection.id} item={collection.id}>
+                                    <Select.ItemText>{collection.name}</Select.ItemText>
+                                  </Select.Item>
+                                )
+                              )}
+                            </Select.Content>
+                          </Select.Positioner>
+                        </Portal>
+                      </Select.Root>
+                    ) : (
+                      <Text fontSize="sm" color="fg.muted">
+                        {settings?.outlineApiUrl && settings?.outlineApiKey
+                          ? 'No collections found. Create a collection in Outline first.'
+                          : 'Configure API URL and Key to load collections'}
+                      </Text>
+                    )}
+                    <Text fontSize="xs" color="fg.muted" mt="1">
+                      Default collection for creating new notes from tasks
+                    </Text>
+                  </Box>
+
+                  <HStack gap="2" justifyContent="flex-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOutlineApiUrl(settings?.outlineApiUrl || '');
+                        setOutlineApiKey(settings?.outlineApiKey || '');
+                        setOutlineCollectionId(settings?.outlineCollectionId || '');
+                      }}
+                      disabled={!settings}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        updateSettings.mutate({
+                          outlineApiUrl: outlineApiUrl || undefined,
+                          outlineApiKey: outlineApiKey || undefined,
+                          outlineCollectionId: outlineCollectionId || undefined
+                        });
+                      }}
+                      disabled={!outlineApiUrl || !outlineApiKey || updateSettings.isPending}
+                      loading={updateSettings.isPending}
+                    >
+                      Save Outline Settings
+                    </Button>
+                  </HStack>
+
+                  {settings?.outlineApiUrl && settings?.outlineApiKey && (
+                    <Box
+                      p="3"
+                      borderWidth="1px"
+                      borderRadius="l2"
+                      borderColor="border.emphasized"
+                      bg="green.subtle"
+                    >
+                      <HStack gap="2">
+                        <Text fontSize="sm" fontWeight="medium" color="green.fg">
+                          ✓ Outline integration is configured
+                        </Text>
+                      </HStack>
+                    </Box>
+                  )}
+                </VStack>
+              </Fieldset.Root>
             </VStack>
           </Card.Body>
         </Card.Root>

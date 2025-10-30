@@ -25,6 +25,9 @@ export const users = pgTable('users', {
       eveningSummaryEnabled?: boolean;
       morningSummaryEnabled?: boolean;
       summarySpaces?: ('work' | 'personal')[];
+      outlineApiUrl?: string;
+      outlineApiKey?: string;
+      outlineCollectionId?: string;
     }>()
     .default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),

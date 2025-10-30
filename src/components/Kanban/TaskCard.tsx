@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Check } from 'lucide-react';
+import { Calendar, Check, FileText } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
@@ -85,6 +85,15 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
               <HStack gap="1">
                 <Check width="12" height="12" />
                 Completed
+              </HStack>
+            </Badge>
+          )}
+
+          {task.noteId && (
+            <Badge variant="outline" colorPalette="blue" fontSize="xs">
+              <HStack gap="1">
+                <FileText width="12" height="12" />
+                Note
               </HStack>
             </Badge>
           )}

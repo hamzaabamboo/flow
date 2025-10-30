@@ -15,10 +15,13 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
         eveningSummaryEnabled?: boolean;
         morningSummaryEnabled?: boolean;
         summarySpaces?: ('work' | 'personal')[];
+        outlineApiUrl?: string;
+        outlineApiKey?: string;
+        outlineCollectionId?: string;
       } | null) || {};
 
     // TODO: Store other settings (theme, defaultSpace, pomodoro, integrations) in users.settings
-    // Currently only morningSummary, eveningSummary, and summarySpaces are persisted
+    // Currently only morningSummary, eveningSummary, summarySpaces, and Outline settings are persisted
     return {
       theme: 'light',
       defaultSpace: 'work',
@@ -42,6 +45,9 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
         github: false,
         slack: false
       },
+      outlineApiUrl: userSettings.outlineApiUrl,
+      outlineApiKey: userSettings.outlineApiKey,
+      outlineCollectionId: userSettings.outlineCollectionId,
       commandBar: {
         shortcuts: [
           { key: 'cmd+k', action: 'open_command_bar' },
@@ -56,31 +62,47 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
   .patch(
     '/',
     async ({ body, db, user }) => {
-      // Update user settings in database
+      // Get current settings
+      const [currentUser] = await db.select().from(users).where(eq(users.id, user.id));
+      const existingSettings =
+        (currentUser?.settings as {
+          eveningSummaryEnabled?: boolean;
+          morningSummaryEnabled?: boolean;
+          summarySpaces?: ('work' | 'personal')[];
+          outlineApiUrl?: string;
+          outlineApiKey?: string;
+          outlineCollectionId?: string;
+        } | null) || {};
+
+      const newSettings = {
+        ...existingSettings
+      };
+
+      // Update notification settings
       if (body.notifications) {
-        const [currentUser] = await db.select().from(users).where(eq(users.id, user.id));
-        const existingSettings =
-          (currentUser?.settings as {
-            eveningSummaryEnabled?: boolean;
-            morningSummaryEnabled?: boolean;
-            summarySpaces?: ('work' | 'personal')[];
-          } | null) || {};
-
-        const newSettings = {
-          ...existingSettings,
-          ...(body.notifications.morningSummary !== undefined && {
-            morningSummaryEnabled: body.notifications.morningSummary
-          }),
-          ...(body.notifications.eveningSummary !== undefined && {
-            eveningSummaryEnabled: body.notifications.eveningSummary
-          }),
-          ...(body.notifications.summarySpaces !== undefined && {
-            summarySpaces: body.notifications.summarySpaces
-          })
-        };
-
-        await db.update(users).set({ settings: newSettings }).where(eq(users.id, user.id));
+        if (body.notifications.morningSummary !== undefined) {
+          newSettings.morningSummaryEnabled = body.notifications.morningSummary;
+        }
+        if (body.notifications.eveningSummary !== undefined) {
+          newSettings.eveningSummaryEnabled = body.notifications.eveningSummary;
+        }
+        if (body.notifications.summarySpaces !== undefined) {
+          newSettings.summarySpaces = body.notifications.summarySpaces;
+        }
       }
+
+      // Update Outline settings
+      if (body.outlineApiUrl !== undefined) {
+        newSettings.outlineApiUrl = body.outlineApiUrl;
+      }
+      if (body.outlineApiKey !== undefined) {
+        newSettings.outlineApiKey = body.outlineApiKey;
+      }
+      if (body.outlineCollectionId !== undefined) {
+        newSettings.outlineCollectionId = body.outlineCollectionId;
+      }
+
+      await db.update(users).set({ settings: newSettings }).where(eq(users.id, user.id));
 
       return {
         success: true,
@@ -116,7 +138,10 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
             github: t.Boolean(),
             slack: t.Boolean()
           })
-        )
+        ),
+        outlineApiUrl: t.Optional(t.String()),
+        outlineApiKey: t.Optional(t.String()),
+        outlineCollectionId: t.Optional(t.String())
       })
     }
   )

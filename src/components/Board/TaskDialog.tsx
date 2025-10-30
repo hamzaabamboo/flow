@@ -16,6 +16,7 @@ import { SimpleDatePicker } from '../ui/simple-date-picker';
 import { QuickDateTimePicker } from '../ui/quick-date-time-picker';
 import * as Dialog from '../ui/styled/dialog';
 import { Box, VStack, HStack, Grid } from 'styled-system/jsx';
+import { NotesSection } from '../Notes/NotesSection';
 
 interface TaskDialogProps {
   open: boolean;
@@ -719,6 +720,13 @@ export function TaskDialog({
                         </VStack>
                       </Box>
                     </VStack>
+                  )}
+
+                  {/* Notes Section */}
+                  {isEdit && task && (
+                    <Box w="full" mt="4">
+                      <NotesSection taskId={task.id} taskTitle={task.title} />
+                    </Box>
                   )}
                 </VStack>
               </form>
