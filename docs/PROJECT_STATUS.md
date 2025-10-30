@@ -6,6 +6,39 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-10-30)
+
+### ✅ Completed This Session - Auto Organize Feature 🎯
+
+- **Auto Organize AI Feature** - Intelligent task organization suggestions
+  - New AI agent (auto-organizer) using Google Gemini 2.5 Flash Lite
+  - Analyzes ongoing tasks and suggests improvements based on:
+    - **Deadline Urgency**: Identifies tasks due soon requiring priority escalation
+    - **Workload Balancing**: Detects overloaded columns (respects WIP limits)
+    - **Content Similarity**: Finds related tasks for better grouping
+  - Three suggestion types with discriminated union types:
+    - **Column Movement**: Move tasks between boards/columns
+    - **Priority Adjustments**: Escalate/de-escalate task priorities
+    - **Due Date Optimization**: Adjust deadlines for better scheduling
+  - Filters out completed tasks (in "Done" column) - only analyzes ongoing work
+  - Backend endpoint: `POST /api/tasks/auto-organize` with date range filtering
+  - Frontend components:
+    - AutoOrganizeDialog: Main suggestion review interface
+    - SuggestionRow: Individual suggestion with inline editing
+    - useAutoOrganize: React Query hooks for fetching/applying suggestions
+  - User Experience:
+    - Click "Auto Organize" button on Agenda or Board pages
+    - Review AI suggestions with confidence scores (60%+ threshold)
+    - Include/exclude individual suggestions with checkboxes
+    - Edit suggestions inline (change target board/column, priority, or date)
+    - Apply changes in bulk with batch processing
+    - Shows summary, total tasks analyzed, completed tasks skipped
+  - Integration points:
+    - Agenda page: Filters by current view date range (day/week)
+    - Board page: Filters by specific board
+  - Graceful error handling and empty state messaging
+  - TypeScript type-safe with Zod schema validation
+
 ## Latest Updates (2025-10-17)
 
 ### ✅ Completed This Session - Raycast Extension & API Tokens
@@ -509,6 +542,7 @@ Moving towards Phase 4 - Advanced Features & Integrations
 | Universal Inbox | ✅ | High - Quick capture and processing |
 | API Tokens & External Access | ✅ | High - Raycast, automation, scripts |
 | Raycast Extension | ✅ | High - Native macOS integration |
+| Auto Organize AI | ✅ | High - Intelligent task organization suggestions |
 | Productivity Analytics | ⏳ | Medium - Charts and insights |
 | Focus Mode | ⏳ | Medium - Distraction-free UI |
 | Notes Integration | ⏳ | Low - External service |
@@ -571,5 +605,5 @@ All core tables implemented:
 
 ---
 
-**Last Updated**: 2025-10-14
+**Last Updated**: 2025-10-30
 **Next Review**: Before starting Productivity Analytics feature

@@ -99,9 +99,11 @@ green.500, red.400, blue.50, white // DON'T USE THESE
 <Box bg="bg.muted" color="colorPalette.fg" />
 ```
 
-### Dynamic Styling - ZERO TOLERANCE
+### 🚨 Dynamic Styling - ZERO TOLERANCE (CRITICAL!)
 
-**Never use dynamic values in Panda props!** Panda CSS performs static analysis at build time.
+**NEVER EVER use dynamic values in Panda CSS props!** Panda CSS performs static analysis at build time. Runtime ternary operators will cause `@pandacss/no-dynamic-styling` lint errors.
+
+**THIS IS A RECURRING ISSUE - FOLLOW PATTERN 2 BELOW**
 
 #### Pattern 1: Use `colorPalette` Prop
 

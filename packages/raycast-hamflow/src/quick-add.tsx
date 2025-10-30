@@ -185,7 +185,7 @@ function QuickAddTask(props: LaunchProps<{ arguments: QuickAddArguments }>) {
         placeholder="Enter task title"
         value={title}
         onChange={setTitle}
-        autoFocus
+        
       />
 
       <Form.TextArea
