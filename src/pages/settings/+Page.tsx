@@ -710,7 +710,13 @@ export default function SettingsPage() {
                         borderColor="border.default"
                       >
                         <HStack gap="3" flex="1">
-                          <Box w="3" h="3" borderRadius="full" bg={`${calendar.color}.500`} />
+                          <Box
+                            data-calendar-color={calendar.color}
+                            w="3"
+                            h="3"
+                            borderRadius="full"
+                            bg="colorPalette.default"
+                          />
                           <VStack gap="1" alignItems="flex-start">
                             <Text fontWeight="semibold">{calendar.name}</Text>
                             <Text fontSize="xs" color="fg.muted">

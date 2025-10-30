@@ -13,6 +13,7 @@ import { TaskActionsMenu } from '../TaskActionsMenu';
 import { CarryOverControls } from './CarryOverControls';
 import type { CalendarEvent } from '../../shared/types/calendar';
 import { Box, HStack, VStack } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 export function TaskItem({
@@ -59,8 +60,8 @@ export function TaskItem({
       <Box
         data-priority={event.priority || 'none'}
         data-calendar-color={isExternal ? event.externalCalendarColor : undefined}
+        data-is-external={isExternal}
         onClick={isExternal ? undefined : onTaskClick}
-        cursor={isExternal ? 'default' : 'pointer'}
         borderColor="border.default"
         borderLeftWidth="4px"
         borderLeftColor="colorPalette.default"
@@ -68,9 +69,19 @@ export function TaskItem({
         borderWidth="1px"
         w="full"
         p="3"
-        bg={isExternal ? 'bg.subtle' : 'bg.default'}
         transition="all 0.2s"
-        _hover={isExternal ? {} : { bg: 'bg.subtle', boxShadow: 'sm' }}
+        className={css({
+          cursor: 'pointer',
+          bg: 'bg.default',
+          '&[data-is-external=true]': {
+            cursor: 'default',
+            bg: 'bg.subtle'
+          },
+          '&[data-is-external=false]:hover': {
+            bg: 'bg.subtle',
+            boxShadow: 'sm'
+          }
+        })}
       >
         <HStack gap="2" justify="space-between" alignItems="center">
           <HStack flex="1" gap="2" alignItems="center">
