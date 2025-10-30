@@ -224,20 +224,17 @@ export const pomodoroActiveState = pgTable('pomodoro_active_state', {
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-// Calendar integrations table for OAuth tokens
-export const calendarIntegrations = pgTable('calendar_integrations', {
+// External calendars table for iCal URL subscriptions
+export const externalCalendars = pgTable('external_calendars', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
-  provider: varchar('provider', { length: 50 }).notNull(), // 'google', 'microsoft'
-  accessToken: text('access_token').notNull(),
-  refreshToken: text('refresh_token'),
-  tokenExpiry: timestamp('token_expiry'),
-  email: varchar('email', { length: 255 }),
-  calendarId: varchar('calendar_id', { length: 255 }),
-  syncEnabled: boolean('sync_enabled').default(true).notNull(),
-  lastSyncAt: timestamp('last_sync_at'),
+  name: varchar('name', { length: 255 }).notNull(), // User-friendly name
+  icalUrl: text('ical_url').notNull(), // .ics subscription URL
+  space: spaceEnum('space').notNull(), // 'work' or 'personal'
+  color: varchar('color', { length: 50 }).notNull(), // Park UI color token (e.g., 'blue', 'green')
+  enabled: boolean('enabled').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });

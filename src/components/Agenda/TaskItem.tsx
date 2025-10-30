@@ -1,4 +1,4 @@
-import { ExternalLink, ArrowRight } from 'lucide-react';
+import { ExternalLink, ArrowRight, Calendar, Copy } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge } from '../ui/badge';
@@ -13,6 +13,7 @@ import { TaskActionsMenu } from '../TaskActionsMenu';
 import { CarryOverControls } from './CarryOverControls';
 import type { CalendarEvent } from '../../shared/types/calendar';
 import { Box, HStack, VStack } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 
 export function TaskItem({
@@ -26,7 +27,8 @@ export function TaskItem({
   actions,
   extraActions,
   onCarryOver,
-  hideCheckboxOnOverdue = false
+  hideCheckboxOnOverdue = false,
+  onCreateCopy
 }: {
   event: CalendarEvent;
   onToggleComplete: () => void;
@@ -44,19 +46,22 @@ export function TaskItem({
   }>;
   onCarryOver?: (taskId: string, targetDate: Date) => void;
   hideCheckboxOnOverdue?: boolean;
+  onCreateCopy?: (event: CalendarEvent) => void;
 }) {
   // Check if task is overdue (has due date in the past and not completed)
   const now = new Date();
   const completed = isTaskCompleted(event);
   const isOverdue = event.dueDate && new Date(event.dueDate) < now && !completed;
   const [showCarryOver, setShowCarryOver] = useState(false);
+  const isExternal = event.type === 'external';
 
   return (
     <>
       <Box
         data-priority={event.priority || 'none'}
-        onClick={isOverdue && hideCheckboxOnOverdue ? onTaskClick : onToggleComplete}
-        cursor="pointer"
+        data-calendar-color={isExternal ? event.externalCalendarColor : undefined}
+        data-is-external={isExternal}
+        onClick={isExternal ? undefined : onTaskClick}
         borderColor="border.default"
         borderLeftWidth="4px"
         borderLeftColor="colorPalette.default"
@@ -64,20 +69,34 @@ export function TaskItem({
         borderWidth="1px"
         w="full"
         p="3"
-        bg="bg.default"
         transition="all 0.2s"
-        _hover={{ bg: 'bg.subtle', boxShadow: 'sm' }}
+        className={css({
+          cursor: 'pointer',
+          bg: 'bg.default',
+          '&[data-is-external=true]': {
+            cursor: 'default',
+            bg: 'bg.subtle'
+          },
+          '&[data-is-external=false]:hover': {
+            bg: 'bg.subtle',
+            boxShadow: 'sm'
+          }
+        })}
       >
         <HStack gap="2" justify="space-between" alignItems="center">
           <HStack flex="1" gap="2" alignItems="center">
-            {!(isOverdue && hideCheckboxOnOverdue) && (
+            {isExternal ? (
+              <Box color="colorPalette.default">
+                <Calendar width="20" height="20" />
+              </Box>
+            ) : !(isOverdue && hideCheckboxOnOverdue) ? (
               <Checkbox
                 size="sm"
                 checked={completed}
                 onCheckedChange={onToggleComplete}
                 onClick={(e) => e.stopPropagation()}
               />
-            )}
+            ) : null}
             <VStack flex="1" gap="1" alignItems="start">
               <HStack gap="2" alignItems="center" flexWrap="wrap">
                 <LinkifiedText
@@ -103,6 +122,13 @@ export function TaskItem({
                     </a>
                   </IconButton>
                 )}
+                {isExternal && event.externalCalendarName && (
+                  <Box data-calendar-color={event.externalCalendarColor}>
+                    <Badge variant="subtle" size="sm">
+                      {event.externalCalendarName}
+                    </Badge>
+                  </Box>
+                )}
                 {event.priority && <PriorityBadge priority={event.priority} size="sm" />}
                 {extraBadges}
               </HStack>
@@ -126,30 +152,46 @@ export function TaskItem({
             </VStack>
           </HStack>
           <HStack gap="1" flexShrink={0}>
-            {isOverdue && hideCheckboxOnOverdue && onCarryOver && (
+            {isExternal && onCreateCopy ? (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowCarryOver(!showCarryOver);
+                  onCreateCopy(event);
                 }}
-                colorPalette="orange"
               >
-                <ArrowRight width="14" height="14" />
-                {showCarryOver ? 'Cancel' : 'Carry Over'}
+                <Copy width="14" height="14" />
+                Create Task
               </Button>
+            ) : (
+              <>
+                {isOverdue && hideCheckboxOnOverdue && onCarryOver && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCarryOver(!showCarryOver);
+                    }}
+                    colorPalette="orange"
+                  >
+                    <ArrowRight width="14" height="14" />
+                    {showCarryOver ? 'Cancel' : 'Carry Over'}
+                  </Button>
+                )}
+                <TaskActionsMenu
+                  task={event}
+                  onEdit={() => onTaskClick()}
+                  {...(onDuplicate && { onDuplicate: () => onDuplicate() })}
+                  {...(onDelete && { onDelete: () => onDelete() })}
+                  {...(onMove && { onMove: () => onMove() })}
+                  size="sm"
+                  extraActions={extraActions}
+                />
+                {actions}
+              </>
             )}
-            <TaskActionsMenu
-              task={event}
-              onEdit={() => onTaskClick()}
-              {...(onDuplicate && { onDuplicate: () => onDuplicate() })}
-              {...(onDelete && { onDelete: () => onDelete() })}
-              {...(onMove && { onMove: () => onMove() })}
-              size="sm"
-              extraActions={extraActions}
-            />
-            {actions}
           </HStack>
         </HStack>
       </Box>

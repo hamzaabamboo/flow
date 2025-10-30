@@ -243,6 +243,20 @@ export default function AgendaPage() {
     setIsTaskDialogOpen(true);
   };
 
+  const handleCreateCopy = (event: CalendarEvent) => {
+    // For external events, create a partial task with the event's data
+    // This will open the TaskDialog with pre-filled fields, allowing user to review/edit
+    const partialTask: Partial<ExtendedTask> = {
+      title: event.title,
+      description: event.description,
+      dueDate: event.dueDate ? new Date(event.dueDate).toISOString() : undefined,
+      priority: event.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined
+      // No board/column info - will default to inbox
+    };
+    setEditingTask(partialTask as ExtendedTask);
+    setIsTaskDialogOpen(true);
+  };
+
   const handleDialogSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -531,8 +545,9 @@ export default function AgendaPage() {
           <Grid
             gap={4}
             gridTemplateColumns={{ base: '1fr', xl: '4fr 1fr' }}
-            w="full"
+            height="100%"
             minH="calc(100vh - 16rem)"
+            flex={1}
           >
             <AgendaWeekView
               selectedDate={selectedDate}
@@ -547,6 +562,10 @@ export default function AgendaPage() {
                   id: taskId,
                   dueDate: newDate.toISOString()
                 });
+              }}
+              onDateClick={(date) => {
+                setSelectedDate(date);
+                setViewMode('day');
               }}
             />
             <AgendaSidebar
@@ -594,6 +613,7 @@ export default function AgendaPage() {
                   onDuplicate={(event) => taskActions.handleDuplicate(event)}
                   onDelete={(event) => taskActions.handleDelete(event)}
                   onMove={(event) => taskActions.handleMove(event)}
+                  onCreateCopy={handleCreateCopy}
                   extraActions={taskActions.extraActions}
                   isCarryingOver={carryOverTasksMutation.isPending}
                 />
@@ -610,6 +630,7 @@ export default function AgendaPage() {
                   onCarryOver={(taskId, targetDate) => {
                     carryOverTasksMutation.mutate({ taskIds: [taskId], targetDate });
                   }}
+                  onCreateCopy={handleCreateCopy}
                   extraActions={taskActions.extraActions}
                 />
               </VStack>

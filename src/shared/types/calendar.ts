@@ -9,7 +9,7 @@ export interface CalendarEvent {
   dueDate?: string | Date;
   priority?: string;
   completed?: boolean;
-  type: 'task' | 'reminder' | 'habit';
+  type: 'task' | 'reminder' | 'habit' | 'external';
   space?: string;
   recurringPattern?: string;
   recurringEndDate?: string;
@@ -22,6 +22,11 @@ export interface CalendarEvent {
   subtasks?: Subtask[];
   instanceDate?: string; // For tracking specific instances of recurring tasks
   link?: string;
+  // External calendar specific fields
+  externalCalendarId?: string;
+  externalCalendarName?: string;
+  externalCalendarColor?: string; // Park UI color token
+  isExternal?: boolean; // Helper flag
 }
 
 export interface ExtendedTask {
