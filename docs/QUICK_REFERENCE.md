@@ -4,14 +4,15 @@
 
 1. **Port is 3000**: Dev server runs on `http://localhost:3000` NOT 5173!
 2. **No 'any' Types**: Always use proper TypeScript types
-3. **Props Stay, Models Move**: Component props in files, data models in shared/types
-4. **Use Styled Components**: Import from `ui/styled/` not `ui/` for complex components
-5. **Global Auth Context**: Use `{ as: 'global' }` in derive for auth propagation
-6. **Logger Error First**: `logger.error(error, 'message')` not the reverse
-7. **Invalidate Queries**: Always `queryClient.invalidateQueries()` after mutations
-8. **Mastra Structured Output**: Use `generate` with `structuredOutputs: true`
-9. **Timezone Utilities**: Always use `src/shared/utils/timezone.ts` for JST ↔ UTC conversions
-10. **UTC Storage**: Store dates in UTC, convert to JST only for display
+3. **NEVER Dynamic Panda CSS**: ALWAYS use data attributes + css() for conditional styles (see Pattern 2 below)
+4. **Props Stay, Models Move**: Component props in files, data models in shared/types
+5. **Use Styled Components**: Import from `ui/styled/` not `ui/` for complex components
+6. **Global Auth Context**: Use `{ as: 'global' }` in derive for auth propagation
+7. **Logger Error First**: `logger.error(error, 'message')` not the reverse
+8. **Invalidate Queries**: Always `queryClient.invalidateQueries()` after mutations
+9. **Mastra Structured Output**: Use `generate` with `structuredOutputs: true`
+10. **Timezone Utilities**: Always use `src/shared/utils/timezone.ts` for JST ↔ UTC conversions
+11. **UTC Storage**: Store dates in UTC, convert to JST only for display
 
 ## 🚀 Common Commands
 
@@ -357,6 +358,50 @@ import * as Dialog from '~/components/ui/styled/dialog';
 <FormLabel htmlFor="field-id">Label</FormLabel>
 <Input id="field-id" />
 ```
+
+## 🎨 Panda CSS Dynamic Styling (CRITICAL!)
+
+**Pattern 2: Data Attributes + css() - THE ONLY WAY FOR CONDITIONAL STYLES**
+
+```tsx
+import { css } from 'styled-system/css';
+
+// ❌ WRONG - Dynamic values in props (will cause lint errors!)
+<Box
+  bg={isActive ? 'bg.default' : 'bg.subtle'}
+  color={priority === 'high' ? 'red.fg' : 'fg.default'}
+/>
+
+// ✅ CORRECT - Data attributes + css()
+const priorityLevel = priority === 'high' ? 'high' : priority === 'medium' ? 'medium' : 'low';
+
+<Box
+  data-active={isActive}
+  data-priority={priorityLevel}
+  className={css({
+    bg: 'bg.subtle',
+    opacity: 0.6,
+    '&[data-active=true]': {
+      bg: 'bg.default',
+      opacity: 1
+    },
+    '&[data-priority=high]': {
+      color: 'red.fg'
+    },
+    '&[data-priority=medium]': {
+      color: 'yellow.fg'
+    }
+  })}
+/>
+```
+
+**Why**: Panda CSS is a static CSS-in-JS solution. All styles must be extractable at build time. Runtime ternary operators break this and cause `@pandacss/no-dynamic-styling` lint errors.
+
+**Steps**:
+1. Calculate string value for data attribute: `const level = condition ? 'high' : 'low'`
+2. Add data attribute: `data-level={level}`
+3. Import css: `import { css } from 'styled-system/css'`
+4. Use className with css(): `className={css({ '&[data-level=high]': {...} })}`
 
 ## 🎨 Panda CSS Semantic Tokens
 
@@ -735,6 +780,7 @@ open http://localhost:3000
 
 | Issue | Wrong | Correct |
 |-------|-------|---------|
+| **Dynamic Panda CSS** | `bg={condition ? 'a' : 'b'}` | `data-state={state}` + `css()` |
 | Dialog padding | `<Dialog.Content>` | `<Dialog.Content><VStack p="6">` |
 | Colors | `bg="green.500"` | `bg="bg.emphasized"` |
 | Dialog import | `Dialog` | `* as Dialog from styled` |

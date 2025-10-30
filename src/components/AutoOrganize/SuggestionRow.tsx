@@ -6,6 +6,7 @@ import { useSpace } from '../../contexts/SpaceContext';
 import { Button } from '../ui/button';
 import { Text } from '../ui/text';
 import { Box, HStack, VStack } from 'styled-system/jsx';
+import { css } from 'styled-system/css';
 import { Checkbox } from '../ui/checkbox';
 import { createListCollection, Select } from '../ui/select';
 import { SimpleDatePicker } from '../ui/simple-date-picker';
@@ -261,14 +262,25 @@ export function SuggestionRow({
     setIsEditing(false);
   };
 
+  // Calculate confidence level for data attribute
+  const confidenceLevel =
+    suggestion.confidence >= 80 ? 'high' : suggestion.confidence >= 60 ? 'medium' : 'low';
+
   return (
     <Box
       p="4"
       borderWidth="1px"
       borderRadius="md"
-      bg={suggestion.included ? 'bg.default' : 'bg.subtle'}
-      opacity={suggestion.included ? 1 : 0.6}
-      transition="all 0.2s"
+      data-included={suggestion.included}
+      className={css({
+        bg: 'bg.subtle',
+        opacity: 0.6,
+        transition: 'all 0.2s',
+        '&[data-included=true]': {
+          bg: 'bg.default',
+          opacity: 1
+        }
+      })}
     >
       <HStack gap="4" alignItems="flex-start">
         {/* Checkbox */}
@@ -328,22 +340,21 @@ export function SuggestionRow({
               px="2"
               py="0.5"
               borderRadius="sm"
-              bg={
-                suggestion.confidence >= 80
-                  ? 'green.subtle'
-                  : suggestion.confidence >= 60
-                    ? 'yellow.subtle'
-                    : 'gray.subtle'
-              }
-              color={
-                suggestion.confidence >= 80
-                  ? 'green.fg'
-                  : suggestion.confidence >= 60
-                    ? 'yellow.fg'
-                    : 'gray.fg'
-              }
               fontSize="xs"
               fontWeight="medium"
+              data-confidence={confidenceLevel}
+              className={css({
+                bg: 'gray.subtle',
+                color: 'gray.fg',
+                '&[data-confidence=high]': {
+                  bg: 'green.subtle',
+                  color: 'green.fg'
+                },
+                '&[data-confidence=medium]': {
+                  bg: 'yellow.subtle',
+                  color: 'yellow.fg'
+                }
+              })}
             >
               {suggestion.confidence}%
             </Box>
