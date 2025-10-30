@@ -26,6 +26,8 @@ interface AgendaWeekViewProps {
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
   onTaskDrop?: (taskId: string, newDate: Date) => void;
+  onCreateCopy?: (event: CalendarEvent) => void;
+  onDateClick?: (date: Date) => void;
 }
 
 // Draggable Task Component
@@ -33,16 +35,22 @@ function DraggableTask({
   event,
   dateKey,
   onTaskClick,
-  onToggleTask
+  onToggleTask,
+  onCreateCopy
 }: {
   event: CalendarEvent;
   dateKey: string;
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
+  onCreateCopy?: (event: CalendarEvent) => void;
 }) {
+  const isExternal = event.type === 'external';
+
+  // Only enable drag for non-external events
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${event.id}-${dateKey}`,
-    data: { event, originalDate: dateKey }
+    data: { event, originalDate: dateKey },
+    disabled: isExternal
   });
 
   const style = transform
@@ -55,60 +63,63 @@ function DraggableTask({
   return (
     <Box
       key={`${event.id}-${event.instanceDate}`}
-      ref={setNodeRef}
+      ref={!isExternal ? setNodeRef : undefined}
       data-priority={event.priority || 'none'}
+      data-calendar-color={isExternal ? event.externalCalendarColor : undefined}
       style={style}
       borderLeftWidth="3px"
       borderLeftColor="colorPalette.default"
       borderRadius="sm"
-      p="1.5"
-      bg="bg.muted"
+      p="1"
+      bg={'bg.muted'}
       transition="all 0.2s"
-      _hover={{ bg: 'bg.subtle' }}
-      cursor="pointer"
-      onClick={() => onTaskClick(event)}
+      _hover={isExternal ? {} : { bg: 'bg.subtle' }}
     >
-      <HStack gap="1.5" justifyContent="space-between" alignItems="center">
-        {/* Drag Handle */}
-        <Box
-          {...attributes}
-          {...listeners}
-          cursor="grab"
-          _active={{ cursor: 'grabbing' }}
-          color="fg.muted"
-          _hover={{ color: 'fg.default' }}
-          transition="color 0.2s"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical size={14} />
-        </Box>
+      <HStack gap="1" justifyContent="space-between" alignItems="center">
+        {/* Drag Handle - only for HamFlow tasks */}
+        {!isExternal && (
+          <Box
+            {...attributes}
+            {...listeners}
+            cursor="grab"
+            _active={{ cursor: 'grabbing' }}
+            color="fg.muted"
+            _hover={{ color: 'fg.default' }}
+            transition="color 0.2s"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={14} />
+          </Box>
+        )}
 
-        <Checkbox
-          checked={isTaskCompleted(event)}
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleTask(event);
-          }}
-          readOnly
-          flex="1"
-        >
-          <VStack gap="0" alignItems="start">
+        {isExternal ? (
+          <Text fontSize="xs" fontWeight="medium" lineHeight="1.2" flex="1" minW="0">
+            {event.title}
+          </Text>
+        ) : (
+          <Checkbox
+            checked={isTaskCompleted(event)}
+            size="sm"
+            onCheckedChange={() => onToggleTask(event)}
+            flex="1"
+            minW="0"
+          >
             <Text
               textDecoration={isTaskCompleted(event) ? 'line-through' : 'none'}
               fontSize="xs"
               fontWeight="medium"
               lineHeight="1.2"
+              cursor="pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onTaskClick(event);
+              }}
             >
               {event.title}
             </Text>
-            {event.dueDate && (
-              <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                {format(new Date(event.dueDate), 'h:mm a')}
-              </Text>
-            )}
-          </VStack>
-        </Checkbox>
+          </Checkbox>
+        )}
       </HStack>
     </Box>
   );
@@ -124,7 +135,9 @@ function DroppableDay({
   dayEvents,
   onToggleHabit,
   onTaskClick,
-  onToggleTask
+  onToggleTask,
+  onCreateCopy,
+  onDateClick
 }: {
   date: Date;
   dateKey: string;
@@ -135,6 +148,8 @@ function DroppableDay({
   onToggleHabit: (params: { habitId: string; date: Date; completed: boolean }) => void;
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
+  onCreateCopy?: (event: CalendarEvent) => void;
+  onDateClick?: (date: Date) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: dateKey,
@@ -180,9 +195,14 @@ function DroppableDay({
         data-is-today={isToday}
         borderBottomWidth="1px"
         borderBottomColor="border.default"
-        p="2"
+        py="1"
+        px="1"
+        cursor={onDateClick ? 'pointer' : 'default'}
+        onClick={onDateClick ? () => onDateClick(date) : undefined}
+        transition="all 0.2s"
+        _hover={onDateClick ? { bg: isToday ? 'colorPalette.muted' : 'bg.muted' } : {}}
       >
-        <VStack gap="0.5" alignItems="center">
+        <VStack gap="0" alignItems="center">
           <Text
             color={isToday ? 'colorPalette.default' : 'fg.muted'}
             fontSize="xs"
@@ -193,7 +213,7 @@ function DroppableDay({
           </Text>
           <Text
             color={isToday ? 'colorPalette.default' : 'fg.default'}
-            fontSize="xl"
+            fontSize="lg"
             fontWeight="bold"
           >
             {format(date, 'd')}
@@ -202,8 +222,8 @@ function DroppableDay({
       </Box>
 
       {/* Day Content */}
-      <Box minH="xs" maxH="md" p="2" overflowY="auto">
-        <VStack gap="1.5" alignItems="stretch">
+      <Box minH="xs" maxH="2xl" p="1" overflowY="auto">
+        <VStack gap="1" alignItems="stretch">
           {/* Combined Habits and Tasks - Sorted by Time */}
           {(() => {
             // Combine habits and tasks with a type indicator
@@ -276,27 +296,20 @@ function DroppableDay({
                     borderLeftWidth="3px"
                     borderLeftColor="colorPalette.default"
                     borderRadius="sm"
-                    p="1.5"
+                    p="1"
                     transition="all 0.2s"
                     _hover={{ bg: 'bg.subtle' }}
                   >
-                    <HStack gap="1.5" justifyContent="space-between" alignItems="center">
-                      <Checkbox checked={habit.completedToday} size="sm" readOnly flex="1">
-                        <VStack gap="0.5" alignItems="start">
-                          <Text
-                            textDecoration={habit.completedToday ? 'line-through' : 'none'}
-                            fontSize="xs"
-                            fontWeight="medium"
-                            lineHeight="1.2"
-                          >
-                            {habit.name}
-                          </Text>
-                          {habit.reminderTime && (
-                            <Text color="fg.muted" fontSize="2xs" lineHeight="1">
-                              {format(new Date(`2000-01-01T${habit.reminderTime}`), 'h:mm a')}
-                            </Text>
-                          )}
-                        </VStack>
+                    <HStack gap="1" justifyContent="space-between" alignItems="center">
+                      <Checkbox checked={habit.completedToday} size="sm" readOnly flex="1" minW="0">
+                        <Text
+                          textDecoration={habit.completedToday ? 'line-through' : 'none'}
+                          fontSize="xs"
+                          fontWeight="medium"
+                          lineHeight="1.2"
+                        >
+                          {habit.name}
+                        </Text>
                       </Checkbox>
                       <HStack gap="1" alignItems="center">
                         {habit.link && (
@@ -328,6 +341,7 @@ function DroppableDay({
                     dateKey={dateKey}
                     onTaskClick={onTaskClick}
                     onToggleTask={onToggleTask}
+                    onCreateCopy={onCreateCopy}
                   />
                 );
               }
@@ -347,7 +361,9 @@ export function AgendaWeekView({
   onToggleHabit,
   onTaskClick,
   onToggleTask,
-  onTaskDrop
+  onTaskDrop,
+  onCreateCopy,
+  onDateClick
 }: AgendaWeekViewProps) {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selectedDate), i));
   const [activeTask, setActiveTask] = React.useState<CalendarEvent | null>(null);
@@ -391,9 +407,9 @@ export function AgendaWeekView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <VStack gap="3" alignItems="stretch" w="full" h="full" overflow="hidden">
-        <Box w="full" h="full" overflowY="auto">
-          <Grid gap="2" gridTemplateColumns="repeat(7, 1fr)" w="full">
+      <VStack gap="2" alignItems="stretch" w="full" h="full" overflow="hidden">
+        <Box w="full" h="full" overflowY="auto" overflowX="auto">
+          <Grid gap="1" gridTemplateColumns="repeat(7, minmax(140px, 1fr))" w="full" height="100%">
             {weekDates.map((date) => {
               const isToday = isSameDay(date, new Date());
               const dateKey = format(date, 'yyyy-MM-dd');
@@ -426,6 +442,8 @@ export function AgendaWeekView({
                   onToggleHabit={onToggleHabit}
                   onTaskClick={onTaskClick}
                   onToggleTask={onToggleTask}
+                  onCreateCopy={onCreateCopy}
+                  onDateClick={onDateClick}
                 />
               );
             })}

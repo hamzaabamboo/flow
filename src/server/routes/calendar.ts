@@ -3,11 +3,21 @@ import { Elysia, t } from 'elysia';
 import { and, eq, isNotNull, inArray, gte, lte } from 'drizzle-orm';
 import ical, { ICalEventStatus, ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
 import { db } from '../db';
-import { tasks, boards, taskCompletions, habits, columns, subtasks } from '../../../drizzle/schema';
+import {
+  tasks,
+  boards,
+  taskCompletions,
+  habits,
+  columns,
+  subtasks,
+  externalCalendars
+} from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
+import { fetchAndParseIcal, convertIcalToEvents } from '../utils/ical-parser';
 import type { Task } from '../../shared/types/board';
 import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
+import { logger } from '../logger';
 
 // Public iCal route (no auth required)
 export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
@@ -502,8 +512,49 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             }
           }
 
-          // Combine and sort by date
-          const allEvents = [...finalEvents].toSorted((a, b) => {
+          // Fetch external calendar events
+          const externalCalendarEvents: any[] = [];
+          try {
+            // Fetch user's enabled external calendars
+            const userCalendars = await db
+              .select()
+              .from(externalCalendars)
+              .where(
+                and(
+                  eq(externalCalendars.userId, user.id),
+                  eq(externalCalendars.enabled, true),
+                  ...(space !== 'all' ? [eq(externalCalendars.space, space)] : [])
+                )
+              );
+
+            // Fetch and parse each calendar in parallel
+            const calendarPromises = userCalendars.map(async (calendar) => {
+              try {
+                const icalData = await fetchAndParseIcal(calendar.icalUrl);
+                const events = convertIcalToEvents(
+                  icalData,
+                  startDate,
+                  endDate,
+                  calendar.id,
+                  calendar.name,
+                  calendar.color
+                );
+                return events;
+              } catch (error) {
+                logger.error(error, `Failed to fetch external calendar: ${calendar.name}`);
+                return []; // Return empty array on error, don't fail the whole request
+              }
+            });
+
+            const calendarResults = await Promise.all(calendarPromises);
+            externalCalendarEvents.push(...calendarResults.flat());
+          } catch (error) {
+            logger.error(error, 'Failed to fetch external calendars');
+            // Continue without external events if there's an error
+          }
+
+          // Combine HamFlow events and external calendar events, then sort by date
+          const allEvents = [...finalEvents, ...externalCalendarEvents].toSorted((a, b) => {
             const aDate = a.dueDate;
             const bDate = b.dueDate;
             if (!aDate || !bDate) return 0;

@@ -29,6 +29,7 @@ import { settingsRoutes } from './routes/settings';
 import { remindersRoutes } from './routes/reminders';
 import { statsRoutes } from './routes/stats';
 import { apiTokensRoutes } from './routes/api-tokens';
+import { externalCalendarsRoutes } from './routes/external-calendars';
 import { oidcAuth } from './auth/oidc';
 import { cronJobs } from './cron';
 import { HabitReminderService } from './services/habit-reminder-service';
@@ -103,6 +104,7 @@ app
       .use(remindersRoutes)
       .use(statsRoutes)
       .use(apiTokensRoutes)
+      .use(externalCalendarsRoutes)
   )
   // WebSocket for real-time updates
   .ws('/ws', {

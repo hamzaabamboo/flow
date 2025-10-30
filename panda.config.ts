@@ -7,6 +7,9 @@ import green from '@park-ui/panda-preset/colors/green';
 import yellow from '@park-ui/panda-preset/colors/yellow';
 import orange from '@park-ui/panda-preset/colors/orange';
 import purple from '@park-ui/panda-preset/colors/purple';
+import pink from '@park-ui/panda-preset/colors/pink';
+import teal from '@park-ui/panda-preset/colors/teal';
+import cyan from '@park-ui/panda-preset/colors/cyan';
 
 export default defineConfig({
   preflight: true,
@@ -65,6 +68,15 @@ export default defineConfig({
           },
           purple: {
             ...purple.tokens
+          },
+          pink: {
+            ...pink.tokens
+          },
+          teal: {
+            ...teal.tokens
+          },
+          cyan: {
+            ...cyan.tokens
           }
         }
       },
@@ -87,6 +99,15 @@ export default defineConfig({
           },
           purple: {
             ...purple.semanticTokens
+          },
+          pink: {
+            ...pink.semanticTokens
+          },
+          teal: {
+            ...teal.semanticTokens
+          },
+          cyan: {
+            ...cyan.semanticTokens
           }
         }
       },
@@ -233,6 +254,30 @@ export default defineConfig({
     },
     '[data-variant=info]': {
       colorPalette: 'blue'
+    },
+    '[data-calendar-color=blue]': {
+      colorPalette: 'blue'
+    },
+    '[data-calendar-color=green]': {
+      colorPalette: 'green'
+    },
+    '[data-calendar-color=purple]': {
+      colorPalette: 'purple'
+    },
+    '[data-calendar-color=orange]': {
+      colorPalette: 'orange'
+    },
+    '[data-calendar-color=red]': {
+      colorPalette: 'red'
+    },
+    '[data-calendar-color=pink]': {
+      colorPalette: 'pink'
+    },
+    '[data-calendar-color=teal]': {
+      colorPalette: 'teal'
+    },
+    '[data-calendar-color=cyan]': {
+      colorPalette: 'cyan'
     }
   },
 

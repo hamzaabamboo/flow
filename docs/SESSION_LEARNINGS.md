@@ -2,6 +2,319 @@
 
 > **IMPORTANT**: Add new learnings after each development session. This helps prevent repeating mistakes and builds institutional knowledge.
 
+## 2025-10-29 - Raycast Extension OAuth → API Token Reversion + UI Fixes
+
+### Problem 1: OAuth Authentication Was Overengineered and Broken
+
+**User Feedback**: Multiple frustrated messages about OAuth implementation being broken
+
+**What Went Wrong**:
+
+1. **Tried to create custom OAuth flow** - Built `/oauth/authorize` and `/oauth/token` endpoints on HamFlow server
+   - These required users to be logged in via web browser (Keycloak OIDC)
+   - Raycast would open browser → user logs in → get code → exchange for JWT
+   - **Problem**: Tokens from OAuth endpoint weren't working with API calls
+
+2. **Server's `withAuth` middleware confusion**:
+   - `withAuth` checks `Authorization: Bearer <token>` 
+   - First tries to hash token and look up in `apiTokens` table (for API keys)
+   - Never tried to verify as JWT first
+   - **Result**: OAuth JWTs were being hashed and failing lookup → 401 errors
+
+3. **Attempted fix was wrong direction**:
+   - Tried to add JWT verification to `withAuth` before API token lookup
+   - Would have made it work, BUT...
+   - User correctly pointed out OAuth should authenticate via Keycloak directly
+   - Using HamFlow's Keycloak instance: `https://auth.ham-san.net/realms/ham-auth`
+
+**The Real Issue**: OAuth is overkill for Raycast extension - API tokens are simpler and sufficient.
+
+**User Decision**: "FUCK IT JUST STICK WITH API KEYS, REMOVE ANY CODE YOU MADE WITH OAUTH"
+
+**Solution**: Reverted to simple API token authentication
+
+```typescript
+// Removed files:
+- src/lib/oauth.ts
+- src/hooks/useOAuth.ts  
+- src/components/withOAuth.tsx
+- src/server/auth/oauth.ts (user deleted before)
+
+// Reverted src/lib/api.ts to simple version:
+class HamFlowAPI {
+  private baseUrl: string;
+  private apiToken: string;
+
+  constructor() {
+    const prefs = getPreferences();
+    this.baseUrl = prefs.serverUrl.replace(/\/$/, '');
+    this.apiToken = prefs.apiToken; // Simple!
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this.apiToken}`, // Just send the API key
+      ...options.headers
+    };
+    // ... rest is simple fetch
+  }
+}
+```
+
+**Key Learnings**:
+- **Don't overcomplicate auth for desktop extensions** - API tokens are fine for Raycast
+- **OAuth PKCE is for when you need user consent flow** - not needed here
+- **If implementing OAuth, use existing provider directly** - don't build custom endpoints
+- **Test authentication flow FIRST** - before building entire UI around it
+
+---
+
+### Problem 2: Missing Raycast Extension Icon
+
+**User Feedback**: "use icon from the project"
+
+**Issue**: Raycast complained about missing `command-icon.png` in assets folder
+
+**Solution**:
+```bash
+# Copy HamFlow logo to Raycast assets
+mkdir -p packages/raycast-hamflow/assets
+cp public/pwa-512x512.png packages/raycast-hamflow/assets/command-icon.png
+```
+
+**File**: `packages/raycast-hamflow/package.json` already referenced it:
+```json
+{
+  "icon": "command-icon.png"
+}
+```
+
+---
+
+### Problem 3: Token Display Box Used Hardcoded Colors (Not Panda Tokens)
+
+**User Feedback**: "the thing that showed up after it complete looks extremely cringe in settings page, you are clearly not using panda tokens"
+
+**Issue**: After creating API token, success box used hardcoded color values:
+
+```tsx
+// BEFORE - WRONG ❌
+<Box
+  p="4"
+  borderWidth="2px"
+  borderColor="green.500"  // ❌ Hardcoded
+  bg="green.50"            // ❌ Hardcoded
+>
+  <Text fontWeight="bold" color="green.900">  {/* ❌ Hardcoded */}
+    ⚠️ Copy your token now!
+  </Text>
+  <Text color="green.900">  {/* ❌ Hardcoded */}
+    This token will only be shown once...
+  </Text>
+  <Input bg="white" />  {/* ❌ Hardcoded */}
+</Box>
+```
+
+**Problems**:
+- Hardcoded colors don't adapt to theme
+- Not using semantic tokens from Panda CSS
+- Cringe emoji usage
+- Poor visual hierarchy
+
+**Solution**: Use proper Panda tokens
+
+```tsx
+// AFTER - CORRECT ✅
+<Box
+  p="4"
+  borderWidth="1px"
+  borderRadius="l2"
+  borderColor="border.emphasized"  // ✅ Semantic token
+  bg="bg.emphasized"               // ✅ Semantic token
+>
+  <HStack gap="2">
+    <Key width="16" height="16" />  {/* ✅ Icon instead of emoji */}
+    <Text fontWeight="semibold">
+      Your new API token
+    </Text>
+  </HStack>
+  <Text fontSize="sm" color="fg.muted">  {/* ✅ Semantic token */}
+    Copy this token now - it won't be shown again for security reasons.
+  </Text>
+  <Input fontFamily="mono" fontSize="sm" />  {/* ✅ Uses default bg */}
+</Box>
+```
+
+**Key Learnings**:
+- **Always use Panda CSS semantic tokens**: `bg.*`, `fg.*`, `border.*`
+- **Never hardcode colors**: Breaks theming and looks unprofessional
+- **Use icons over emojis**: More consistent, professional appearance
+- **Semantic naming matters**: `border.emphasized` > `green.500`
+
+**Panda Token Reference**:
+```typescript
+// Backgrounds
+bg.default, bg.subtle, bg.muted, bg.emphasized
+
+// Foreground (text)
+fg.default, fg.muted, fg.subtle, fg.emphasized
+
+// Borders
+border.default, border.muted, border.subtle, border.emphasized
+
+// Avoid these:
+green.500, red.400, blue.50, white, etc. ❌
+```
+
+---
+
+### Problem 4: Dialog Component Misuse (0 Padding)
+
+**User Feedback**: "how about the frikin modal??? it has 0 padding you are clearly misusing the component"
+
+**Issue**: Create API Token modal had no padding - content went edge-to-edge
+
+```tsx
+// BEFORE - WRONG ❌
+<Dialog.Content>
+  <Dialog.Title>Create API Token</Dialog.Title>
+  <Dialog.Description>
+    Create a new API token...
+  </Dialog.Description>
+  <VStack gap="4" mt="4">  {/* No padding on Content! */}
+    <Box>
+      <FormLabel>Token Name</FormLabel>
+      <Input />
+    </Box>
+  </VStack>
+</Dialog.Content>
+```
+
+**Problem**: Dialog.Content has no default padding - must wrap content in VStack with padding
+
+**Solution**: Follow the pattern used in other dialogs (habits, inbox)
+
+```tsx
+// AFTER - CORRECT ✅
+<Dialog.Content maxW="md">  {/* Set max width */}
+  <VStack gap="6" p="6">    {/* Add padding wrapper */}
+    <VStack gap="1" alignItems="start">  {/* Group title/description */}
+      <Dialog.Title>Create API Token</Dialog.Title>
+      <Dialog.Description>
+        Create a new API token for external integrations like Raycast.
+      </Dialog.Description>
+    </VStack>
+
+    <Box width="100%">  {/* Stretch form fields */}
+      <FormLabel htmlFor="token-name">Token Name</FormLabel>
+      <Input id="token-name" placeholder="My Raycast Extension" />
+    </Box>
+
+    <HStack gap="2" justifyContent="flex-end" width="100%">
+      <Dialog.CloseTrigger asChild>
+        <Button variant="outline" size="sm">Cancel</Button>
+      </Dialog.CloseTrigger>
+      <Button size="sm">Create Token</Button>
+    </HStack>
+  </VStack>
+
+  {/* Close button positioned absolutely */}
+  <Dialog.CloseTrigger asChild>
+    <Button variant="ghost" size="sm" position="absolute" top="2" right="2">
+      <X width="16" height="16" />
+    </Button>
+  </Dialog.CloseTrigger>
+</Dialog.Content>
+```
+
+**Dialog Component Structure Pattern**:
+
+```tsx
+<Dialog.Root>
+  <Dialog.Trigger asChild>
+    <Button>Open</Button>
+  </Dialog.Trigger>
+  
+  <Portal>
+    <Dialog.Backdrop />
+    <Dialog.Positioner>
+      <Dialog.Content maxW="md|lg|xl">  {/* 1. Set max width */}
+        <VStack gap="6" p="6">          {/* 2. Add padding wrapper */}
+          
+          {/* 3. Group title and description */}
+          <VStack gap="1" alignItems="start">
+            <Dialog.Title>Title</Dialog.Title>
+            <Dialog.Description>Description</Dialog.Description>
+          </VStack>
+
+          {/* 4. Content sections with width="100%" */}
+          <Box width="100%">
+            {/* Form fields */}
+          </Box>
+
+          {/* 5. Actions row */}
+          <HStack gap="2" justifyContent="flex-end" width="100%">
+            <Button>Cancel</Button>
+            <Button>Confirm</Button>
+          </HStack>
+        </VStack>
+
+        {/* 6. Close button (absolute positioned) */}
+        <Dialog.CloseTrigger asChild>
+          <Button position="absolute" top="2" right="2">×</Button>
+        </Dialog.CloseTrigger>
+      </Dialog.Content>
+    </Dialog.Positioner>
+  </Portal>
+</Dialog.Root>
+```
+
+**Key Learnings**:
+- **Dialog.Content has NO default padding** - always wrap in VStack with p="6"
+- **Set maxW on Dialog.Content** - prevents dialog from being too wide
+- **Use consistent spacing**: `gap="6"` for major sections, `gap="1"` for related text
+- **Add width="100%"** to form sections so they stretch properly
+- **Check existing patterns first** - look at other dialogs in the codebase
+
+**Common Dialog Sizes**:
+- `maxW="sm"` - Small dialogs (confirmations)
+- `maxW="md"` - Standard forms (API token creation)
+- `maxW="lg"` - Larger forms (habit editing)
+- `maxW="xl"` - Complex multi-section forms
+
+---
+
+### Summary: What Went Wrong and Why
+
+1. **Overengineering**: Tried to build custom OAuth when API tokens were sufficient
+2. **Not reading docs properly**: Didn't understand Raycast OAuth PKCE flow correctly
+3. **Not following existing patterns**: Token display and modal didn't match codebase style
+4. **Hardcoded values**: Used literal colors instead of semantic tokens
+5. **Component misuse**: Didn't wrap Dialog content properly
+
+### Checklist for Future UI Work
+
+- [ ] Check if existing patterns/components exist first
+- [ ] Use semantic tokens (bg.*, fg.*, border.*) - NEVER hardcode colors
+- [ ] Follow spacing system (gap="6" major, gap="4" standard, gap="1" related)
+- [ ] Wrap Dialog.Content in VStack with p="6"
+- [ ] Set maxW on Dialog.Content
+- [ ] Add width="100%" to form sections
+- [ ] Use icons over emojis
+- [ ] Test both light and dark themes
+- [ ] Keep it simple - don't overcomplicate auth
+
+### Files Modified
+
+- ✅ Deleted OAuth files: `oauth.ts`, `useOAuth.ts`, `withOAuth.tsx`
+- ✅ Reverted `packages/raycast-hamflow/src/lib/api.ts` to use API tokens
+- ✅ Updated `packages/raycast-hamflow/package.json` - added apiToken preference
+- ✅ Added icon: `packages/raycast-hamflow/assets/command-icon.png`
+- ✅ Fixed `src/pages/settings/+Page.tsx`:
+  - Token display box (lines 645-693) - proper Panda tokens
+  - Create token modal (lines 533-586) - proper Dialog structure
+
 ## 2025-10-21 - Raycast Extension, Habit Reminders Fix & AI Date Parsing
 
 ### Problem 1: Duplicate Habit Reminders (30+ per habit!)

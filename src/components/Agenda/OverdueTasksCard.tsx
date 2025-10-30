@@ -19,6 +19,7 @@ interface OverdueTasksCardProps {
   onDuplicate?: (task: CalendarEvent) => void;
   onDelete?: (task: CalendarEvent) => void;
   onMove?: (task: CalendarEvent) => void;
+  onCreateCopy?: (event: CalendarEvent) => void;
   extraActions?: Array<{
     value: string;
     label: string;
@@ -36,6 +37,7 @@ export function OverdueTasksCard({
   onDuplicate,
   onDelete,
   onMove,
+  onCreateCopy,
   extraActions,
   isCarryingOver
 }: OverdueTasksCardProps) {
@@ -93,6 +95,7 @@ export function OverdueTasksCard({
                 onDelete={onDelete ? () => onDelete(event) : undefined}
                 onMove={onMove ? () => onMove(event) : undefined}
                 onCarryOver={(taskId, targetDate) => onCarryOver([taskId], targetDate)}
+                onCreateCopy={onCreateCopy ? () => onCreateCopy(event) : undefined}
                 hideCheckboxOnOverdue={true}
                 extraActions={extraActions}
                 extraBadges={

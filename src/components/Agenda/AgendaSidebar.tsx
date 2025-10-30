@@ -28,25 +28,25 @@ export function AgendaSidebar({
   statsTitle
 }: AgendaSidebarProps) {
   return (
-    <VStack gap={6} h="full" justifyContent="space-between">
+    <VStack gap={6} h="fit-content" justifyContent="space-between">
       {/* Habits Section for Week View */}
       <Card.Root w="full">
-        <Card.Header p="3">
-          <Card.Title fontSize="sm">This Week's Habits</Card.Title>
+        <Card.Header p="4">
+          <Card.Title fontSize="md">This Week's Habits</Card.Title>
         </Card.Header>
-        <Card.Body p="3" pt="0">
+        <Card.Body p="4" pt="0">
           {isLoadingHabits ? (
-            <Center>
+            <Center py="4">
               <Spinner size="sm" />
             </Center>
           ) : isErrorHabits ? (
-            <Center>
-              <Text color="red.default" fontSize="xs">
+            <Center py="4">
+              <Text color="red.default" fontSize="sm">
                 Error loading habits
               </Text>
             </Center>
           ) : (
-            <VStack gap="1.5" alignItems="stretch" maxH="300px" overflowY="auto">
+            <VStack gap="2.5" alignItems="stretch">
               {(() => {
                 const uniqueHabits = Array.from(
                   new Map(habits?.map((h) => [h.id, h]) || []).values()
@@ -56,11 +56,13 @@ export function AgendaSidebar({
                     <HStack
                       key={habit.id}
                       justifyContent="space-between"
+                      alignItems="start"
                       borderRadius="md"
-                      p="1.5"
+                      p="2.5"
                       bg="bg.subtle"
+                      gap="2"
                     >
-                      <Text fontSize="xs" fontWeight="medium">
+                      <Text fontSize="sm" fontWeight="medium" flex="1" minW="0" wordBreak="break-word">
                         {habit.name}
                       </Text>
                       {habit.link && (
@@ -68,15 +70,15 @@ export function AgendaSidebar({
                           href={habit.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ display: 'flex', alignItems: 'center' }}
+                          style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
                         >
-                          <ExternalLink width="12" height="12" />
+                          <ExternalLink width="14" height="14" />
                         </a>
                       )}
                     </HStack>
                   ))
                 ) : (
-                  <Text py="2" color="fg.subtle" fontSize="xs" textAlign="center">
+                  <Text py="4" color="fg.subtle" fontSize="sm" textAlign="center">
                     No habits this week
                   </Text>
                 );

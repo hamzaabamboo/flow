@@ -11,7 +11,10 @@ import {
   Key,
   Trash2,
   Copy,
-  X
+  X,
+  CalendarPlus,
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { Box, VStack, HStack, Center } from '../../../styled-system/jsx';
 import * as Card from '../../components/ui/styled/card';
@@ -25,8 +28,12 @@ import { useSpace } from '../../contexts/SpaceContext';
 import { useToaster } from '../../contexts/ToasterContext';
 import { Input } from '../../components/ui/input';
 import * as Dialog from '../../components/ui/styled/dialog';
+import * as RadioButtonGroup from '../../components/ui/styled/radio-button-group';
+import * as Select from '../../components/ui/styled/select';
+import { createListCollection } from '../../components/ui/select';
 import { Portal } from '@ark-ui/react/portal';
 import { FormLabel } from '../../components/ui/form-label';
+import { IconButton } from '../../components/ui/icon-button';
 import { useState } from 'react';
 
 interface UserSettings {
@@ -62,6 +69,17 @@ interface ApiToken {
   createdAt: string;
 }
 
+interface ExternalCalendar {
+  id: string;
+  name: string;
+  icalUrl: string;
+  space: 'work' | 'personal';
+  color: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function SettingsPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
@@ -69,6 +87,23 @@ export default function SettingsPage() {
   const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
   const [createdToken, setCreatedToken] = useState<string | null>(null);
+
+  // External calendars state
+  const [isAddCalendarOpen, setIsAddCalendarOpen] = useState(false);
+  const [newCalendarName, setNewCalendarName] = useState('');
+  const [newCalendarUrl, setNewCalendarUrl] = useState('');
+  const [newCalendarSpace, setNewCalendarSpace] = useState<'work' | 'personal'>('work');
+  const [newCalendarColor, setNewCalendarColor] = useState('blue');
+  const [editingCalendar, setEditingCalendar] = useState<ExternalCalendar | null>(null);
+  const [isEditCalendarOpen, setIsEditCalendarOpen] = useState(false);
+
+  // Space options for Select component
+  const spaceOptions = createListCollection({
+    items: [
+      { label: 'Work', value: 'work' },
+      { label: 'Personal', value: 'personal' }
+    ]
+  });
 
   // Fetch settings
   const { data: settings, isLoading } = useQuery<UserSettings>({
@@ -196,6 +231,141 @@ export default function SettingsPage() {
     onError: (error) => {
       toast?.(error.message, {
         title: 'HamBot Test Failed',
+        type: 'error'
+      });
+    }
+  });
+
+  // Fetch external calendars
+  const { data: externalCalendars } = useQuery<ExternalCalendar[]>({
+    queryKey: ['external-calendars'],
+    queryFn: async () => {
+      const response = await fetch('/api/external-calendars');
+      if (!response.ok) throw new Error('Failed to fetch external calendars');
+      return response.json();
+    }
+  });
+
+  // Add external calendar
+  const addExternalCalendar = useMutation({
+    mutationFn: async (calendar: {
+      name: string;
+      icalUrl: string;
+      space: 'work' | 'personal';
+      color: string;
+    }) => {
+      const response = await fetch('/api/external-calendars', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(calendar)
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add calendar');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      setIsAddCalendarOpen(false);
+      setNewCalendarName('');
+      setNewCalendarUrl('');
+      setNewCalendarSpace('work');
+      setNewCalendarColor('blue');
+      toast?.('Calendar added successfully', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: (error) => {
+      toast?.(error.message, {
+        title: 'Error',
+        type: 'error'
+      });
+    }
+  });
+
+  // Toggle external calendar enabled
+  const toggleExternalCalendar = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const response = await fetch(`/api/external-calendars/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      if (!response.ok) throw new Error('Failed to update calendar');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+    }
+  });
+
+  // Update external calendar
+  const updateExternalCalendar = useMutation({
+    mutationFn: async ({
+      id,
+      data
+    }: {
+      id: string;
+      data: {
+        name?: string;
+        icalUrl?: string;
+        space?: 'work' | 'personal';
+        color?: string;
+      };
+    }) => {
+      const response = await fetch(`/api/external-calendars/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update calendar');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      setIsEditCalendarOpen(false);
+      setEditingCalendar(null);
+      toast?.('Calendar updated successfully', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: (error) => {
+      toast?.(error.message, {
+        title: 'Error',
+        type: 'error'
+      });
+    }
+  });
+
+  // Delete external calendar
+  const deleteExternalCalendar = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/external-calendars/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete calendar');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast?.('Calendar deleted successfully', {
+        title: 'Success',
+        type: 'success'
+      });
+    },
+    onError: () => {
+      toast?.('Failed to delete calendar', {
+        title: 'Error',
         type: 'error'
       });
     }
@@ -505,6 +675,363 @@ export default function SettingsPage() {
                     </>
                   )}
                 </VStack>
+              </Fieldset.Root>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+
+        {/* External Calendars Section */}
+        <Card.Root>
+          <Card.Header>
+            <HStack gap="2">
+              <CalendarPlus width="20" height="20" />
+              <Heading size="lg">External Calendars</Heading>
+            </HStack>
+          </Card.Header>
+          <Card.Body>
+            <VStack gap="4" alignItems="stretch">
+              <Fieldset.Root>
+                <Fieldset.Legend>Subscriptions</Fieldset.Legend>
+                <Fieldset.HelperText>
+                  Subscribe to external iCal feeds (Google Calendar, Outlook, etc.) to view events
+                  in your agenda.
+                </Fieldset.HelperText>
+
+                {/* List of calendars */}
+                <VStack gap="3" mt="4" alignItems="stretch">
+                  {externalCalendars && externalCalendars.length > 0 ? (
+                    externalCalendars.map((calendar) => (
+                      <HStack
+                        key={calendar.id}
+                        justify="space-between"
+                        p="3"
+                        borderWidth="1px"
+                        borderRadius="l2"
+                        borderColor="border.default"
+                      >
+                        <HStack gap="3" flex="1">
+                          <Box w="3" h="3" borderRadius="full" bg={`${calendar.color}.500`} />
+                          <VStack gap="1" alignItems="flex-start">
+                            <Text fontWeight="semibold">{calendar.name}</Text>
+                            <Text fontSize="xs" color="fg.muted">
+                              {calendar.space}
+                            </Text>
+                          </VStack>
+                        </HStack>
+                        <HStack gap="2">
+                          <Switch
+                            checked={calendar.enabled}
+                            onCheckedChange={(e) =>
+                              toggleExternalCalendar.mutate({ id: calendar.id, enabled: e.checked })
+                            }
+                          />
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingCalendar(calendar);
+                              setIsEditCalendarOpen(true);
+                            }}
+                          >
+                            <Pencil width="16" height="16" />
+                          </IconButton>
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteExternalCalendar.mutate(calendar.id)}
+                          >
+                            <Trash2 width="16" height="16" />
+                          </IconButton>
+                        </HStack>
+                      </HStack>
+                    ))
+                  ) : (
+                    <Text fontSize="sm" color="fg.muted">
+                      No external calendars added yet.
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Add Calendar Dialog */}
+                <Dialog.Root
+                  open={isAddCalendarOpen}
+                  onOpenChange={(e) => setIsAddCalendarOpen(e.open)}
+                >
+                  <Dialog.Trigger asChild>
+                    <Button mt="4">
+                      <Plus width="16" height="16" />
+                      Add Calendar
+                    </Button>
+                  </Dialog.Trigger>
+                  <Portal>
+                    <Dialog.Backdrop />
+                    <Dialog.Positioner>
+                      <Dialog.Content maxW="md">
+                        <VStack gap="4" p="6" alignItems="stretch">
+                          <Dialog.Title>Add External Calendar</Dialog.Title>
+                          <Dialog.Description>
+                            Subscribe to an iCal feed from Google Calendar, Outlook, or any .ics
+                            URL.
+                          </Dialog.Description>
+
+                          {/* Form fields */}
+                          <Box>
+                            <FormLabel>Calendar Name</FormLabel>
+                            <Input
+                              placeholder="Work Calendar"
+                              value={newCalendarName}
+                              onChange={(e) => setNewCalendarName(e.target.value)}
+                            />
+                          </Box>
+
+                          <Box>
+                            <FormLabel>iCal URL</FormLabel>
+                            <Input
+                              placeholder="https://calendar.google.com/..."
+                              value={newCalendarUrl}
+                              onChange={(e) => setNewCalendarUrl(e.target.value)}
+                            />
+                            <Text fontSize="xs" color="fg.muted" mt="1">
+                              Paste the public iCal subscription URL
+                            </Text>
+                          </Box>
+
+                          <Box>
+                            <FormLabel>Space</FormLabel>
+                            <Select.Root
+                              collection={spaceOptions}
+                              value={[newCalendarSpace]}
+                              onValueChange={(details) =>
+                                setNewCalendarSpace(details.value[0] as 'work' | 'personal')
+                              }
+                              positioning={{ sameWidth: true }}
+                              size="md"
+                            >
+                              <Select.Trigger>
+                                <Select.ValueText placeholder="Select space" />
+                              </Select.Trigger>
+                              <Portal>
+                                <Select.Positioner>
+                                  <Select.Content>
+                                    {spaceOptions.items.map((item) => (
+                                      <Select.Item key={item.value} item={item}>
+                                        <Select.ItemText>{item.label}</Select.ItemText>
+                                      </Select.Item>
+                                    ))}
+                                  </Select.Content>
+                                </Select.Positioner>
+                              </Portal>
+                            </Select.Root>
+                          </Box>
+
+                          <Box>
+                            <FormLabel>Color</FormLabel>
+                            <RadioButtonGroup.Root
+                              value={newCalendarColor}
+                              onValueChange={(e) => e.value && setNewCalendarColor(e.value)}
+                            >
+                              <HStack gap="2" flexWrap="wrap">
+                                {[
+                                  'blue',
+                                  'green',
+                                  'purple',
+                                  'orange',
+                                  'red',
+                                  'pink',
+                                  'teal',
+                                  'cyan'
+                                ].map((c) => (
+                                  <RadioButtonGroup.Item key={c} value={c}>
+                                    <RadioButtonGroup.ItemControl />
+                                    <RadioButtonGroup.ItemHiddenInput />
+                                    <RadioButtonGroup.ItemText>
+                                      <Box data-calendar-color={c}>
+                                        <Box
+                                          w="6"
+                                          h="6"
+                                          borderRadius="full"
+                                          bg="colorPalette.emphasized"
+                                        />
+                                      </Box>
+                                    </RadioButtonGroup.ItemText>
+                                  </RadioButtonGroup.Item>
+                                ))}
+                              </HStack>
+                            </RadioButtonGroup.Root>
+                          </Box>
+
+                          <HStack gap="3" justify="flex-end" mt="2">
+                            <Dialog.CloseTrigger asChild>
+                              <Button variant="outline">Cancel</Button>
+                            </Dialog.CloseTrigger>
+                            <Button
+                              onClick={() =>
+                                addExternalCalendar.mutate({
+                                  name: newCalendarName,
+                                  icalUrl: newCalendarUrl,
+                                  space: newCalendarSpace,
+                                  color: newCalendarColor
+                                })
+                              }
+                              loading={addExternalCalendar.isPending}
+                              disabled={!newCalendarName || !newCalendarUrl}
+                            >
+                              Add Calendar
+                            </Button>
+                          </HStack>
+                        </VStack>
+                      </Dialog.Content>
+                    </Dialog.Positioner>
+                  </Portal>
+                </Dialog.Root>
+
+                {/* Edit Calendar Dialog */}
+                <Dialog.Root
+                  open={isEditCalendarOpen}
+                  onOpenChange={(e) => setIsEditCalendarOpen(e.open)}
+                >
+                  <Portal>
+                    <Dialog.Backdrop />
+                    <Dialog.Positioner>
+                      <Dialog.Content maxW="md">
+                        <VStack gap="4" p="6" alignItems="stretch">
+                          <Dialog.Title>Edit External Calendar</Dialog.Title>
+                          <Dialog.Description>
+                            Update your external calendar subscription settings.
+                          </Dialog.Description>
+
+                          {/* Form fields */}
+                          <Box>
+                            <FormLabel>Calendar Name</FormLabel>
+                            <Input
+                              placeholder="Work Calendar"
+                              value={editingCalendar?.name || ''}
+                              onChange={(e) =>
+                                setEditingCalendar((prev) =>
+                                  prev ? { ...prev, name: e.target.value } : prev
+                                )
+                              }
+                            />
+                          </Box>
+
+                          <Box>
+                            <FormLabel>iCal URL</FormLabel>
+                            <Input
+                              placeholder="https://calendar.google.com/..."
+                              value={editingCalendar?.icalUrl || ''}
+                              onChange={(e) =>
+                                setEditingCalendar((prev) =>
+                                  prev ? { ...prev, icalUrl: e.target.value } : prev
+                                )
+                              }
+                            />
+                            <Text fontSize="xs" color="fg.muted" mt="1">
+                              Paste the public iCal subscription URL
+                            </Text>
+                          </Box>
+
+                          <Box>
+                            <FormLabel>Space</FormLabel>
+                            <Select.Root
+                              collection={spaceOptions}
+                              value={[editingCalendar?.space || 'work']}
+                              onValueChange={(details) =>
+                                setEditingCalendar((prev) =>
+                                  prev
+                                    ? { ...prev, space: details.value[0] as 'work' | 'personal' }
+                                    : prev
+                                )
+                              }
+                              positioning={{ sameWidth: true }}
+                              size="md"
+                            >
+                              <Select.Trigger>
+                                <Select.ValueText placeholder="Select space" />
+                              </Select.Trigger>
+                              <Portal>
+                                <Select.Positioner>
+                                  <Select.Content>
+                                    {spaceOptions.items.map((item) => (
+                                      <Select.Item key={item.value} item={item}>
+                                        <Select.ItemText>{item.label}</Select.ItemText>
+                                      </Select.Item>
+                                    ))}
+                                  </Select.Content>
+                                </Select.Positioner>
+                              </Portal>
+                            </Select.Root>
+                          </Box>
+
+                          <Box>
+                            <FormLabel>Color</FormLabel>
+                            <RadioButtonGroup.Root
+                              value={editingCalendar?.color || 'blue'}
+                              onValueChange={(e) =>
+                                e.value &&
+                                setEditingCalendar((prev) =>
+                                  prev ? { ...prev, color: e.value as string } : prev
+                                )
+                              }
+                            >
+                              <HStack gap="2" flexWrap="wrap">
+                                {[
+                                  'blue',
+                                  'green',
+                                  'purple',
+                                  'orange',
+                                  'red',
+                                  'pink',
+                                  'teal',
+                                  'cyan'
+                                ].map((c) => (
+                                  <RadioButtonGroup.Item key={c} value={c}>
+                                    <RadioButtonGroup.ItemControl />
+                                    <RadioButtonGroup.ItemHiddenInput />
+                                    <RadioButtonGroup.ItemText>
+                                      <Box data-calendar-color={c}>
+                                        <Box
+                                          w="6"
+                                          h="6"
+                                          borderRadius="full"
+                                          bg="colorPalette.emphasized"
+                                        />
+                                      </Box>
+                                    </RadioButtonGroup.ItemText>
+                                  </RadioButtonGroup.Item>
+                                ))}
+                              </HStack>
+                            </RadioButtonGroup.Root>
+                          </Box>
+
+                          <HStack gap="3" justify="flex-end" mt="2">
+                            <Dialog.CloseTrigger asChild>
+                              <Button variant="outline">Cancel</Button>
+                            </Dialog.CloseTrigger>
+                            <Button
+                              onClick={() => {
+                                if (editingCalendar) {
+                                  updateExternalCalendar.mutate({
+                                    id: editingCalendar.id,
+                                    data: {
+                                      name: editingCalendar.name,
+                                      icalUrl: editingCalendar.icalUrl,
+                                      space: editingCalendar.space,
+                                      color: editingCalendar.color
+                                    }
+                                  });
+                                }
+                              }}
+                              loading={updateExternalCalendar.isPending}
+                              disabled={!editingCalendar?.name || !editingCalendar?.icalUrl}
+                            >
+                              Update Calendar
+                            </Button>
+                          </HStack>
+                        </VStack>
+                      </Dialog.Content>
+                    </Dialog.Positioner>
+                  </Portal>
+                </Dialog.Root>
               </Fieldset.Root>
             </VStack>
           </Card.Body>
