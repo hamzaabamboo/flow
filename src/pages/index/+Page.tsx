@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import { VStack, HStack, Grid, Center, Box } from '../../../styled-system/jsx';
 import { Button } from '../../components/ui/button';
 import { IconButton } from '../../components/ui/icon-button';
@@ -24,6 +24,13 @@ import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
 import { isTaskCompleted } from '../../shared/utils/taskCompletion';
 import { jstToUtc } from '../../shared/utils/timezone';
+import { AutoOrganizeDialog } from '../../components/AutoOrganize/AutoOrganizeDialog';
+import {
+  useAutoOrganize,
+  useApplyAutoOrganize
+} from '../../components/AutoOrganize/useAutoOrganize';
+import { useToaster } from '../../contexts/ToasterContext';
+import type { AutoOrganizeSuggestion } from '../../shared/types/autoOrganize';
 
 interface CompleteTaskPayload {
   id: string;
@@ -34,10 +41,20 @@ interface CompleteTaskPayload {
 export default function AgendaPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
+  const { toast } = useToaster();
   const [viewMode, setViewMode] = useQueryState<'day' | 'week'>('view', 'day');
   const [selectedDate, setSelectedDate] = useDateQueryState('date');
   const [editingTask, setEditingTask] = useState<ExtendedTask | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isAutoOrganizeDialogOpen, setIsAutoOrganizeDialogOpen] = useState(false);
+  const [autoOrganizeSuggestions, setAutoOrganizeSuggestions] = useState<AutoOrganizeSuggestion[]>(
+    []
+  );
+  const [autoOrganizeSummary, setAutoOrganizeSummary] = useState<string>('');
+  const [totalTasksAnalyzed, setTotalTasksAnalyzed] = useState<number>(0);
+
+  const autoOrganizeMutation = useAutoOrganize();
+  const applyAutoOrganizeMutation = useApplyAutoOrganize();
 
   // Use task actions hook
   const taskActions = useTaskActions({
@@ -330,6 +347,63 @@ export default function AgendaPage() {
     }
   };
 
+  // Auto Organize handlers
+  const handleAutoOrganize = async () => {
+    try {
+      let start: Date, end: Date;
+
+      if (viewMode === 'day') {
+        start = new Date(selectedDate);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(selectedDate);
+        end.setHours(23, 59, 59, 999);
+      } else {
+        const weekStart = startOfWeek(selectedDate);
+        const weekEnd = endOfWeek(selectedDate);
+        start = new Date(weekStart);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(weekEnd);
+        end.setHours(23, 59, 59, 999);
+      }
+
+      const startUnix = Math.floor(start.getTime() / 1000);
+      const endUnix = Math.ceil(end.getTime() / 1000);
+
+      const result = await autoOrganizeMutation.mutateAsync({
+        space: currentSpace,
+        startDate: startUnix,
+        endDate: endUnix
+      });
+
+      setAutoOrganizeSuggestions(result.suggestions);
+      setAutoOrganizeSummary(result.summary);
+      setTotalTasksAnalyzed(result.totalTasksAnalyzed);
+      setIsAutoOrganizeDialogOpen(true);
+    } catch (error) {
+      console.error('Auto organize error:', error);
+      toast?.('Failed to generate suggestions. Please try again.', { type: 'error' });
+    }
+  };
+
+  const handleApplyAutoOrganize = async (suggestions: AutoOrganizeSuggestion[]) => {
+    try {
+      const result = await applyAutoOrganizeMutation.mutateAsync(suggestions);
+
+      setIsAutoOrganizeDialogOpen(false);
+
+      toast?.(
+        `Successfully organized ${result.applied} tasks${result.failed > 0 ? `. ${result.failed} failed.` : ''}`,
+        { type: 'success' }
+      );
+
+      // Refetch events to show updated tasks
+      refetchEvents();
+    } catch (error) {
+      console.error('Apply auto organize error:', error);
+      toast?.('Failed to apply changes. Please try again.', { type: 'error' });
+    }
+  };
+
   // Separate overdue tasks
   const overdueTasks = useMemo(() => {
     if (!events || viewMode !== 'day') {
@@ -465,6 +539,17 @@ export default function AgendaPage() {
             </VStack>
 
             <HStack gap="2" justifyContent={{ base: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
+              {/* Auto Organize Button */}
+              <Button
+                variant="outline"
+                size={{ base: 'xs', sm: 'sm' }}
+                onClick={handleAutoOrganize}
+                loading={autoOrganizeMutation.isPending}
+              >
+                <Sparkles width="16" height="16" />
+                <Box display={{ base: 'none', sm: 'block' }}>Auto Organize</Box>
+              </Button>
+
               {/* Create Task Button */}
               <Button
                 variant="solid"
@@ -665,6 +750,17 @@ export default function AgendaPage() {
           task={taskActions.taskToMove}
           onMove={(taskId, columnId) => taskActions.moveTaskMutation.mutate({ taskId, columnId })}
           isMoving={taskActions.isMoving}
+        />
+
+        {/* Auto Organize Dialog */}
+        <AutoOrganizeDialog
+          open={isAutoOrganizeDialogOpen}
+          onOpenChange={setIsAutoOrganizeDialogOpen}
+          suggestions={autoOrganizeSuggestions}
+          onApply={handleApplyAutoOrganize}
+          isApplying={applyAutoOrganizeMutation.isPending}
+          summary={autoOrganizeSummary}
+          totalTasksAnalyzed={totalTasksAnalyzed}
         />
       </VStack>
     </Box>

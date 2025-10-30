@@ -26,6 +26,7 @@ import { habitsRoutes } from './routes/habits';
 import { commandRoutes } from './routes/command';
 import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
+import { autoOrganizeRoutes } from './routes/autoOrganize';
 import { remindersRoutes } from './routes/reminders';
 import { statsRoutes } from './routes/stats';
 import { apiTokensRoutes } from './routes/api-tokens';
@@ -105,6 +106,7 @@ app
       .use(statsRoutes)
       .use(apiTokensRoutes)
       .use(externalCalendarsRoutes)
+      .use(autoOrganizeRoutes)
   )
   // WebSocket for real-time updates
   .ws('/ws', {
