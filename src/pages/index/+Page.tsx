@@ -563,7 +563,6 @@ export default function AgendaPage() {
                   dueDate: newDate.toISOString()
                 });
               }}
-              onCreateCopy={handleCreateCopy}
               onDateClick={(date) => {
                 setSelectedDate(date);
                 setViewMode('day');

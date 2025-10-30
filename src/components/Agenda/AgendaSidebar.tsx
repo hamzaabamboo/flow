@@ -62,7 +62,13 @@ export function AgendaSidebar({
                       bg="bg.subtle"
                       gap="2"
                     >
-                      <Text fontSize="sm" fontWeight="medium" flex="1" minW="0" wordBreak="break-word">
+                      <Text
+                        fontSize="sm"
+                        fontWeight="medium"
+                        flex="1"
+                        minW="0"
+                        wordBreak="break-word"
+                      >
                         {habit.name}
                       </Text>
                       {habit.link && (

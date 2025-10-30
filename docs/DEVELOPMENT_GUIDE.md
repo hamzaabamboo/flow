@@ -52,9 +52,38 @@ hamflow/
 ```typescript
 // ✅ CORRECT - Use styled components for complex features
 import * as Dialog from '../ui/styled/dialog';
+import { Portal } from '@ark-ui/react/portal';
 
 // ❌ WRONG - Basic components lack features
 import { Dialog } from '../ui/dialog';
+```
+
+### Panda CSS Semantic Token Reference
+
+**ALWAYS use semantic tokens - NEVER hardcode colors!**
+
+```typescript
+// ✅ CORRECT - Semantic tokens adapt to theme
+// Backgrounds
+bg.default     // Primary background
+bg.subtle      // Secondary background
+bg.muted       // Tertiary background
+bg.emphasized  // Highlighted background
+
+// Foreground (text)
+fg.default     // Primary text
+fg.muted       // Secondary text
+fg.subtle      // Tertiary text
+fg.emphasized  // Highlighted text
+
+// Borders
+border.default    // Primary border
+border.muted      // Secondary border
+border.subtle     // Tertiary border
+border.emphasized // Highlighted border
+
+// ❌ WRONG - Hardcoded colors break theming
+green.500, red.400, blue.50, white // DON'T USE THESE
 ```
 
 ### Color System Rules
@@ -70,10 +99,196 @@ import { Dialog } from '../ui/dialog';
 <Box bg="bg.muted" color="colorPalette.fg" />
 ```
 
+### Dynamic Styling - ZERO TOLERANCE
+
+**Never use dynamic values in Panda props!** Panda CSS performs static analysis at build time.
+
+#### Pattern 1: Use `colorPalette` Prop
+
+```typescript
+// ❌ WRONG - Dynamic bg value
+<Box bg={getPriorityColor(task.priority)} />
+
+// ✅ CORRECT - Use colorPalette + semantic token
+<Box
+  colorPalette={getPriorityColor(task.priority)}
+  bg="colorPalette.solid"
+/>
+```
+
+#### Pattern 2: Data Attributes + `css()` for Conditional Styles
+
+```typescript
+import { css } from 'styled-system/css';
+
+// ❌ WRONG - Ternary in style prop
+<Box
+  borderColor={isDragOver ? 'colorPalette.default' : 'transparent'}
+  bg={isDragOver ? 'colorPalette.subtle' : 'bg.muted'}
+/>
+
+// ✅ CORRECT - Data attribute + css()
+<Box
+  data-drag-over={isDragOver}
+  className={css({
+    borderColor: 'transparent',
+    bg: 'bg.muted',
+    '&[data-drag-over=true]': {
+      borderColor: 'colorPalette.default',
+      bg: 'colorPalette.subtle'
+    }
+  })}
+/>
+```
+
+#### Pattern 3: Global CSS for App-Wide Patterns
+
+```typescript
+// panda.config.ts
+globalCss: {
+  '[data-priority=urgent]': { colorPalette: 'red' },
+  '[data-priority=high]': { colorPalette: 'orange' },
+  '[data-space=work]': { colorPalette: 'blue' },
+  '[data-space=personal]': { colorPalette: 'purple' }
+}
+
+// Usage in components
+<Box data-priority={task.priority} bg="colorPalette.subtle">
+  {task.title}
+</Box>
+```
+
+#### Pattern 4: CSS Custom Properties for Truly Dynamic Values
+
+```typescript
+// ❌ WRONG - Inline style with dynamic value
+<Box style={{ width: `${progress}%` }} />
+
+// ✅ CORRECT - CSS custom property
+<Box
+  style={{ '--progress': `${progress}%` } as React.CSSProperties}
+  className={css({ width: 'var(--progress)' })}
+/>
+```
+
+### Dialog Component Structure
+
+**Dialog.Content has NO default padding** - always wrap in VStack!
+
+```tsx
+<Dialog.Root>
+  <Dialog.Trigger asChild>
+    <Button>Open Dialog</Button>
+  </Dialog.Trigger>
+
+  <Portal>
+    <Dialog.Backdrop />
+    <Dialog.Positioner>
+      <Dialog.Content maxW="md">  {/* 1. Set max width */}
+        <VStack gap="6" p="6">    {/* 2. REQUIRED: Add padding wrapper */}
+
+          {/* 3. Group title and description */}
+          <VStack gap="1" alignItems="start">
+            <Dialog.Title>Dialog Title</Dialog.Title>
+            <Dialog.Description>
+              Description text goes here
+            </Dialog.Description>
+          </VStack>
+
+          {/* 4. Content sections with width="100%" */}
+          <Box width="100%">
+            <FormLabel htmlFor="field-id">Field Label</FormLabel>
+            <Input id="field-id" placeholder="Placeholder" />
+          </Box>
+
+          {/* 5. Actions row */}
+          <HStack gap="2" justifyContent="flex-end" width="100%">
+            <Dialog.CloseTrigger asChild>
+              <Button variant="outline">Cancel</Button>
+            </Dialog.CloseTrigger>
+            <Button>Confirm</Button>
+          </HStack>
+        </VStack>
+
+        {/* 6. Close button (absolute positioned) */}
+        <Dialog.CloseTrigger asChild>
+          <Button variant="ghost" position="absolute" top="2" right="2">
+            <X width="16" height="16" />
+          </Button>
+        </Dialog.CloseTrigger>
+      </Dialog.Content>
+    </Dialog.Positioner>
+  </Portal>
+</Dialog.Root>
+```
+
+**Common Dialog Sizes:**
+- `maxW="sm"` - Small (confirmations)
+- `maxW="md"` - Standard forms
+- `maxW="lg"` - Larger forms
+- `maxW="xl"` - Complex multi-section forms
+
+**Key Rules:**
+- Use `<Portal>` for proper z-index
+- Wrap content in `<VStack gap="6" p="6">`
+- Set `maxW` on Dialog.Content
+- Add `width="100%"` to form sections
+- Use `gap="6"` for major sections, `gap="1"` for related text
+
+### Drag and Drop with dnd-kit
+
+Use `DragOverlay` for proper z-index management:
+
+```tsx
+import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
+
+function Component() {
+  const [activeItem, setActiveItem] = useState(null);
+
+  const handleDragStart = (event) => {
+    setActiveItem(event.active.data.current);
+  };
+
+  const handleDragEnd = (event) => {
+    setActiveItem(null);
+    // Handle drop logic
+  };
+
+  return (
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      {/* Draggable items */}
+
+      {/* Render overlay with high z-index */}
+      <DragOverlay>
+        {activeItem ? (
+          <Box
+            borderLeftWidth="3px"
+            borderLeftColor="colorPalette.default"
+            borderRadius="sm"
+            p="1.5"
+            bg="bg.muted"
+            boxShadow="lg"
+            opacity={0.9}
+          >
+            {/* Preview content */}
+          </Box>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+```
+
+**Benefits:**
+- DragOverlay renders at root level with high z-index
+- Dragged preview always appears on top
+- Smooth visual feedback during drag
+
 ### Component Props
 
 - TaskDialog: `open` (NOT `isOpen`)
 - Badge sizes: `"sm"`, `"md"`, `"lg"` (NO `"xs"`)
+- FormLabel: Use `htmlFor` to connect with Input `id`
 - Always check prop types when errors occur
 
 ## 📝 Type System Rules

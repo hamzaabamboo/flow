@@ -17,17 +17,16 @@ Welcome to the HamFlow project! This index helps Claude Code (and developers) na
 | Document | Purpose | Update Frequency |
 |----------|---------|-----------------|
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Feature tracking, blockers, progress | Every session |
-| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Commands, gotchas, quick lookups | As needed |
+| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Commands, patterns, code snippets | As needed |
 | [CLAUDE_WORKFLOW.md](docs/CLAUDE_WORKFLOW.md) | Claude Code task execution guide | When workflow changes |
-| [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | Patterns, standards, conventions | When patterns emerge |
-| [SESSION_LEARNINGS.md](docs/SESSION_LEARNINGS.md) | Discoveries and insights | After solving problems |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Problems and solutions | When issues fixed |
+| [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | UI patterns, styling, conventions | When patterns emerge |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Bug solutions, debugging steps | When issues fixed |
 
 ### 🏗️ Architecture & Stack
 
 | Document | Purpose | Update Frequency |
 |----------|---------|-----------------|
-| [TECH_STACK.md](docs/TECH_STACK.md) | Technologies, architecture, dependencies | When stack changes |
+| [TECH_STACK.md](docs/TECH_STACK.md) | Technologies, architecture, real-time patterns | When stack changes |
 | [design_document.md](design_document.md) | Original requirements and specs | Rarely |
 
 ### 📅 Maintenance
@@ -80,7 +79,7 @@ bun test
 | Development Guide | 🟢 Current | Weekly |
 | Troubleshooting | 🟢 Current | As needed |
 | Tech Stack | 🟢 Current | Monthly |
-| Session Learnings | 🟢 Active | Per session |
+| Quick Reference | 🟢 Current | As needed |
 
 ## 🚀 Quick Links
 
@@ -94,11 +93,12 @@ bun test
 | Event | Action | File |
 |-------|--------|------|
 | Task completed | Update status | PROJECT_STATUS.md |
-| Bug fixed | Add solution | TROUBLESHOOTING.md |
-| Pattern discovered | Document it | SESSION_LEARNINGS.md |
+| Bug fixed | Add solution (with code) | TROUBLESHOOTING.md |
+| UI pattern discovered | Document pattern | DEVELOPMENT_GUIDE.md |
 | Workflow changed | Update guide | DEVELOPMENT_GUIDE.md |
-| Dependency added | Update stack | TECH_STACK.md |
-| Command learned | Add reference | QUICK_REFERENCE.md |
+| Architecture decision | Document with rationale | TECH_STACK.md |
+| Dependency added | Update stack info | TECH_STACK.md |
+| Code snippet useful | Add to quick ref | QUICK_REFERENCE.md |
 
 ---
 

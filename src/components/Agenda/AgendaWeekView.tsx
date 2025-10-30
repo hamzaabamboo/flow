@@ -26,7 +26,6 @@ interface AgendaWeekViewProps {
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
   onTaskDrop?: (taskId: string, newDate: Date) => void;
-  onCreateCopy?: (event: CalendarEvent) => void;
   onDateClick?: (date: Date) => void;
 }
 
@@ -35,14 +34,12 @@ function DraggableTask({
   event,
   dateKey,
   onTaskClick,
-  onToggleTask,
-  onCreateCopy
+  onToggleTask
 }: {
   event: CalendarEvent;
   dateKey: string;
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
-  onCreateCopy?: (event: CalendarEvent) => void;
 }) {
   const isExternal = event.type === 'external';
 
@@ -66,14 +63,19 @@ function DraggableTask({
       ref={!isExternal ? setNodeRef : undefined}
       data-priority={event.priority || 'none'}
       data-calendar-color={isExternal ? event.externalCalendarColor : undefined}
+      data-is-external={isExternal}
       style={style}
-      borderLeftWidth="3px"
-      borderLeftColor="colorPalette.default"
-      borderRadius="sm"
-      p="1"
-      bg={'bg.muted'}
-      transition="all 0.2s"
-      _hover={isExternal ? {} : { bg: 'bg.subtle' }}
+      className={css({
+        borderLeftWidth: '3px',
+        borderLeftColor: 'colorPalette.default',
+        borderRadius: 'sm',
+        p: '1',
+        bg: 'bg.muted',
+        transition: 'all 0.2s',
+        '&[data-is-external=false]:hover': {
+          bg: 'bg.subtle'
+        }
+      })}
     >
       <HStack gap="1" justifyContent="space-between" alignItems="center">
         {/* Drag Handle - only for HamFlow tasks */}
@@ -115,6 +117,14 @@ function DraggableTask({
                 e.preventDefault();
                 onTaskClick(event);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onTaskClick(event);
+                }
+              }}
+              tabIndex={0}
             >
               {event.title}
             </Text>
@@ -136,7 +146,6 @@ function DroppableDay({
   onToggleHabit,
   onTaskClick,
   onToggleTask,
-  onCreateCopy,
   onDateClick
 }: {
   date: Date;
@@ -148,7 +157,6 @@ function DroppableDay({
   onToggleHabit: (params: { habitId: string; date: Date; completed: boolean }) => void;
   onTaskClick: (event: CalendarEvent) => void;
   onToggleTask: (event: CalendarEvent) => void;
-  onCreateCopy?: (event: CalendarEvent) => void;
   onDateClick?: (date: Date) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -188,33 +196,56 @@ function DroppableDay({
       <Box
         className={css({
           bg: 'bg.subtle',
+          borderBottomWidth: '1px',
+          borderBottomColor: 'border.default',
+          py: '1',
+          px: '1',
+          transition: 'all 0.2s',
           '&[data-is-today=true]': {
             bg: 'colorPalette.subtle'
+          },
+          '&[data-clickable=true]': {
+            cursor: 'pointer'
+          },
+          '&[data-clickable=false]': {
+            cursor: 'default'
+          },
+          '&[data-clickable=true]:hover': {
+            bg: 'bg.muted'
+          },
+          '&[data-clickable=true][data-is-today=true]:hover': {
+            bg: 'colorPalette.muted'
           }
         })}
         data-is-today={isToday}
-        borderBottomWidth="1px"
-        borderBottomColor="border.default"
-        py="1"
-        px="1"
-        cursor={onDateClick ? 'pointer' : 'default'}
+        data-clickable={!!onDateClick}
         onClick={onDateClick ? () => onDateClick(date) : undefined}
-        transition="all 0.2s"
-        _hover={onDateClick ? { bg: isToday ? 'colorPalette.muted' : 'bg.muted' } : {}}
       >
         <VStack gap="0" alignItems="center">
           <Text
-            color={isToday ? 'colorPalette.default' : 'fg.muted'}
-            fontSize="xs"
-            fontWeight="semibold"
-            textTransform="uppercase"
+            data-is-today={isToday}
+            className={css({
+              color: 'fg.muted',
+              fontSize: 'xs',
+              fontWeight: 'semibold',
+              textTransform: 'uppercase',
+              '&[data-is-today=true]': {
+                color: 'colorPalette.default'
+              }
+            })}
           >
             {format(date, 'EEE')}
           </Text>
           <Text
-            color={isToday ? 'colorPalette.default' : 'fg.default'}
-            fontSize="lg"
-            fontWeight="bold"
+            data-is-today={isToday}
+            className={css({
+              color: 'fg.default',
+              fontSize: 'lg',
+              fontWeight: 'bold',
+              '&[data-is-today=true]': {
+                color: 'colorPalette.default'
+              }
+            })}
           >
             {format(date, 'd')}
           </Text>
@@ -341,7 +372,6 @@ function DroppableDay({
                     dateKey={dateKey}
                     onTaskClick={onTaskClick}
                     onToggleTask={onToggleTask}
-                    onCreateCopy={onCreateCopy}
                   />
                 );
               }
@@ -362,7 +392,6 @@ export function AgendaWeekView({
   onTaskClick,
   onToggleTask,
   onTaskDrop,
-  onCreateCopy,
   onDateClick
 }: AgendaWeekViewProps) {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selectedDate), i));
@@ -442,7 +471,6 @@ export function AgendaWeekView({
                   onToggleHabit={onToggleHabit}
                   onTaskClick={onTaskClick}
                   onToggleTask={onToggleTask}
-                  onCreateCopy={onCreateCopy}
                   onDateClick={onDateClick}
                 />
               );
