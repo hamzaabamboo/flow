@@ -89,6 +89,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
+  const [currentSessionCommands, setCurrentSessionCommands] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
@@ -136,6 +137,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       setSelectedBoardId('');
       setSelectedColumnId('');
       setConversationHistory([]); // Clear conversation context
+      setCurrentSessionCommands([]);
       // Stop voice recognition if active
       if (isListening && recognitionRef.current) {
         recognitionRef.current.stop();
@@ -221,20 +223,26 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
     if (!cmd.trim()) return;
 
     setIsProcessing(true);
-    setSuggestion(null);
 
-    // Add to history (avoid duplicates)
-    const newHistory = [cmd, ...commandHistory.filter((c) => c !== cmd)].slice(0, 20); // Keep last 20
-    setCommandHistory(newHistory);
-    localStorage.setItem('commandHistory', JSON.stringify(newHistory));
-    setHistoryIndex(-1);
+    // Add command to current session
+    const newSessionCommands = [...currentSessionCommands, cmd];
+    setCurrentSessionCommands(newSessionCommands);
+
+    // If we have an existing suggestion, this is a follow-up command
+    const isFollowUp = suggestion !== null;
+
+    // Build context for AI - include current suggestion if it's a follow-up
+    let contextMessage = cmd;
+    if (isFollowUp && suggestion) {
+      contextMessage = `Previous command result: ${JSON.stringify(suggestion)}\n\nFollow-up command: ${cmd}\n\nModify the previous result based on this follow-up command. Keep all existing fields unless the follow-up explicitly changes them.`;
+    }
 
     try {
       const response = await fetch('/api/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          command: cmd,
+          command: contextMessage,
           space: currentSpace,
           conversationHistory: conversationHistory.slice(-5) // Send last 5 turns for context
         })
@@ -243,6 +251,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
       if (response.ok) {
         const result = await response.json();
         setSuggestion(result);
+        setCommand(''); // Clear input for next follow-up
       } else {
         toast?.('Command processing failed. Please try again', { type: 'error' });
       }
@@ -312,11 +321,22 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         const result = await response.json();
         toast?.(getSuccessMessage(suggestion.action), { type: 'success' });
 
+        // Save current session to command history
+        if (currentSessionCommands.length > 0) {
+          const sessionCommand = currentSessionCommands.join(' → ');
+          const newHistory = [
+            sessionCommand,
+            ...commandHistory.filter((c) => c !== sessionCommand)
+          ].slice(0, 20);
+          setCommandHistory(newHistory);
+          localStorage.setItem('commandHistory', JSON.stringify(newHistory));
+        }
+
         // Add to conversation history for follow-up context
         setConversationHistory([
           ...conversationHistory,
           {
-            command,
+            command: currentSessionCommands[currentSessionCommands.length - 1] || '',
             response: suggestion
           }
         ]);
@@ -346,6 +366,7 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         setSuggestion(null);
         setSelectedBoardId('');
         setSelectedColumnId('');
+        setCurrentSessionCommands([]);
         inputRef.current?.focus();
 
         // Wait a bit for invalidation to trigger before closing
@@ -375,11 +396,12 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const handleReject = () => {
     setSuggestion(null);
     setCommand('');
+    setCurrentSessionCommands([]);
     inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    // Handle history navigation
+    // Handle history navigation (only when no suggestion)
     if (e.key === 'ArrowUp' && !suggestion && commandHistory.length > 0) {
       e.preventDefault();
       const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
@@ -397,9 +419,11 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (suggestion) {
+      // If suggestion is shown and input is empty, accept the suggestion
+      if (suggestion && !command.trim()) {
         handleAccept();
       } else {
+        // Process command (either initial or follow-up)
         processCommand(command);
       }
     } else if (e.key === 'Escape') {
@@ -425,15 +449,19 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a command or click the mic..."
-                disabled={isListening || isProcessing || !!suggestion}
+                placeholder={
+                  suggestion
+                    ? 'Type follow-up command (e.g., "today", "high priority")...'
+                    : 'Type a command or click the mic...'
+                }
+                disabled={isListening || isProcessing}
                 size="lg"
                 flex="1"
               />
 
               <IconButton
                 onClick={() => void handleVoiceInput()}
-                disabled={isListening || isProcessing || !!suggestion}
+                disabled={isListening || isProcessing}
                 variant={isListening ? 'solid' : 'outline'}
                 aria-label="Voice input"
                 size="lg"
@@ -465,6 +493,32 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
             {/* Suggestion Section */}
             {suggestion && !isProcessing && (
               <VStack gap="4" alignItems="stretch" p="6">
+                {/* Command Chain Display */}
+                {currentSessionCommands.length > 0 && (
+                  <Box
+                    bg="bg.muted"
+                    borderRadius="sm"
+                    p="2"
+                    borderLeftWidth="3px"
+                    borderLeftColor="colorPalette.default"
+                  >
+                    <HStack gap="2" flexWrap="wrap">
+                      {currentSessionCommands.map((cmd, index) => (
+                        <React.Fragment key={`${cmd}-${index}`}>
+                          <Text fontSize="xs" color="fg.muted">
+                            {cmd}
+                          </Text>
+                          {index < currentSessionCommands.length - 1 && (
+                            <Text fontSize="xs" color="fg.subtle">
+                              →
+                            </Text>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </HStack>
+                  </Box>
+                )}
+
                 <VStack gap="2" alignItems="stretch">
                   <HStack gap="2">
                     {getActionIcon(suggestion.action)}
@@ -567,28 +621,34 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                   )}
                 </VStack>
 
-                <HStack gap="2" justify="space-between">
-                  <Button variant="outline" onClick={handleReject}>
-                    <X width="16" height="16" />
-                    Cancel
-                  </Button>
-                  <HStack gap="2">
-                    {suggestion.action === 'create_task' && (
-                      <Button variant="outline" onClick={() => void handleSendToInbox()}>
-                        <Inbox width="16" height="16" />
-                        Send to Inbox
-                      </Button>
-                    )}
-                    <Button variant="solid" onClick={() => void handleAccept()}>
-                      <Check width="16" height="16" />
-                      Confirm
+                <VStack gap="2" alignItems="stretch">
+                  <HStack gap="2" justify="space-between">
+                    <Button variant="outline" onClick={handleReject}>
+                      <X width="16" height="16" />
+                      Cancel
                     </Button>
+                    <HStack gap="2">
+                      {suggestion.action === 'create_task' && (
+                        <Button variant="outline" onClick={() => void handleSendToInbox()}>
+                          <Inbox width="16" height="16" />
+                          Send to Inbox
+                        </Button>
+                      )}
+                      <Button variant="solid" onClick={() => void handleAccept()}>
+                        <Check width="16" height="16" />
+                        Confirm
+                      </Button>
+                    </HStack>
                   </HStack>
-                </HStack>
+                  <Text color="fg.subtle" fontSize="xs" textAlign="center" pt="1">
+                    💡 Tip: Type follow-up commands like "today", "high priority", or "add to
+                    Engineering board" to refine this task
+                  </Text>
+                </VStack>
               </VStack>
             )}
 
-            {/* Empty State */}
+            {/* Empty State when typing */}
             {!isProcessing && !suggestion && command.trim() && (
               <Box p="4" textAlign="center">
                 <Text color="fg.muted" fontSize="sm">
