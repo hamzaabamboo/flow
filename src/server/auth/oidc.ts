@@ -4,12 +4,13 @@ import { jwt } from '@elysiajs/jwt';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../../../drizzle/schema';
+import { HAMAUTH_CONFIG, validateHamAuthToken } from './hamauth-utils';
 
-// OIDC configuration
+// OIDC configuration for web login flow
 const OIDC_CONFIG = {
-  issuer: process.env.OIDC_ISSUER || '',
-  clientId: process.env.OIDC_CLIENT_ID || '',
-  clientSecret: process.env.OIDC_CLIENT_SECRET || '',
+  issuer: HAMAUTH_CONFIG.issuer,
+  clientId: HAMAUTH_CONFIG.clientId,
+  clientSecret: HAMAUTH_CONFIG.clientSecret,
   redirectUri: process.env.OIDC_REDIRECT_URI || 'http://localhost:3000/api/auth/callback',
   scope: 'openid profile email'
 };
@@ -114,21 +115,12 @@ export const oidcAuth = new Elysia()
 
         const tokens = await tokenResponse.json();
 
-        // Get user info
-        const userInfoResponse = await fetch(
-          `${OIDC_CONFIG.issuer}/protocol/openid-connect/userinfo`,
-          {
-            headers: {
-              Authorization: `Bearer ${tokens.access_token}`
-            }
-          }
-        );
+        // Get user info using shared utility
+        const userInfo = await validateHamAuthToken(tokens.access_token);
 
-        if (!userInfoResponse.ok) {
-          throw new Error('Failed to fetch user info');
+        if (!userInfo) {
+          throw new Error('Failed to fetch user info from HamAuth');
         }
-
-        const userInfo = await userInfoResponse.json();
 
         // Find or create user
         let [user] = await db.select().from(users).where(eq(users.email, userInfo.email));

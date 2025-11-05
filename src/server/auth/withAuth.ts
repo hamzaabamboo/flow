@@ -5,6 +5,7 @@ import { eq, asc } from 'drizzle-orm';
 import { users, apiTokens } from '../../../drizzle/schema';
 import { db } from '../db';
 import { logger } from '../logger';
+import { validateHamAuthTokenCached } from './hamauth-utils';
 
 interface AuthUser {
   id: string;
@@ -36,9 +37,9 @@ export const withAuth = () =>
       const authHeader = request.headers.get('authorization');
       if (authHeader?.startsWith('Bearer ')) {
         const rawToken = authHeader.substring(7);
-        const hashedToken = await hashToken(rawToken);
 
-        // Look up token in database
+        // First, check if it's an API token from our database
+        const hashedToken = await hashToken(rawToken);
         const [tokenRecord] = await db
           .select()
           .from(apiTokens)
@@ -74,9 +75,40 @@ export const withAuth = () =>
           }
         }
 
-        // Invalid API token
+        // Not an API token - try validating as HamAuth access token
+        logger.info('Bearer token not found in API tokens - validating with HamAuth');
+        const hamAuthUserInfo = await validateHamAuthTokenCached(rawToken);
+
+        if (hamAuthUserInfo) {
+          logger.info(`Valid HamAuth token for user: ${hamAuthUserInfo.email}`);
+
+          // Find or create user
+          let [user] = await db.select().from(users).where(eq(users.email, hamAuthUserInfo.email));
+
+          if (!user) {
+            logger.info(`Creating new user from HamAuth token: ${hamAuthUserInfo.email}`);
+            [user] = await db
+              .insert(users)
+              .values({
+                email: hamAuthUserInfo.email,
+                name: hamAuthUserInfo.name || hamAuthUserInfo.email
+              })
+              .returning();
+          }
+
+          return {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name
+            } as AuthUser
+          };
+        }
+
+        // Neither API token nor valid HamAuth token
+        logger.warn('Invalid Bearer token - not an API token or HamAuth token');
         set.status = 401;
-        throw new Error('Invalid API token');
+        throw new Error('Invalid Bearer token');
       }
 
       // Fall back to JWT cookie authentication
