@@ -39,7 +39,7 @@ import { HamBotIntegration } from './integrations/hambot';
 import { wsManager } from './websocket';
 import { users } from 'drizzle/schema';
 
-const app = new Elysia({
+const _app = new Elysia({
   serve: {
     port: 3000,
     idleTimeout: 60
@@ -55,10 +55,10 @@ const root = join(process.cwd());
 if (!isProduction) {
   const { createDevMiddleware } = await import('vike/server');
   const { devMiddleware } = await createDevMiddleware({ root });
-  app.use(connect(devMiddleware));
+  _app.use(connect(devMiddleware));
 } else {
   // In production, serve static assets
-  app.use(
+  _app.use(
     staticPlugin({
       assets: join(root, 'dist', 'client'),
       prefix: '/'
@@ -66,7 +66,7 @@ if (!isProduction) {
   );
 }
 
-app
+const app = _app
   .use(
     cors({
       origin: process.env.FRONTEND_URL || 'http://localhost:3001',
@@ -379,3 +379,5 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error({ promise, reason }, 'Unhandled Rejection');
   gracefulShutdown();
 });
+
+export type App = typeof app;
