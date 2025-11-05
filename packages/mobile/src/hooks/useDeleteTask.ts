@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
-import { getStoredToken } from '@/store/authStore'
+import { getStoredAccessToken } from '@/store/authStore'
 import { API_URL } from '@/api/client'
 
 export const useDeleteTask = () => {
@@ -8,7 +8,7 @@ export const useDeleteTask = () => {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const token = await getStoredToken()
+      const token = await getStoredAccessToken()
       if (!token) throw new Error('Not authenticated')
 
       const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {

@@ -43,11 +43,13 @@ export default function LoginScreen() {
       }
 
       // Store tokens and user info
+      console.log('[Login] Storing tokens and user info...')
       await setTokens(tokens, {
         email: userInfo.email,
         name: userInfo.name || userInfo.preferred_username,
       })
 
+      console.log('[Login] Tokens stored, navigating to tabs...')
       // Navigate to main app
       router.replace('/(tabs)')
     } catch (err) {

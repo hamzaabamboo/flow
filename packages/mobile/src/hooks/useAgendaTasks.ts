@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns'
 import { useSpaceStore } from '@/store/spaceStore'
-import { getStoredToken } from '@/store/authStore'
+import { getStoredAccessToken } from '@/store/authStore'
 import { API_URL } from '@/api/client'
 import type { CalendarEvent } from '@/types'
 
@@ -14,7 +14,7 @@ export const useAgendaTasks = (view: 'day' | 'week', date: Date = new Date()) =>
   return useQuery({
     queryKey: ['agenda', view, format(date, 'yyyy-MM-dd'), currentSpace],
     queryFn: async (): Promise<CalendarEvent[]> => {
-      const token = await getStoredToken()
+      const token = await getStoredAccessToken()
       if (!token) throw new Error('Not authenticated')
 
       const response = await fetch(

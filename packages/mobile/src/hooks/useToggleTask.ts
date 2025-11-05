@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
-import { getStoredToken } from '@/store/authStore'
+import { getStoredAccessToken } from '@/store/authStore'
 import { API_URL } from '@/api/client'
 
 export const useToggleTask = () => {
@@ -8,7 +8,7 @@ export const useToggleTask = () => {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const token = await getStoredToken()
+      const token = await getStoredAccessToken()
       if (!token) throw new Error('Not authenticated')
 
       // First get the task to toggle its state

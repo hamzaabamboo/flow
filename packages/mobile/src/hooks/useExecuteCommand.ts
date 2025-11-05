@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
-import { getStoredToken } from '@/store/authStore'
+import { getStoredAccessToken } from '@/store/authStore'
+import { useSpaceStore } from '@/store/spaceStore'
 import { API_URL } from '@/api/client'
 
 interface CommandResponse {
@@ -21,11 +22,14 @@ interface CommandResponse {
 
 export const useExecuteCommand = () => {
   const queryClient = useQueryClient()
+  const currentSpace = useSpaceStore((state) => state.currentSpace)
 
   return useMutation({
     mutationFn: async (command: string): Promise<CommandResponse> => {
-      const token = await getStoredToken()
+      const token = await getStoredAccessToken()
       if (!token) throw new Error('Not authenticated')
+
+      if (!currentSpace) throw new Error('No space selected')
 
       // First, parse the command
       const parseResponse = await fetch(`${API_URL}/api/command`, {
@@ -34,11 +38,13 @@ export const useExecuteCommand = () => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ command, space: currentSpace }),
       })
 
       if (!parseResponse.ok) {
-        throw new Error('Failed to parse command')
+        const errorText = await parseResponse.text()
+        console.error('Parse command failed:', parseResponse.status, errorText)
+        throw new Error(`Failed to parse command: ${parseResponse.status} - ${errorText}`)
       }
 
       const parsedIntent = await parseResponse.json()
@@ -50,11 +56,13 @@ export const useExecuteCommand = () => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ intent: parsedIntent }),
+        body: JSON.stringify({ ...parsedIntent, space: currentSpace }),
       })
 
       if (!executeResponse.ok) {
-        throw new Error('Failed to execute command')
+        const errorText = await executeResponse.text()
+        console.error('Execute command failed:', executeResponse.status, errorText)
+        throw new Error(`Failed to execute command: ${executeResponse.status} - ${errorText}`)
       }
 
       return {

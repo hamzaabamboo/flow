@@ -30,6 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setTokens: async (tokens: HamAuthTokens, userInfo?: { email: string; name?: string }) => {
     try {
+      console.log('[AuthStore] Setting tokens...', { userEmail: userInfo?.email })
       // Store access token
       await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken)
 
@@ -53,14 +54,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         userEmail: userInfo?.email || null,
         userName: userInfo?.name || null,
       })
+      console.log('[AuthStore] Tokens saved successfully, isAuthenticated: true')
     } catch (error) {
-      console.error('Failed to store tokens:', error)
+      console.error('[AuthStore] Failed to store tokens:', error)
       throw error
     }
   },
 
   loadTokens: async () => {
     try {
+      console.log('[AuthStore] Loading tokens...')
       const [accessToken, refreshToken, userEmail, userName] = await Promise.all([
         SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
         SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
@@ -68,15 +71,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         SecureStore.getItemAsync(STORAGE_KEYS.USER_NAME),
       ])
 
+      const isAuthenticated = !!accessToken
+      console.log('[AuthStore] Tokens loaded:', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        userEmail,
+        isAuthenticated
+      })
+
       set({
         accessToken,
         refreshToken,
-        isAuthenticated: !!accessToken,
+        isAuthenticated,
         userEmail,
         userName,
       })
     } catch (error) {
-      console.error('Failed to load tokens:', error)
+      console.error('[AuthStore] Failed to load tokens:', error)
       set({
         accessToken: null,
         refreshToken: null,
