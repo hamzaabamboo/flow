@@ -41,6 +41,7 @@ export async function validateHamAuthToken(accessToken: string): Promise<HamAuth
 
     if (!userInfoResponse.ok) {
       // Token is invalid or expired
+      console.warn(`HamAuth token validation failed: ${userInfoResponse.status} ${userInfoResponse.statusText}`);
       return null;
     }
 
@@ -70,8 +71,9 @@ interface CachedTokenInfo {
 
 const tokenCache = new Map<string, CachedTokenInfo>();
 
-// Cache tokens for 5 minutes
-const CACHE_DURATION_MS = 5 * 60 * 1000;
+// Cache tokens for 1 minute to avoid caching tokens that are about to expire
+// HamAuth tokens typically expire in 5 minutes, so caching for 1 minute is safe
+const CACHE_DURATION_MS = 1 * 60 * 1000;
 
 /**
  * Clean up expired cache entries
@@ -122,6 +124,9 @@ export async function validateHamAuthTokenCached(
       userInfo,
       expiresAt: Date.now() + CACHE_DURATION_MS
     });
+  } else {
+    // Token is invalid - remove from cache to avoid checking again
+    tokenCache.delete(cacheKey);
   }
 
   return userInfo;

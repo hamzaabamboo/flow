@@ -1,8 +1,7 @@
 import { Tabs } from 'expo-router'
 import { useTheme } from 'react-native-paper'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name']
+import { SpaceSwitcher } from '@/components/SpaceSwitcher'
 
 export default function TabLayout() {
   const theme = useTheme()
@@ -19,6 +18,7 @@ export default function TabLayout() {
           backgroundColor: theme.colors.surface,
         },
         headerTintColor: theme.colors.onSurface,
+        headerRight: () => <SpaceSwitcher />,
       }}
     >
       <Tabs.Screen
@@ -28,6 +28,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="calendar" size={size} color={color} />
           ),
+          tabBarLabel: 'Agenda',
         }}
       />
       <Tabs.Screen
@@ -37,6 +38,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
           ),
+          tabBarLabel: 'Boards',
         }}
       />
       <Tabs.Screen
@@ -46,6 +48,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="checkbox-marked-outline" size={size} color={color} />
           ),
+          tabBarLabel: 'Tasks',
         }}
       />
       <Tabs.Screen
@@ -55,6 +58,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="cog" size={size} color={color} />
           ),
+          tabBarLabel: 'Settings',
         }}
       />
     </Tabs>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, StyleSheet, ScrollView, Platform } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { TextInput, Button, Text, Surface, useTheme, Chip, IconButton, ActivityIndicator } from 'react-native-paper'
 import { useRouter } from 'expo-router'
 import { useExecuteCommand } from '@/hooks/useExecuteCommand'
@@ -101,20 +102,21 @@ export default function CommandModal() {
   }
 
   return (
-    <Surface style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text variant="headlineSmall" style={styles.title}>
-              What would you like to do?
-            </Text>
-            <IconButton
-              icon="close"
-              onPress={() => router.back()}
-              style={styles.closeButton}
-            />
-          </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Surface style={[styles.surface, { backgroundColor: theme.colors.background }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.content}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onBackground }]}>
+                What would you like to do?
+              </Text>
+              <IconButton
+                icon="close"
+                onPress={() => router.back()}
+                style={styles.closeButton}
+              />
+            </View>
 
           {/* Command Input */}
           <TextInput
@@ -129,7 +131,7 @@ export default function CommandModal() {
             numberOfLines={3}
             style={styles.input}
             placeholder="e.g., Add task 'Deploy staging' tomorrow at 3pm"
-            autoFocus
+            
           />
 
           {/* Voice Button */}
@@ -215,11 +217,15 @@ export default function CommandModal() {
         </View>
       </ScrollView>
     </Surface>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  surface: {
     flex: 1,
   },
   scrollContent: {
@@ -232,13 +238,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   closeButton: {
     margin: 0,
   },
   title: {
     flex: 1,
+    fontWeight: '700',
   },
   input: {
     marginBottom: 16,

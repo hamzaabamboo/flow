@@ -1,33 +1,29 @@
-import { useEffect, useState } from 'react'
 import { Redirect } from 'expo-router'
 import { ActivityIndicator, View } from 'react-native'
 import { useAuthStore } from '@/store/authStore'
 
 export default function Index() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const [isReady, setIsReady] = useState(false)
+  const isLoading = useAuthStore((state) => state.isLoading)
 
-  useEffect(() => {
-    console.log('[Index] Auth state:', { isAuthenticated })
-    // Give a moment for auth to load
-    const timer = setTimeout(() => {
-      setIsReady(true)
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [isAuthenticated])
+  console.log('[Index] Auth state:', { isAuthenticated, isLoading })
 
-  if (!isReady) {
-    console.log('[Index] Waiting for auth state...')
+  // Wait for auth to finish loading from SecureStore
+  if (isLoading) {
+    console.log('[Index] Loading auth state from SecureStore...')
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#09090b' }}>
+        <ActivityIndicator size="large" color="#60a5fa" />
       </View>
     )
   }
 
-  console.log('[Index] Redirecting...', { isAuthenticated, destination: isAuthenticated ? '/(tabs)' : '/(auth)/login' })
+  console.log('[Index] Redirecting...', {
+    isAuthenticated,
+    destination: isAuthenticated ? '/(tabs)' : '/(auth)/login'
+  })
 
-  // Simple redirect based on auth
+  // Redirect based on auth state
   if (isAuthenticated) {
     return <Redirect href="/(tabs)" />
   }

@@ -1,38 +1,49 @@
-import { View, StyleSheet } from 'react-native'
-import { SegmentedButtons, useTheme } from 'react-native-paper'
+import { StyleSheet, Pressable } from 'react-native'
+import { Text, useTheme } from 'react-native-paper'
 import { useSpaceStore } from '@/store/spaceStore'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
+import * as Haptics from 'expo-haptics'
 
 export const SpaceSwitcher = () => {
   const theme = useTheme()
   const { currentSpace, setSpace } = useSpaceStore()
 
+  const handleToggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    setSpace(currentSpace === 'work' ? 'personal' : 'work')
+  }
+
   return (
-    <View style={styles.container}>
-      <SegmentedButtons
-        value={currentSpace}
-        onValueChange={(value) => setSpace(value as 'work' | 'personal')}
-        buttons={[
-          {
-            value: 'work',
-            label: 'Work',
-            icon: 'briefcase',
-            style: currentSpace === 'work' ? { backgroundColor: theme.colors.primaryContainer } : undefined,
-          },
-          {
-            value: 'personal',
-            label: 'Personal',
-            icon: 'home',
-            style: currentSpace === 'personal' ? { backgroundColor: theme.colors.primaryContainer } : undefined,
-          },
-        ]}
+    <Pressable
+      style={[
+        styles.button,
+        {
+          backgroundColor: theme.colors.primary,
+        }
+      ]}
+      onPress={handleToggle}
+    >
+      <MaterialCommunityIcons
+        name={currentSpace === 'work' ? 'briefcase' : 'home'}
+        size={24}
+        color="#000"
       />
-    </View>
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    paddingBottom: 8,
+  button: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
 })

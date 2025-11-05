@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Stack } from 'expo-router'
 import { PaperProvider } from 'react-native-paper'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useColorScheme } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { lightTheme, darkTheme } from '@/theme'
+import { getThemeForSpace } from '@/theme'
 import { useAuthStore } from '@/store/authStore'
 import { useSpaceStore } from '@/store/spaceStore'
 
@@ -22,6 +22,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme()
   const loadTokens = useAuthStore((state) => state.loadTokens)
   const loadSpace = useSpaceStore((state) => state.loadSpace)
+  const currentSpace = useSpaceStore((state) => state.currentSpace)
 
   // Load stored data on mount
   useEffect(() => {
@@ -29,10 +30,16 @@ export default function RootLayout() {
     loadSpace()
   }, [loadTokens, loadSpace])
 
+  // Dynamic theme based on current space
+  const theme = useMemo(
+    () => getThemeForSpace(currentSpace, colorScheme === 'dark'),
+    [currentSpace, colorScheme]
+  )
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <PaperProvider theme={colorScheme === 'dark' ? darkTheme : lightTheme}>
+        <PaperProvider theme={theme}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="(auth)" />

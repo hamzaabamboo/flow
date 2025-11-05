@@ -47,27 +47,43 @@ export const TaskCard = ({ task }: TaskCardProps) => {
     </View>
   )
 
+  const priorityColor = task.priority ? getPriorityColor(task.priority, true) : theme.colors.outline
+
   return (
     <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-      <Card mode="elevated" style={styles.card}>
-        <Card.Content>
+      <Card
+        mode="elevated"
+        elevation={1}
+        style={[
+          styles.card,
+          {
+            borderLeftWidth: 3,
+            borderLeftColor: priorityColor,
+            backgroundColor: theme.colors.surface
+          }
+        ]}
+      >
+        <Card.Content style={styles.cardContent}>
           <View style={styles.row}>
             <Checkbox
               status={task.completed ? 'checked' : 'unchecked'}
               onPress={handleToggle}
+              color={priorityColor}
             />
             <View style={styles.content}>
               <Text
                 variant="titleMedium"
-                style={task.completed && styles.completedText}
+                style={[
+                  { fontWeight: '600', color: theme.colors.onSurface, flexWrap: 'wrap' },
+                  task.completed && styles.completedText
+                ]}
               >
                 {task.title}
               </Text>
               {task.description && (
                 <Text
                   variant="bodySmall"
-                  numberOfLines={1}
-                  style={{ color: theme.colors.onSurfaceVariant }}
+                  style={{ color: theme.colors.onSurfaceVariant, marginTop: 2, flexWrap: 'wrap' }}
                 >
                   {task.description}
                 </Text>
@@ -76,8 +92,10 @@ export const TaskCard = ({ task }: TaskCardProps) => {
                 {task.dueDate && (
                   <Chip
                     icon="clock-outline"
-                    compact
-                    style={{ backgroundColor: theme.colors.surfaceVariant }}
+                    textStyle={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}
+                    style={{
+                      backgroundColor: theme.colors.surfaceVariant,
+                    }}
                   >
                     {format(new Date(task.dueDate), 'HH:mm')}
                   </Chip>
@@ -85,10 +103,9 @@ export const TaskCard = ({ task }: TaskCardProps) => {
                 {task.priority && (
                   <Chip
                     icon="flag"
-                    compact
-                    textStyle={{ color: 'white' }}
+                    textStyle={{ fontSize: 12, color: '#000', fontWeight: '600' }}
                     style={{
-                      backgroundColor: getPriorityColor(task.priority, theme),
+                      backgroundColor: priorityColor,
                     }}
                   >
                     {task.priority}
@@ -97,8 +114,10 @@ export const TaskCard = ({ task }: TaskCardProps) => {
                 {task.type === 'habit' && (
                   <Chip
                     icon="repeat"
-                    compact
-                    style={{ backgroundColor: theme.colors.secondaryContainer }}
+                    textStyle={{ fontSize: 12 }}
+                    style={{
+                      backgroundColor: theme.colors.secondaryContainer,
+                    }}
                   >
                     Habit
                   </Chip>
@@ -107,6 +126,8 @@ export const TaskCard = ({ task }: TaskCardProps) => {
             </View>
             <IconButton
               icon="dots-vertical"
+              size={20}
+              iconColor={theme.colors.onSurfaceVariant}
               onPress={() => router.push(`/modal/task/${task.id}`)}
             />
           </View>
@@ -119,19 +140,26 @@ export const TaskCard = ({ task }: TaskCardProps) => {
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
-    marginVertical: 6,
+    marginVertical: 4,
+    borderRadius: 8,
+    elevation: 0,
+  },
+  cardContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   content: {
     flex: 1,
     marginLeft: 8,
+    marginRight: 8,
   },
   chips: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
     marginTop: 8,
     flexWrap: 'wrap',
   },
@@ -145,6 +173,6 @@ const styles = StyleSheet.create({
   },
   completedText: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.5,
   },
 })
