@@ -54,7 +54,7 @@ export const useAgendaTasks = (view: 'day' | 'week', date: Date = new Date()) =>
       const events = (data as any[]).map((event) => ({
         ...event,
         // Use the same completion logic as the web frontend
-        completed: isTaskCompleted(event)
+        completed: isTaskCompleted(event.columnName)
       })) as CalendarEvent[];
 
       console.log('[useAgendaTasks] Received tasks:', events.length, 'tasks');

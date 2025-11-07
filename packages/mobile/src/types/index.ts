@@ -51,6 +51,9 @@ export interface CalendarEvent {
   type: 'task' | 'habit';
   space: 'work' | 'personal';
   link?: string;
+  columnName?: string;
+  boardId?: string;
+  boardName?: string;
 }
 
 export type Space = 'work' | 'personal';
