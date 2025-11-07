@@ -1,0 +1,91 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, feat/react-native]
+    paths:
+      - 'packages/mobile/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Build profile (development, preview, production)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Expo CLI
+        run: bun add -g @expo/cli eas-cli
+
+      - name: Build Android APK (Development)
+        if: github.event_name == 'push' || github.event.inputs.profile == 'development'
+        working-directory: packages/mobile
+        run: |
+          bunx expo prebuild --platform android
+          cd android
+          ./gradlew assembleDebug
+        env:
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL || 'http://localhost:3000' }}
+          EXPO_PUBLIC_WS_URL: ${{ secrets.EXPO_PUBLIC_WS_URL || 'ws://localhost:3000' }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamflow-android-${{ github.event.inputs.profile || 'development' }}-${{ github.sha }}
+          path: packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Comment PR with download link
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = `## 📱 Android APK Built Successfully!
+
+            Build profile: \`${{ github.event.inputs.profile || 'development' }}\`
+            Commit: \`${{ github.sha }}\`
+
+            Download the APK from the Actions artifacts above ⬆️
+
+            The artifact will be available for 30 days.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
