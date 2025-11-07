@@ -297,8 +297,12 @@ const app = _app
       }
     }
 
-    // Initialize WebSocket manager
-    wsManager.setApp(app);
+    try {
+      // Initialize WebSocket manager
+      wsManager.setApp(_app);
+    } catch (error) {
+      logger.error(error, 'Websocket Startup Failed');
+    }
 
     // Check for missing habit reminders on startup
     try {
@@ -375,8 +379,8 @@ process.on('uncaughtException', (error) => {
   gracefulShutdown();
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error({ promise, reason }, 'Unhandled Rejection');
+process.on('unhandledRejection', async (reason, promise) => {
+  logger.error({ promise: await promise, reason: await reason }, 'Unhandled Rejection');
   gracefulShutdown();
 });
 
