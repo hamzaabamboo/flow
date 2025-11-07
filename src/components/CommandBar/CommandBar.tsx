@@ -14,6 +14,7 @@ import { Dialog } from '../ui/dialog';
 import { Select, createListCollection } from '../ui/select';
 import type { Column } from '../../shared/types';
 import { HStack, VStack, Box } from 'styled-system/jsx';
+import { api } from '../../api/client';
 
 interface CommandBarProps {
   open: boolean;
@@ -103,11 +104,9 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
   const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${currentSpace}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) return [];
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
+      if (error) return [];
+      return data;
     },
     enabled: open
   });
@@ -238,19 +237,14 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
     }
 
     try {
-      const response = await fetch('/api/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          command: contextMessage,
-          space: currentSpace,
-          conversationHistory: conversationHistory.slice(-5) // Send last 5 turns for context
-        })
+      const { data, error } = await api.api.command.post({
+        command: contextMessage,
+        space: currentSpace,
+        conversationHistory: conversationHistory.slice(-5) // Send last 5 turns for context
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuggestion(result);
+      if (!error && data) {
+        setSuggestion(data);
         setCommand(''); // Clear input for next follow-up
       } else {
         toast?.('Command processing failed. Please try again', { type: 'error' });
@@ -268,17 +262,13 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
 
     try {
       // Force create as inbox item
-      const response = await fetch('/api/command/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create_inbox_item',
-          data: suggestion.data,
-          space: currentSpace
-        })
+      const { error } = await api.api.command.execute.post({
+        action: 'create_inbox_item',
+        data: suggestion.data,
+        space: currentSpace
       });
 
-      if (response.ok) {
+      if (!error) {
         toast?.('Sent to inbox', { type: 'success' });
         queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
         onOpenChange(false);
@@ -307,18 +297,13 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
         };
       }
 
-      const response = await fetch('/api/command/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: suggestion.action,
-          data: finalData,
-          space: currentSpace
-        })
+      const { data: result, error } = await api.api.command.execute.post({
+        action: suggestion.action,
+        data: finalData,
+        space: currentSpace
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (!error && result) {
         toast?.(getSuccessMessage(suggestion.action), { type: 'success' });
 
         // Save current session to command history

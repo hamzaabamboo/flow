@@ -41,7 +41,9 @@ export async function validateHamAuthToken(accessToken: string): Promise<HamAuth
 
     if (!userInfoResponse.ok) {
       // Token is invalid or expired
-      console.warn(`HamAuth token validation failed: ${userInfoResponse.status} ${userInfoResponse.statusText}`);
+      console.warn(
+        `HamAuth token validation failed: ${userInfoResponse.status} ${userInfoResponse.statusText}`
+      );
       return null;
     }
 

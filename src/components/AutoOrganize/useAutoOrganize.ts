@@ -4,22 +4,18 @@ import type {
   AutoOrganizeResponse,
   AutoOrganizeSuggestion
 } from '../../shared/types/autoOrganize';
+import { api } from '../../api/client';
 
 export function useAutoOrganize() {
   return useMutation<AutoOrganizeResponse, Error, AutoOrganizeRequest>({
     mutationFn: async (request) => {
-      const response = await fetch('/api/tasks/auto-organize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(request)
-      });
+      const { data, error } = await api.api.tasks['auto-organize'].post(request);
 
-      if (!response.ok) {
+      if (error) {
         throw new Error('Failed to generate organization suggestions');
       }
 
-      return response.json();
+      return data;
     }
   });
 }
@@ -50,14 +46,9 @@ export function useApplyAutoOrganize() {
               break;
           }
 
-          const response = await fetch(`/api/tasks/${suggestion.taskId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(updates)
-          });
+          const { error } = await api.api.tasks({ id: suggestion.taskId }).patch(updates);
 
-          if (!response.ok) {
+          if (error) {
             throw new Error(`Failed to update task ${suggestion.taskId}`);
           }
 

@@ -31,6 +31,7 @@ import {
 } from '../../components/AutoOrganize/useAutoOrganize';
 import { useToaster } from '../../contexts/ToasterContext';
 import type { AutoOrganizeSuggestion } from '../../shared/types/autoOrganize';
+import { api } from '../../api/client';
 
 interface CompleteTaskPayload {
   id: string;
@@ -100,14 +101,16 @@ export default function AgendaPage() {
       const startUnix = Math.floor(start.getTime() / 1000);
       const endUnix = Math.ceil(end.getTime() / 1000);
 
-      // Include overdue tasks for day view
-      const includeOverdueParam = viewMode === 'day' ? '&includeOverdue=true' : '';
-
-      const response = await fetch(
-        `/api/calendar/events?start=${startUnix}&end=${endUnix}&space=${currentSpace}${includeOverdueParam}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch events');
-      return response.json();
+      const { data, error } = await api.api.calendar.events.get({
+        query: {
+          start: startUnix.toString(),
+          end: endUnix.toString(),
+          space: currentSpace,
+          ...(viewMode === 'day' ? { includeOverdue: 'true' } : {})
+        }
+      });
+      if (error) throw new Error('Failed to fetch events');
+      return data;
     }
   });
 
@@ -123,11 +126,11 @@ export default function AgendaPage() {
         viewMode === 'day'
           ? format(selectedDate, 'yyyy-MM-dd')
           : format(startOfWeek(selectedDate), 'yyyy-MM-dd');
-      const response = await fetch(
-        `/api/habits?date=${dateStr}&space=${currentSpace}&view=${viewMode}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch habits');
-      return response.json();
+      const { data, error } = await api.api.habits.get({
+        query: { date: dateStr, space: currentSpace, view: viewMode }
+      });
+      if (error) throw new Error('Failed to fetch habits');
+      return data;
     }
   });
 
@@ -139,13 +142,9 @@ export default function AgendaPage() {
         body.instanceDate =
           instanceDate instanceof Date ? instanceDate.toISOString().split('T')[0] : instanceDate;
       }
-      const response = await fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (!response.ok) throw new Error('Failed to update task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id }).patch(body);
+      if (error) throw new Error('Failed to update task');
+      return data;
     },
     onSuccess: () => {
       refetchEvents();
@@ -163,13 +162,11 @@ export default function AgendaPage() {
       completed: boolean;
     }) => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const response = await fetch(`/api/habits/${habitId}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, completed })
-      });
-      if (!response.ok) throw new Error('Failed to toggle habit');
-      return response.json();
+      const { data, error } = await api.api
+        .habits({ habitId })
+        .log.post({ date: dateStr, completed });
+      if (error) throw new Error('Failed to toggle habit');
+      return data;
     },
     onSuccess: () => {
       refetchHabits();
@@ -179,13 +176,9 @@ export default function AgendaPage() {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...taskData, space: currentSpace })
-      });
-      if (!response.ok) throw new Error('Failed to create task');
-      return response.json();
+      const { data, error } = await api.api.tasks.post({ ...taskData, space: currentSpace });
+      if (error) throw new Error('Failed to create task');
+      return data;
     },
     onSuccess: () => {
       setEditingTask(null);
@@ -197,13 +190,9 @@ export default function AgendaPage() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      const response = await fetch(`/api/tasks/${taskData.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData)
-      });
-      if (!response.ok) throw new Error('Failed to update task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskData.id! }).patch(taskData);
+      if (error) throw new Error('Failed to update task');
+      return data;
     },
     onSuccess: () => {
       setEditingTask(null);
@@ -229,11 +218,7 @@ export default function AgendaPage() {
         // We need to convert it properly to UTC for storage
         const newUtcDate = jstToUtc(targetDate);
 
-        return fetch(`/api/tasks/${taskId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dueDate: newUtcDate.toISOString() })
-        });
+        return api.api.tasks({ id: taskId }).patch({ dueDate: newUtcDate.toISOString() });
       });
 
       await Promise.all(promises);

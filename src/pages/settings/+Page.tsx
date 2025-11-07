@@ -36,6 +36,7 @@ import { Portal } from '@ark-ui/react/portal';
 import { FormLabel } from '../../components/ui/form-label';
 import { IconButton } from '../../components/ui/icon-button';
 import { useState } from 'react';
+import { api } from '../../api/client';
 
 interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
@@ -118,9 +119,8 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useQuery<UserSettings>({
     queryKey: ['settings'],
     queryFn: async () => {
-      const response = await fetch('/api/settings');
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      const data = await response.json();
+      const { data, error } = await api.api.settings.get();
+      if (error) throw new Error('Failed to fetch settings');
 
       // Initialize Outline settings
       if (data.outlineApiUrl) setOutlineApiUrl(data.outlineApiUrl);
@@ -135,9 +135,8 @@ export default function SettingsPage() {
   const { data: outlineCollections, isLoading: collectionsLoading } = useQuery({
     queryKey: ['outline-collections', settings?.outlineApiUrl, settings?.outlineApiKey],
     queryFn: async () => {
-      const response = await fetch('/api/notes/collections');
-      if (!response.ok) return [];
-      const data = await response.json();
+      const { data, error } = await api.api.notes.collections.get();
+      if (error) return [];
       return data.data || [];
     },
     enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
@@ -146,13 +145,9 @@ export default function SettingsPage() {
   // Update settings mutation
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<UserSettings>) => {
-      const response = await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings)
-      });
-      if (!response.ok) throw new Error('Failed to update settings');
-      return response.json();
+      const { data, error } = await api.api.settings.patch(newSettings);
+      if (error) throw new Error('Failed to update settings');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
@@ -174,9 +169,9 @@ export default function SettingsPage() {
   const { data: calendarFeed } = useQuery<{ url: string; instructions: string }>({
     queryKey: ['calendar-feed'],
     queryFn: async () => {
-      const response = await fetch('/api/calendar/feed-url');
-      if (!response.ok) throw new Error('Failed to fetch calendar feed URL');
-      return response.json();
+      const { data, error } = await api.api.calendar['feed-url'].get();
+      if (error) throw new Error('Failed to fetch calendar feed URL');
+      return data;
     }
   });
 
@@ -184,22 +179,18 @@ export default function SettingsPage() {
   const { data: apiTokens = [], isLoading: isLoadingTokens } = useQuery<ApiToken[]>({
     queryKey: ['api-tokens'],
     queryFn: async () => {
-      const response = await fetch('/api/api-tokens');
-      if (!response.ok) throw new Error('Failed to fetch API tokens');
-      return response.json();
+      const { data, error } = await api.api['api-tokens'].get();
+      if (error) throw new Error('Failed to fetch API tokens');
+      return data;
     }
   });
 
   // Create API token
   const createApiToken = useMutation({
     mutationFn: async (name: string) => {
-      const response = await fetch('/api/api-tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      if (!response.ok) throw new Error('Failed to create API token');
-      return response.json();
+      const { data, error } = await api.api['api-tokens'].post({ name });
+      if (error) throw new Error('Failed to create API token');
+      return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
@@ -223,11 +214,9 @@ export default function SettingsPage() {
   // Delete API token
   const deleteApiToken = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/api-tokens/${id}`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) throw new Error('Failed to delete API token');
-      return response.json();
+      const { data, error } = await api.api['api-tokens']({ id }).delete();
+      if (error) throw new Error('Failed to delete API token');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
@@ -249,16 +238,14 @@ export default function SettingsPage() {
     mutationFn: async ({ type }: { type: 'morning' | 'evening' }) => {
       if (!settings) throw new Error('Settings not loaded');
 
-      const response = await fetch('/api/settings/test-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, spaces: settings.notifications.summarySpaces })
+      const { data, error } = await api.api.settings['test-summary'].post({
+        type,
+        spaces: settings.notifications.summarySpaces
       });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to send via HamBot');
+      if (error) {
+        throw new Error(error.value || 'Failed to send via HamBot');
       }
-      return response.json();
+      return data;
     },
     onSuccess: (data) => {
       toast?.(data.message, {
@@ -279,9 +266,9 @@ export default function SettingsPage() {
   const { data: externalCalendars } = useQuery<ExternalCalendar[]>({
     queryKey: ['external-calendars'],
     queryFn: async () => {
-      const response = await fetch('/api/external-calendars');
-      if (!response.ok) throw new Error('Failed to fetch external calendars');
-      return response.json();
+      const { data, error } = await api.api['external-calendars'].get();
+      if (error) throw new Error('Failed to fetch external calendars');
+      return data;
     }
   });
 
@@ -293,16 +280,11 @@ export default function SettingsPage() {
       space: 'work' | 'personal';
       color: string;
     }) => {
-      const response = await fetch('/api/external-calendars', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(calendar)
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to add calendar');
+      const { data, error } = await api.api['external-calendars'].post(calendar);
+      if (error) {
+        throw new Error(error.value?.error || 'Failed to add calendar');
       }
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
@@ -328,13 +310,9 @@ export default function SettingsPage() {
   // Toggle external calendar enabled
   const toggleExternalCalendar = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const response = await fetch(`/api/external-calendars/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled })
-      });
-      if (!response.ok) throw new Error('Failed to update calendar');
-      return response.json();
+      const { data, error } = await api.api['external-calendars']({ id }).patch({ enabled });
+      if (error) throw new Error('Failed to update calendar');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
@@ -346,7 +324,7 @@ export default function SettingsPage() {
   const updateExternalCalendar = useMutation({
     mutationFn: async ({
       id,
-      data
+      data: updateData
     }: {
       id: string;
       data: {
@@ -356,16 +334,11 @@ export default function SettingsPage() {
         color?: string;
       };
     }) => {
-      const response = await fetch(`/api/external-calendars/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update calendar');
+      const { data, error } = await api.api['external-calendars']({ id }).patch(updateData);
+      if (error) {
+        throw new Error(error.value?.error || 'Failed to update calendar');
       }
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['external-calendars'] });
@@ -388,11 +361,9 @@ export default function SettingsPage() {
   // Delete external calendar
   const deleteExternalCalendar = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/external-calendars/${id}`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) throw new Error('Failed to delete calendar');
-      return response.json();
+      const { data, error } = await api.api['external-calendars']({ id }).delete();
+      if (error) throw new Error('Failed to delete calendar');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['external-calendars'] });

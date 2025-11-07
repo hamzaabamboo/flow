@@ -1,4 +1,4 @@
-import type { CalendarEvent, ExtendedTask } from '../shared/types/calendar';
+import type { CalendarEvent, ExtendedTask } from '@hamflow/shared';
 
 export function calendarEventToExtendedTask(event: CalendarEvent): ExtendedTask {
   return {

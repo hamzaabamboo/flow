@@ -7,6 +7,7 @@ import * as Popover from '../ui/styled/popover';
 import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import { Badge } from '../ui/badge';
+import { api } from '../../api/client';
 
 interface Reminder {
   id: string;
@@ -24,9 +25,8 @@ export function NotificationDropdown() {
   const { data: reminders = [], refetch } = useQuery<Reminder[]>({
     queryKey: ['reminders', 'upcoming'],
     queryFn: async () => {
-      const response = await fetch('/api/reminders');
-      if (!response.ok) throw new Error('Failed to fetch reminders');
-      const allReminders = await response.json();
+      const { data: allReminders, error } = await api.api.reminders.get();
+      if (error) throw new Error('Failed to fetch reminders');
 
       // Sort by time and limit to 10 most recent
       return allReminders
@@ -43,9 +43,7 @@ export function NotificationDropdown() {
 
   const handleDismiss = async (id: string) => {
     try {
-      await fetch(`/api/reminders/${id}`, {
-        method: 'DELETE'
-      });
+      await api.api.reminders({ id }).delete();
       refetch();
     } catch (error) {
       console.error('Failed to dismiss reminder:', error);

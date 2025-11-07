@@ -7,6 +7,7 @@ import { IconButton } from '../ui/icon-button';
 import { Text } from '../ui/text';
 import type { Subtask } from '../../shared/types';
 import { HStack, VStack } from 'styled-system/jsx';
+import { api } from '../../api/client';
 
 interface SubtaskListProps {
   taskId: string;
@@ -22,25 +23,18 @@ export function SubtaskList({ taskId, compact = false }: SubtaskListProps) {
   const { data: subtasks = [] } = useQuery<Subtask[]>({
     queryKey: ['subtasks', taskId],
     queryFn: async () => {
-      const response = await fetch(`/api/subtasks/task/${taskId}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch subtasks');
-      return response.json();
+      const { data, error } = await api.api.subtasks.task({ taskId }).get();
+      if (error) throw new Error('Failed to fetch subtasks');
+      return data;
     }
   });
 
   // Create subtask mutation
   const createSubtaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      const response = await fetch('/api/subtasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ taskId, title })
-      });
-      if (!response.ok) throw new Error('Failed to create subtask');
-      return response.json();
+      const { data, error } = await api.api.subtasks.post({ taskId, title });
+      if (error) throw new Error('Failed to create subtask');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', taskId] });
@@ -52,14 +46,9 @@ export function SubtaskList({ taskId, compact = false }: SubtaskListProps) {
   // Update subtask mutation
   const updateSubtaskMutation = useMutation({
     mutationFn: async ({ id, completed }: { id: string; completed: boolean }) => {
-      const response = await fetch(`/api/subtasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ completed })
-      });
-      if (!response.ok) throw new Error('Failed to update subtask');
-      return response.json();
+      const { data, error } = await api.api.subtasks({ id }).patch({ completed });
+      if (error) throw new Error('Failed to update subtask');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', taskId] });
@@ -69,12 +58,9 @@ export function SubtaskList({ taskId, compact = false }: SubtaskListProps) {
   // Delete subtask mutation
   const deleteSubtaskMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/subtasks/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to delete subtask');
-      return response.json();
+      const { data, error } = await api.api.subtasks({ id }).delete();
+      if (error) throw new Error('Failed to delete subtask');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', taskId] });

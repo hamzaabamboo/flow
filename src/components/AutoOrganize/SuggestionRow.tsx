@@ -13,6 +13,7 @@ import { SimpleDatePicker } from '../ui/simple-date-picker';
 import { PriorityBadge } from '../PriorityBadge';
 import type { AutoOrganizeSuggestion } from '../../shared/types/autoOrganize';
 import type { Column } from '../../shared/types';
+import { api } from '../../api/client';
 
 interface SuggestionRowProps {
   suggestion: AutoOrganizeSuggestion;
@@ -33,11 +34,9 @@ export function SuggestionRow({
   const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${currentSpace}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch boards');
+      return data;
     },
     enabled: isEditing && suggestion.details.type === 'column_move'
   });

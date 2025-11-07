@@ -24,6 +24,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { IconButton } from '../../components/ui/icon-button';
 import { useSpace } from '../../contexts/SpaceContext';
 import type { Habit } from '../../shared/types/calendar';
+import { api } from '../../api/client';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sun' },
@@ -54,9 +55,9 @@ export default function HabitsPage() {
   const { data: habits } = useQuery({
     queryKey: ['habits', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/habits?space=${currentSpace}`);
-      if (!response.ok) throw new Error('Failed to fetch habits');
-      return response.json() as Promise<Habit[]>;
+      const { data, error } = await api.api.habits.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch habits');
+      return data as Habit[];
     }
   });
 
@@ -67,9 +68,9 @@ export default function HabitsPage() {
       if (!habits || habits.length === 0) return [];
 
       const statsPromises = habits.map(async (habit) => {
-        const response = await fetch(`/api/habits/${habit.id}/stats`);
-        if (!response.ok) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
-        return response.json();
+        const { data, error } = await api.api.habits({ habitId: habit.id }).stats.get();
+        if (error) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
+        return data;
       });
 
       return Promise.all(statsPromises);
@@ -80,13 +81,9 @@ export default function HabitsPage() {
   // Create habit
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await fetch('/api/habits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, space: currentSpace })
-      });
-      if (!response.ok) throw new Error('Failed to create habit');
-      return response.json();
+      const { data: result, error } = await api.api.habits.post({ ...data, space: currentSpace });
+      if (error) throw new Error('Failed to create habit');
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
@@ -98,13 +95,9 @@ export default function HabitsPage() {
   // Update habit
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      const response = await fetch(`/api/habits/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error('Failed to update habit');
-      return response.json();
+      const { data: result, error } = await api.api.habits({ habitId: id }).patch(data);
+      if (error) throw new Error('Failed to update habit');
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
@@ -116,9 +109,9 @@ export default function HabitsPage() {
   // Delete habit
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/habits/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete habit');
-      return response.json();
+      const { data, error } = await api.api.habits({ habitId: id }).delete();
+      if (error) throw new Error('Failed to delete habit');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
@@ -128,9 +121,9 @@ export default function HabitsPage() {
   // Toggle habit completion (used in Agenda view, not here)
   const _toggleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/habits/${id}/log`, { method: 'POST' });
-      if (!response.ok) throw new Error('Failed to log habit');
-      return response.json();
+      const { data, error } = await api.api.habits({ habitId: id }).log.post({});
+      if (error) throw new Error('Failed to log habit');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });
@@ -140,13 +133,9 @@ export default function HabitsPage() {
   // Toggle habit active status
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const response = await fetch(`/api/habits/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active })
-      });
-      if (!response.ok) throw new Error('Failed to toggle habit');
-      return response.json();
+      const { data, error } = await api.api.habits({ habitId: id }).patch({ active });
+      if (error) throw new Error('Failed to toggle habit');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits', currentSpace] });

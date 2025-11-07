@@ -1,6 +1,5 @@
 import { MoreVertical, Edit2, Copy, MoveRight, Trash2 } from 'lucide-react';
-import type { Task } from '../shared/types';
-import type { CalendarEvent, ExtendedTask } from '../shared/types/calendar';
+import type { Task, CalendarEvent, ExtendedTask } from '@hamflow/shared';
 import { IconButton } from './ui/icon-button';
 import * as Menu from './ui/styled/menu';
 import { HStack } from 'styled-system/jsx';

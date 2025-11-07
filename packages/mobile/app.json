@@ -43,7 +43,9 @@
         }
       ],
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "./plugins/withAndroidShareTarget",
+      "./plugins/withAndroidAgendaWidget"
     ],
     "experiments": {
       "typedRoutes": true

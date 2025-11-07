@@ -16,7 +16,7 @@ export default function LoginScreen() {
   // Create redirect URI using expo-auth-session
   const redirectUri = AuthSession.makeRedirectUri({
     scheme: 'hamflow',
-    path: 'auth/callback'
+    path: '(auth)/callback'
   });
 
   const handleOIDCLogin = async () => {

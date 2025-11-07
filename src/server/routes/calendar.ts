@@ -252,329 +252,318 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
 // Authenticated calendar routes
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .decorate('db', db)
-  .group('', (app) =>
-    app
-      .use(withAuth())
+  .use(withAuth())
+  // Get iCal feed URL (returns the URL for subscription)
+  .get('/feed-url', ({ user }) => {
+    // Generate a secure token for the user's calendar feed
+    const token = createHash('sha256')
+      .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
+      .digest('hex');
 
-      // Get iCal feed URL (returns the URL for subscription)
-      .get('/feed-url', ({ user }) => {
-        // Generate a secure token for the user's calendar feed
-        const token = createHash('sha256')
-          .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
-          .digest('hex');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return {
+      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
+      instructions:
+        'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
+    };
+  })
 
-        return {
-          url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
-          instructions:
-            'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
-        };
-      })
+  // Get calendar events for a date range (JSON format for frontend)
+  .get(
+    '/events',
+    async ({ query, db, user }) => {
+      const { start, end, space = 'all', includeOverdue = 'false' } = query;
 
-      // Get calendar events for a date range (JSON format for frontend)
-      .get(
-        '/events',
-        async ({ query, db, user }) => {
-          const { start, end, space = 'all', includeOverdue = 'false' } = query;
+      // Convert UNIX timestamps (seconds) to Date objects
+      const startDate = new Date(parseInt(start) * 1000);
+      const endDate = new Date(parseInt(end) * 1000);
 
-          // Convert UNIX timestamps (seconds) to Date objects
-          const startDate = new Date(parseInt(start) * 1000);
-          const endDate = new Date(parseInt(end) * 1000);
+      // Build the query with joins
+      const queryBuilder = db
+        .select({
+          // Select all columns from tasks
+          id: tasks.id,
+          columnId: tasks.columnId,
+          userId: tasks.userId,
+          title: tasks.title,
+          description: tasks.description,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          noteId: tasks.noteId,
+          labels: tasks.labels,
+          recurringPattern: tasks.recurringPattern,
+          recurringEndDate: tasks.recurringEndDate,
+          parentTaskId: tasks.parentTaskId,
+          metadata: tasks.metadata,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          // Manually join board space for filtering
+          space: boards.space,
+          boardId: boards.id,
+          boardName: boards.name,
+          columnName: columns.name
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id));
 
-          // Build the query with joins
-          const queryBuilder = db
-            .select({
-              // Select all columns from tasks
-              id: tasks.id,
-              columnId: tasks.columnId,
-              userId: tasks.userId,
-              title: tasks.title,
-              description: tasks.description,
-              dueDate: tasks.dueDate,
-              priority: tasks.priority,
-              noteId: tasks.noteId,
-              labels: tasks.labels,
-              recurringPattern: tasks.recurringPattern,
-              recurringEndDate: tasks.recurringEndDate,
-              parentTaskId: tasks.parentTaskId,
-              metadata: tasks.metadata,
-              createdAt: tasks.createdAt,
-              updatedAt: tasks.updatedAt,
-              // Manually join board space for filtering
-              space: boards.space,
-              boardId: boards.id,
-              boardName: boards.name,
-              columnName: columns.name
-            })
-            .from(tasks)
-            .leftJoin(columns, eq(tasks.columnId, columns.id))
-            .leftJoin(boards, eq(columns.boardId, boards.id));
+      // Define conditions for main query - only fetch tasks in the date range
+      const whereConditions = [
+        eq(tasks.userId, user.id),
+        isNotNull(tasks.dueDate),
+        gte(tasks.dueDate, startDate),
+        lte(tasks.dueDate, endDate)
+      ];
+      if (space !== 'all') {
+        whereConditions.push(eq(boards.space, space));
+      }
 
-          // Define conditions for main query - only fetch tasks in the date range
-          const whereConditions = [
-            eq(tasks.userId, user.id),
-            isNotNull(tasks.dueDate),
-            gte(tasks.dueDate, startDate),
-            lte(tasks.dueDate, endDate)
-          ];
-          if (space !== 'all') {
-            whereConditions.push(eq(boards.space, space));
-          }
+      let allTasks = await queryBuilder.where(and(...whereConditions));
 
-          let allTasks = await queryBuilder.where(and(...whereConditions));
+      // If includeOverdue is true, fetch overdue incomplete tasks separately
+      if (includeOverdue === 'true') {
+        const overdueConditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
+        if (space !== 'all') {
+          overdueConditions.push(eq(boards.space, space));
+        }
 
-          // If includeOverdue is true, fetch overdue incomplete tasks separately
-          if (includeOverdue === 'true') {
-            const overdueConditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
-            if (space !== 'all') {
-              overdueConditions.push(eq(boards.space, space));
-            }
+        const overdueQueryBuilder = db
+          .select({
+            id: tasks.id,
+            columnId: tasks.columnId,
+            userId: tasks.userId,
+            title: tasks.title,
+            description: tasks.description,
+            dueDate: tasks.dueDate,
+            priority: tasks.priority,
+            noteId: tasks.noteId,
+            labels: tasks.labels,
+            recurringPattern: tasks.recurringPattern,
+            recurringEndDate: tasks.recurringEndDate,
+            parentTaskId: tasks.parentTaskId,
+            metadata: tasks.metadata,
+            createdAt: tasks.createdAt,
+            updatedAt: tasks.updatedAt,
+            space: boards.space,
+            boardId: boards.id,
+            boardName: boards.name,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .leftJoin(boards, eq(columns.boardId, boards.id))
+          .where(and(...overdueConditions));
 
-            const overdueQueryBuilder = db
-              .select({
-                id: tasks.id,
-                columnId: tasks.columnId,
-                userId: tasks.userId,
-                title: tasks.title,
-                description: tasks.description,
-                dueDate: tasks.dueDate,
-                priority: tasks.priority,
-                noteId: tasks.noteId,
-                labels: tasks.labels,
-                recurringPattern: tasks.recurringPattern,
-                recurringEndDate: tasks.recurringEndDate,
-                parentTaskId: tasks.parentTaskId,
-                metadata: tasks.metadata,
-                createdAt: tasks.createdAt,
-                updatedAt: tasks.updatedAt,
-                space: boards.space,
-                boardId: boards.id,
-                boardName: boards.name,
-                columnName: columns.name
-              })
-              .from(tasks)
-              .leftJoin(columns, eq(tasks.columnId, columns.id))
-              .leftJoin(boards, eq(columns.boardId, boards.id))
-              .where(and(...overdueConditions));
+        const overdueTasks = await overdueQueryBuilder;
 
-            const overdueTasks = await overdueQueryBuilder;
+        // Filter overdue tasks: due date < start date AND (not in Done column OR is recurring)
+        const filteredOverdueTasks = overdueTasks.filter((task) => {
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          const isOverdue = dueDate < startDate;
+          const isNotDone = task.columnName?.toLowerCase() !== 'done';
+          const isRecurring = !!task.recurringPattern;
+          // Include if: (overdue AND not done) OR (overdue AND recurring)
+          return isOverdue && (isNotDone || isRecurring);
+        });
 
-            // Filter overdue tasks: due date < start date AND (not in Done column OR is recurring)
-            const filteredOverdueTasks = overdueTasks.filter((task) => {
-              if (!task.dueDate) return false;
-              const dueDate = new Date(task.dueDate);
-              const isOverdue = dueDate < startDate;
-              const isNotDone = task.columnName?.toLowerCase() !== 'done';
-              const isRecurring = !!task.recurringPattern;
-              // Include if: (overdue AND not done) OR (overdue AND recurring)
-              return isOverdue && (isNotDone || isRecurring);
-            });
+        // Merge with main tasks, avoiding duplicates
+        const mainTaskIds = new Set(allTasks.map((t) => t.id));
+        const uniqueOverdueTasks = filteredOverdueTasks.filter((t) => !mainTaskIds.has(t.id));
 
-            // Merge with main tasks, avoiding duplicates
-            const mainTaskIds = new Set(allTasks.map((t) => t.id));
-            const uniqueOverdueTasks = filteredOverdueTasks.filter((t) => !mainTaskIds.has(t.id));
+        allTasks = [...allTasks, ...uniqueOverdueTasks];
+      }
 
-            allTasks = [...allTasks, ...uniqueOverdueTasks];
-          }
+      // Fetch recurring tasks without dueDates (so they can still appear in calendar)
+      const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
+      if (space !== 'all') {
+        recurringConditions.push(eq(boards.space, space));
+      }
 
-          // Fetch recurring tasks without dueDates (so they can still appear in calendar)
-          const recurringConditions = [
-            eq(tasks.userId, user.id),
-            isNotNull(tasks.recurringPattern)
-          ];
-          if (space !== 'all') {
-            recurringConditions.push(eq(boards.space, space));
-          }
+      const recurringQueryBuilder = db
+        .select({
+          id: tasks.id,
+          columnId: tasks.columnId,
+          userId: tasks.userId,
+          title: tasks.title,
+          description: tasks.description,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          noteId: tasks.noteId,
+          labels: tasks.labels,
+          recurringPattern: tasks.recurringPattern,
+          recurringEndDate: tasks.recurringEndDate,
+          parentTaskId: tasks.parentTaskId,
+          metadata: tasks.metadata,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          space: boards.space,
+          boardId: boards.id,
+          boardName: boards.name,
+          columnName: columns.name
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(...recurringConditions));
 
-          const recurringQueryBuilder = db
-            .select({
-              id: tasks.id,
-              columnId: tasks.columnId,
-              userId: tasks.userId,
-              title: tasks.title,
-              description: tasks.description,
-              dueDate: tasks.dueDate,
-              priority: tasks.priority,
-              noteId: tasks.noteId,
-              labels: tasks.labels,
-              recurringPattern: tasks.recurringPattern,
-              recurringEndDate: tasks.recurringEndDate,
-              parentTaskId: tasks.parentTaskId,
-              metadata: tasks.metadata,
-              createdAt: tasks.createdAt,
-              updatedAt: tasks.updatedAt,
-              space: boards.space,
-              boardId: boards.id,
-              boardName: boards.name,
-              columnName: columns.name
-            })
-            .from(tasks)
-            .leftJoin(columns, eq(tasks.columnId, columns.id))
-            .leftJoin(boards, eq(columns.boardId, boards.id))
-            .where(and(...recurringConditions));
+      const recurringTasks = await recurringQueryBuilder;
 
-          const recurringTasks = await recurringQueryBuilder;
+      // Merge recurring tasks, avoiding duplicates
+      const existingTaskIds = new Set(allTasks.map((t) => t.id));
+      const uniqueRecurringTasks = recurringTasks.filter((t) => !existingTaskIds.has(t.id));
 
-          // Merge recurring tasks, avoiding duplicates
-          const existingTaskIds = new Set(allTasks.map((t) => t.id));
-          const uniqueRecurringTasks = recurringTasks.filter((t) => !existingTaskIds.has(t.id));
+      allTasks = [...allTasks, ...uniqueRecurringTasks];
 
-          allTasks = [...allTasks, ...uniqueRecurringTasks];
+      // Fetch subtasks separately for the fetched tasks
+      const taskIds = allTasks.map((t) => t.id);
+      const subtasksData = taskIds.length
+        ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
+        : [];
 
-          // Fetch subtasks separately for the fetched tasks
-          const taskIds = allTasks.map((t) => t.id);
-          const subtasksData = taskIds.length
-            ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
-            : [];
+      // Manually attach subtasks to their parent tasks and normalize types
+      const tasksWithSubtasks = allTasks.map((task) => ({
+        ...task,
+        description: task.description ?? undefined,
+        dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
+        priority: task.priority ?? undefined,
+        labels: task.labels ?? undefined,
+        recurringPattern: task.recurringPattern ?? undefined,
+        recurringEndDate: task.recurringEndDate ? task.recurringEndDate.toISOString() : undefined,
+        parentTaskId: task.parentTaskId ?? undefined,
+        space: task.space ?? undefined,
+        boardId: task.boardId ?? undefined,
+        boardName: task.boardName ?? undefined,
+        columnName: task.columnName ?? undefined,
+        link: task.metadata?.link ?? undefined,
+        createdAt: task.createdAt?.toISOString(),
+        updatedAt: task.updatedAt?.toISOString(),
+        subtasks: subtasksData
+          .filter((st) => st.taskId === task.id)
+          .map((st) => ({
+            ...st,
+            completed: st.completed ?? false,
+            createdAt: st.createdAt.toISOString(),
+            updatedAt: st.updatedAt.toISOString()
+          }))
+      }));
 
-          // Manually attach subtasks to their parent tasks and normalize types
-          const tasksWithSubtasks = allTasks.map((task) => ({
-            ...task,
-            description: task.description ?? undefined,
-            dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
-            priority: task.priority ?? undefined,
-            labels: task.labels ?? undefined,
-            recurringPattern: task.recurringPattern ?? undefined,
-            recurringEndDate: task.recurringEndDate
-              ? task.recurringEndDate.toISOString()
-              : undefined,
-            parentTaskId: task.parentTaskId ?? undefined,
-            space: task.space ?? undefined,
-            boardId: task.boardId ?? undefined,
-            boardName: task.boardName ?? undefined,
-            columnName: task.columnName ?? undefined,
-            link: task.metadata?.link ?? undefined,
-            createdAt: task.createdAt?.toISOString(),
-            updatedAt: task.updatedAt?.toISOString(),
-            subtasks: subtasksData
-              .filter((st) => st.taskId === task.id)
-              .map((st) => ({
-                ...st,
-                completed: st.completed ?? false,
-                createdAt: st.createdAt.toISOString(),
-                updatedAt: st.updatedAt.toISOString()
-              }))
-          }));
+      // Fetch all task completions for the user's tasks in the date range
+      const completions = await db
+        .select()
+        .from(taskCompletions)
+        .where(
+          and(
+            eq(taskCompletions.userId, user.id),
+            gte(taskCompletions.completedDate, startDate.toISOString().split('T')[0]),
+            lte(taskCompletions.completedDate, endDate.toISOString().split('T')[0])
+          )
+        );
 
-          // Fetch all task completions for the user's tasks in the date range
-          const completions = await db
-            .select()
-            .from(taskCompletions)
-            .where(
-              and(
-                eq(taskCompletions.userId, user.id),
-                gte(taskCompletions.completedDate, startDate.toISOString().split('T')[0]),
-                lte(taskCompletions.completedDate, endDate.toISOString().split('T')[0])
-              )
-            );
+      // Create a map of task completions by taskId and date
+      const completionMap = new Map<string, Set<string>>();
+      for (const completion of completions) {
+        const taskId = completion.taskId;
+        const dateStr = completion.completedDate;
+        if (!completionMap.has(taskId)) {
+          completionMap.set(taskId, new Set());
+        }
+        completionMap.get(taskId)!.add(dateStr);
+      }
 
-          // Create a map of task completions by taskId and date
-          const completionMap = new Map<string, Set<string>>();
-          for (const completion of completions) {
-            const taskId = completion.taskId;
-            const dateStr = completion.completedDate;
-            if (!completionMap.has(taskId)) {
-              completionMap.set(taskId, new Set());
-            }
-            completionMap.get(taskId)!.add(dateStr);
-          }
+      // Expand recurring tasks into individual instances
+      const taskEvents = expandRecurringTasks(
+        tasksWithSubtasks as Task[],
+        startDate,
+        endDate,
+        completionMap
+      );
 
-          // Expand recurring tasks into individual instances
-          const taskEvents = expandRecurringTasks(
-            tasksWithSubtasks as Task[],
-            startDate,
-            endDate,
-            completionMap
+      // If includeOverdue is true, add overdue tasks that were filtered out by expandRecurringTasks
+      let finalEvents = [...taskEvents];
+      if (includeOverdue === 'true') {
+        const overdueTasksFiltered = tasksWithSubtasks.filter((task) => {
+          if (!task.dueDate || task.recurringPattern) return false;
+          const taskDueDate = new Date(task.dueDate);
+          return taskDueDate < startDate;
+        });
+
+        // Add overdue tasks back to the results
+        for (const overdueTask of overdueTasksFiltered) {
+          finalEvents.push({
+            ...overdueTask,
+            space: overdueTask.space,
+            type: 'task' as const,
+            completed: false,
+            instanceDate: overdueTask.dueDate as string,
+            dueDate: new Date(overdueTask.dueDate as string),
+            priority: overdueTask.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
+            metadata: overdueTask.metadata || undefined
+          });
+        }
+      }
+
+      // Fetch external calendar events
+      const externalCalendarEvents: any[] = [];
+      try {
+        // Fetch user's enabled external calendars
+        const userCalendars = await db
+          .select()
+          .from(externalCalendars)
+          .where(
+            and(
+              eq(externalCalendars.userId, user.id),
+              eq(externalCalendars.enabled, true),
+              ...(space !== 'all' ? [eq(externalCalendars.space, space)] : [])
+            )
           );
 
-          // If includeOverdue is true, add overdue tasks that were filtered out by expandRecurringTasks
-          let finalEvents = [...taskEvents];
-          if (includeOverdue === 'true') {
-            const overdueTasksFiltered = tasksWithSubtasks.filter((task) => {
-              if (!task.dueDate || task.recurringPattern) return false;
-              const taskDueDate = new Date(task.dueDate);
-              return taskDueDate < startDate;
-            });
-
-            // Add overdue tasks back to the results
-            for (const overdueTask of overdueTasksFiltered) {
-              finalEvents.push({
-                ...overdueTask,
-                space: overdueTask.space,
-                type: 'task' as const,
-                completed: false,
-                instanceDate: overdueTask.dueDate as string,
-                dueDate: new Date(overdueTask.dueDate as string),
-                priority: overdueTask.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
-                metadata: overdueTask.metadata || undefined
-              });
-            }
-          }
-
-          // Fetch external calendar events
-          const externalCalendarEvents: any[] = [];
+        // Fetch and parse each calendar in parallel
+        const calendarPromises = userCalendars.map(async (calendar) => {
           try {
-            // Fetch user's enabled external calendars
-            const userCalendars = await db
-              .select()
-              .from(externalCalendars)
-              .where(
-                and(
-                  eq(externalCalendars.userId, user.id),
-                  eq(externalCalendars.enabled, true),
-                  ...(space !== 'all' ? [eq(externalCalendars.space, space)] : [])
-                )
-              );
-
-            // Fetch and parse each calendar in parallel
-            const calendarPromises = userCalendars.map(async (calendar) => {
-              try {
-                const icalData = await fetchAndParseIcal(calendar.icalUrl);
-                const events = convertIcalToEvents(
-                  icalData,
-                  startDate,
-                  endDate,
-                  calendar.id,
-                  calendar.name,
-                  calendar.color
-                );
-                return events;
-              } catch (error) {
-                logger.error(error, `Failed to fetch external calendar: ${calendar.name}`);
-                return []; // Return empty array on error, don't fail the whole request
-              }
-            });
-
-            const calendarResults = await Promise.all(calendarPromises);
-            externalCalendarEvents.push(...calendarResults.flat());
+            const icalData = await fetchAndParseIcal(calendar.icalUrl);
+            const events = convertIcalToEvents(
+              icalData,
+              startDate,
+              endDate,
+              calendar.id,
+              calendar.name,
+              calendar.color
+            );
+            return events;
           } catch (error) {
-            logger.error(error, 'Failed to fetch external calendars');
-            // Continue without external events if there's an error
+            logger.error(error, `Failed to fetch external calendar: ${calendar.name}`);
+            return []; // Return empty array on error, don't fail the whole request
           }
+        });
 
-          // Combine HamFlow events and external calendar events, then sort by date
-          const allEvents = [...finalEvents, ...externalCalendarEvents].toSorted((a, b) => {
-            const aDate = a.dueDate;
-            const bDate = b.dueDate;
-            if (!aDate || !bDate) return 0;
-            if (aDate instanceof Date && bDate instanceof Date) {
-              return aDate.getTime() - bDate.getTime();
-            }
-            return 0;
-          });
+        const calendarResults = await Promise.all(calendarPromises);
+        externalCalendarEvents.push(...calendarResults.flat());
+      } catch (error) {
+        logger.error(error, 'Failed to fetch external calendars');
+        // Continue without external events if there's an error
+      }
 
-          return allEvents;
-        },
-        {
-          query: t.Object({
-            start: t.String(),
-            end: t.String(),
-            space: t.Optional(
-              t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])
-            ),
-            includeOverdue: t.Optional(t.String())
-          })
+      // Combine HamFlow events and external calendar events, then sort by date
+      const allEvents = [...finalEvents, ...externalCalendarEvents].toSorted((a, b) => {
+        const aDate = a.dueDate;
+        const bDate = b.dueDate;
+        if (!aDate || !bDate) return 0;
+        if (aDate instanceof Date && bDate instanceof Date) {
+          return aDate.getTime() - bDate.getTime();
         }
-      )
+        return 0;
+      });
+
+      return allEvents;
+    },
+    {
+      query: t.Object({
+        start: t.String(),
+        end: t.String(),
+        space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])),
+        includeOverdue: t.Optional(t.String())
+      })
+    }
   );

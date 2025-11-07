@@ -22,6 +22,7 @@ import {
   useApplyAutoOrganize
 } from '../../../components/AutoOrganize/useAutoOrganize';
 import type { AutoOrganizeSuggestion } from '../../../shared/types/autoOrganize';
+import { api } from '../../../api/client';
 
 export default function BoardPage() {
   const pageContext = usePageContext();
@@ -43,11 +44,9 @@ export default function BoardPage() {
   const { data: board, isLoading: boardLoading } = useQuery<BoardWithColumns>({
     queryKey: ['board', boardId],
     queryFn: async () => {
-      const response = await fetch(`/api/boards/${boardId}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch board');
-      return response.json();
+      const { data, error } = await api.api.boards({ boardId }).get();
+      if (error) throw new Error('Failed to fetch board');
+      return data;
     }
   });
 
@@ -58,11 +57,9 @@ export default function BoardPage() {
       if (!board) return [];
 
       const tasksPromises = board.columns.map(async (column) => {
-        const response = await fetch(`/api/tasks/${column.id}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) return [];
-        return response.json();
+        const { data, error } = await api.api.tasks({ id: column.id }).get();
+        if (error) return [];
+        return data;
       });
 
       const tasksByColumn = await Promise.all(tasksPromises);
@@ -93,14 +90,10 @@ export default function BoardPage() {
 
   const handleCopySummary = async (columnId?: string) => {
     try {
-      const url = columnId
-        ? `/api/boards/${boardId}/summary?columnId=${columnId}`
-        : `/api/boards/${boardId}/summary`;
-      const response = await fetch(url, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch summary');
-      const data = await response.json();
+      const { data, error } = columnId
+        ? await api.api.boards({ boardId }).summary.get({ query: { columnId } })
+        : await api.api.boards({ boardId }).summary.get();
+      if (error) throw new Error('Failed to fetch summary');
 
       await navigator.clipboard.writeText(data.summary);
       toast?.('Summary copied to clipboard!', { type: 'success' });

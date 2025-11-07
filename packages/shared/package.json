@@ -1,0 +1,17 @@
+{
+  "name": "@hamflow/shared",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "catalog:",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  },
+  "private": true
+}

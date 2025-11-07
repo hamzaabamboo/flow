@@ -1,10 +1,35 @@
-import { Tabs } from 'expo-router'
-import { useTheme } from 'react-native-paper'
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import { SpaceSwitcher } from '@/components/SpaceSwitcher'
+import { Tabs, useRouter } from 'expo-router';
+import { View, StyleSheet } from 'react-native';
+import { useTheme, IconButton } from 'react-native-paper';
+import * as Haptics from 'expo-haptics';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { SpaceSwitcher } from '@/components/SpaceSwitcher';
+
+function HeaderActions() {
+  const router = useRouter();
+  const theme = useTheme();
+
+  const handleCommandPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/modal/command');
+  };
+
+  return (
+    <View style={styles.headerActions}>
+      <IconButton
+        icon="lightning-bolt"
+        size={24}
+        iconColor={theme.colors.primary}
+        onPress={handleCommandPress}
+        style={styles.commandButton}
+      />
+      <SpaceSwitcher />
+    </View>
+  );
+}
 
 export default function TabLayout() {
-  const theme = useTheme()
+  const theme = useTheme();
 
   return (
     <Tabs
@@ -12,13 +37,13 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.surface
         },
         headerStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.surface
         },
         headerTintColor: theme.colors.onSurface,
-        headerRight: () => <SpaceSwitcher />,
+        headerRight: () => <HeaderActions />
       }}
     >
       <Tabs.Screen
@@ -28,7 +53,17 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="calendar" size={size} color={color} />
           ),
-          tabBarLabel: 'Agenda',
+          tabBarLabel: 'Agenda'
+        }}
+      />
+      <Tabs.Screen
+        name="habits"
+        options={{
+          title: 'Habits',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="chart-donut" size={size} color={color} />
+          ),
+          tabBarLabel: 'Habits'
         }}
       />
       <Tabs.Screen
@@ -38,7 +73,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
           ),
-          tabBarLabel: 'Boards',
+          tabBarLabel: 'Boards'
         }}
       />
       <Tabs.Screen
@@ -48,7 +83,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="checkbox-marked-outline" size={size} color={color} />
           ),
-          tabBarLabel: 'Tasks',
+          tabBarLabel: 'Tasks'
         }}
       />
       <Tabs.Screen
@@ -58,9 +93,20 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="cog" size={size} color={color} />
           ),
-          tabBarLabel: 'Settings',
+          tabBarLabel: 'Settings'
         }}
       />
     </Tabs>
-  )
+  );
 }
+
+const styles = StyleSheet.create({
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4
+  },
+  commandButton: {
+    margin: 0
+  }
+});

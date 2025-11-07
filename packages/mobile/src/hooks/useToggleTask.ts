@@ -1,51 +1,48 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import * as Haptics from 'expo-haptics'
-import { getStoredAccessToken } from '@/store/authStore'
-import { API_URL } from '@/api/client'
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
+import { api } from '@/api/client';
+
+interface ToggleTaskParams {
+  taskId: string;
+  instanceDate?: string | Date;
+}
 
 export const useToggleTask = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (taskId: string) => {
-      const token = await getStoredAccessToken()
-      if (!token) throw new Error('Not authenticated')
-
+    mutationFn: async ({ taskId, instanceDate }: ToggleTaskParams) => {
       // First get the task to toggle its state
-      const getResponse = await fetch(`${API_URL}/api/tasks/${taskId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const { data: task, error: getError } = await api.api.tasks({ id: taskId }).get();
 
-      if (!getResponse.ok) throw new Error('Failed to get task')
+      if (getError) throw new Error('Failed to get task');
 
-      const task = await getResponse.json()
+      // Build payload
+      const payload: { completed: boolean; instanceDate?: string } = {
+        completed: !task.completed
+      };
+
+      // Add instanceDate if provided (for recurring tasks)
+      if (instanceDate) {
+        payload.instanceDate =
+          instanceDate instanceof Date ? instanceDate.toISOString().split('T')[0] : instanceDate;
+      }
 
       // Toggle completed state
-      const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          completed: !task.completed,
-        }),
-      })
+      const { data, error: patchError } = await api.api.tasks({ id: taskId }).patch(payload);
 
-      if (!response.ok) throw new Error('Failed to toggle task')
+      if (patchError) throw new Error('Failed to toggle task');
 
-      return response.json()
+      return data;
     },
     onSuccess: () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      queryClient.invalidateQueries({ queryKey: ['agenda'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
-      console.error('Failed to toggle task:', error)
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-    },
-  })
-}
+      console.error('Failed to toggle task:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  });
+};

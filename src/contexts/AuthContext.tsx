@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { User, AuthContextType } from '../shared/types/user';
+import type { User, AuthContextType } from '@hamflow/shared';
+import { api } from '../api/client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -17,18 +18,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryKey: ['auth', 'user'],
     queryFn: async () => {
       try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include'
-        });
+        const { data, error } = await api.api.auth.me.get();
 
-        if (!response.ok) {
-          if (response.status === 401) {
+        if (error) {
+          if (error.status === 401) {
             // Clear any stale cookies by attempting logout
             try {
-              await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include'
-              });
+              await api.api.auth.logout.post();
             } catch {
               // Ignore logout errors
             }
@@ -43,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Failed to fetch user');
         }
 
-        return response.json();
+        return data as User;
       } catch (error) {
         console.error('Auth check failed:', error);
         return null;
@@ -69,10 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async () => {
       try {
         // Call the logout endpoint
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include'
-        });
+        await api.api.auth.logout.post();
 
         // Clear client-side state
         queryClient.setQueryData(['auth', 'user'], null);

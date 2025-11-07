@@ -7,9 +7,7 @@ import { Text } from './ui/text';
 import { Box, VStack, HStack } from 'styled-system/jsx';
 import { createListCollection, Select } from './ui/select';
 import * as Dialog from './ui/styled/dialog';
-import type { Column } from '../shared/types';
-import type { CalendarEvent, ExtendedTask } from '../shared/types/calendar';
-import type { Task } from '../shared/types';
+import type { Column, CalendarEvent, ExtendedTask, Task } from '@hamflow/shared';
 
 interface MoveTaskDialogProps {
   open: boolean;

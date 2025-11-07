@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   TextInput,
@@ -8,52 +8,98 @@ import {
   Surface,
   useTheme,
   IconButton,
-  SegmentedButtons,
   Chip,
-  Divider
+  Divider,
+  Portal,
+  Dialog,
+  Paragraph
 } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
+import { useTaskDetail } from '@/hooks/useTaskDetail';
+import { useUpdateTask } from '@/hooks/useUpdateTask';
+import { useDeleteTask } from '@/hooks/useDeleteTask';
 
-const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
-const STATUS_OPTIONS = ['todo', 'in_progress', 'completed'];
+const PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
 
 export default function TaskDetailModal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const router = useRouter();
 
-  // Mock task data - replace with actual API call
-  const [task, setTask] = useState({
-    id,
-    title: 'Review Pull Request #123',
-    description: 'Review the authentication refactor PR and provide feedback',
-    priority: 'high',
-    status: 'in_progress',
-    dueDate: new Date(),
-    tags: ['Development', 'Code Review']
-  });
+  // Fetch real task data
+  const { data: task, isLoading, error } = useTaskDetail(id);
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Local state for editing
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [editedPriority, setEditedPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>(
+    'medium'
+  );
+  const [editedCompleted, setEditedCompleted] = useState(false);
+
+  // Initialize edit state when entering edit mode
+  const handleEditStart = () => {
+    if (task) {
+      setEditedTitle(task.title);
+      setEditedDescription(task.description || '');
+      setEditedPriority(task.priority || 'medium');
+      setEditedCompleted(task.completed);
+      setIsEditing(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
 
   const handleSave = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsEditing(false);
-    // TODO: Save to API
+    if (!task) return;
+
+    try {
+      await updateTask.mutateAsync({
+        taskId: task.id,
+        updates: {
+          title: editedTitle,
+          description: editedDescription || undefined,
+          priority: editedPriority,
+          completed: editedCompleted
+        }
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save task:', error);
+    }
   };
 
   const handleDelete = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    // TODO: Show confirmation dialog
-    // TODO: Delete from API
-    router.back();
+    if (!task) return;
+
+    try {
+      await deleteTask.mutateAsync(task.id);
+      setShowDeleteDialog(false);
+      router.back();
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+    }
   };
 
   const handleComplete = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTask({ ...task, status: 'completed' });
-    // TODO: Update API
+    if (!task) return;
+
+    try {
+      await updateTask.mutateAsync({
+        taskId: task.id,
+        updates: {
+          completed: !task.completed
+        }
+      });
+    } catch (error) {
+      console.error('Failed to toggle task completion:', error);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -70,6 +116,39 @@ export default function TaskDetailModal() {
         return theme.colors.surfaceVariant;
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.content, styles.centerContent]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="bodyLarge" style={{ marginTop: 16 }}>
+            Loading task...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state
+  if (error || !task) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.content, styles.centerContent]}>
+          <Text variant="headlineSmall" style={{ color: theme.colors.error, marginBottom: 8 }}>
+            Error Loading Task
+          </Text>
+          <Text variant="bodyMedium" style={{ marginBottom: 16, textAlign: 'center' }}>
+            {error?.message || 'Task not found'}
+          </Text>
+          <Button mode="contained" onPress={() => router.back()}>
+            Go Back
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -88,8 +167,12 @@ export default function TaskDetailModal() {
                 <IconButton
                   icon={isEditing ? 'close' : 'pencil'}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setIsEditing(!isEditing);
+                    if (isEditing) {
+                      setIsEditing(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } else {
+                      handleEditStart();
+                    }
                   }}
                 />
                 <IconButton icon="close" onPress={() => router.back()} />
@@ -100,8 +183,8 @@ export default function TaskDetailModal() {
             <TextInput
               mode="outlined"
               label="Title"
-              value={task.title}
-              onChangeText={(text) => setTask({ ...task, title: text })}
+              value={isEditing ? editedTitle : task.title}
+              onChangeText={setEditedTitle}
               style={styles.input}
               disabled={!isEditing}
             />
@@ -110,8 +193,8 @@ export default function TaskDetailModal() {
             <TextInput
               mode="outlined"
               label="Description"
-              value={task.description}
-              onChangeText={(text) => setTask({ ...task, description: text })}
+              value={isEditing ? editedDescription : task.description || ''}
+              onChangeText={setEditedDescription}
               multiline
               numberOfLines={4}
               style={styles.input}
@@ -126,27 +209,32 @@ export default function TaskDetailModal() {
                 Priority
               </Text>
               <View style={styles.priorityContainer}>
-                {PRIORITIES.map((priority) => (
-                  <Chip
-                    key={priority}
-                    selected={task.priority === priority}
-                    onPress={() => {
-                      if (isEditing) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setTask({ ...task, priority });
-                      }
-                    }}
-                    style={[
-                      styles.priorityChip,
-                      task.priority === priority && {
-                        backgroundColor: getPriorityColor(priority)
-                      }
-                    ]}
-                    disabled={!isEditing}
-                  >
-                    {priority}
-                  </Chip>
-                ))}
+                {PRIORITIES.map((priority) => {
+                  const currentPriority = isEditing ? editedPriority : task.priority;
+                  const isSelected = currentPriority === priority;
+
+                  return (
+                    <Chip
+                      key={priority}
+                      selected={isSelected}
+                      onPress={() => {
+                        if (isEditing) {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setEditedPriority(priority);
+                        }
+                      }}
+                      style={[
+                        styles.priorityChip,
+                        isSelected && {
+                          backgroundColor: getPriorityColor(priority)
+                        }
+                      ]}
+                      disabled={!isEditing}
+                    >
+                      {priority}
+                    </Chip>
+                  );
+                })}
               </View>
             </View>
 
@@ -157,63 +245,42 @@ export default function TaskDetailModal() {
               <Text variant="labelLarge" style={styles.sectionLabel}>
                 Status
               </Text>
-              <SegmentedButtons
-                value={task.status}
-                onValueChange={(value) => {
-                  if (isEditing) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setTask({ ...task, status: value });
-                  }
-                }}
-                buttons={[
-                  {
-                    value: 'todo',
-                    label: 'To Do',
-                    icon: 'circle-outline',
-                    disabled: !isEditing
-                  },
-                  {
-                    value: 'in_progress',
-                    label: 'In Progress',
-                    icon: 'progress-clock',
-                    disabled: !isEditing
-                  },
-                  {
-                    value: 'completed',
-                    label: 'Done',
-                    icon: 'check-circle',
-                    disabled: !isEditing
-                  }
-                ]}
-                style={styles.segmentedButtons}
-              />
+              <Text variant="bodyLarge">{task.completed ? 'Completed' : 'Not Completed'}</Text>
             </View>
 
             <Divider style={styles.divider} />
 
             {/* Due Date */}
-            <View style={styles.section}>
-              <Text variant="labelLarge" style={styles.sectionLabel}>
-                Due Date
-              </Text>
-              <Text variant="bodyLarge">{format(task.dueDate, 'PPP p')}</Text>
-            </View>
-
-            <Divider style={styles.divider} />
+            {task.dueDate && (
+              <>
+                <View style={styles.section}>
+                  <Text variant="labelLarge" style={styles.sectionLabel}>
+                    Due Date
+                  </Text>
+                  <Text variant="bodyLarge">{format(new Date(task.dueDate), 'PPP')}</Text>
+                </View>
+                <Divider style={styles.divider} />
+              </>
+            )}
 
             {/* Tags */}
-            <View style={styles.section}>
-              <Text variant="labelLarge" style={styles.sectionLabel}>
-                Tags
-              </Text>
-              <View style={styles.tagsContainer}>
-                {task.tags.map((tag, index) => (
-                  <Chip key={index} mode="outlined" style={styles.tag}>
-                    {tag}
-                  </Chip>
-                ))}
-              </View>
-            </View>
+            {task.labels && task.labels.length > 0 && (
+              <>
+                <View style={styles.section}>
+                  <Text variant="labelLarge" style={styles.sectionLabel}>
+                    Labels
+                  </Text>
+                  <View style={styles.tagsContainer}>
+                    {task.labels.map((label) => (
+                      <Chip key={label} mode="outlined" style={styles.tag}>
+                        {label}
+                      </Chip>
+                    ))}
+                  </View>
+                </View>
+                <Divider style={styles.divider} />
+              </>
+            )}
 
             {/* Action Buttons */}
             {isEditing ? (
@@ -223,16 +290,19 @@ export default function TaskDetailModal() {
                   onPress={handleSave}
                   style={styles.actionButton}
                   icon="content-save"
+                  loading={updateTask.isPending}
+                  disabled={updateTask.isPending || !editedTitle.trim()}
                 >
                   Save Changes
                 </Button>
                 <Button
                   mode="contained-tonal"
-                  onPress={handleDelete}
+                  onPress={() => setShowDeleteDialog(true)}
                   buttonColor={theme.colors.errorContainer}
                   textColor={theme.colors.error}
                   style={styles.actionButton}
                   icon="delete"
+                  disabled={deleteTask.isPending}
                 >
                   Delete Task
                 </Button>
@@ -244,15 +314,39 @@ export default function TaskDetailModal() {
                   onPress={handleComplete}
                   style={styles.actionButton}
                   icon="check"
-                  disabled={task.status === 'completed'}
+                  disabled={task.completed || updateTask.isPending}
+                  loading={updateTask.isPending}
                 >
-                  {task.status === 'completed' ? 'Completed' : 'Mark Complete'}
+                  {task.completed ? 'Completed' : 'Mark Complete'}
                 </Button>
               </View>
             )}
           </View>
         </ScrollView>
       </Surface>
+
+      {/* Delete Confirmation Dialog */}
+      <Portal>
+        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
+          <Dialog.Title>Delete Task</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
+            <Button
+              onPress={handleDelete}
+              textColor={theme.colors.error}
+              loading={deleteTask.isPending}
+              disabled={deleteTask.isPending}
+            >
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -269,6 +363,11 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   header: {
     flexDirection: 'row',

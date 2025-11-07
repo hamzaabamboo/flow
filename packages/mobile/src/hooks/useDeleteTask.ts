@@ -1,33 +1,24 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import * as Haptics from 'expo-haptics'
-import { getStoredAccessToken } from '@/store/authStore'
-import { API_URL } from '@/api/client'
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
+import { api } from '@/api/client';
 
 export const useDeleteTask = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const token = await getStoredAccessToken()
-      if (!token) throw new Error('Not authenticated')
+      const { error } = await api.api.tasks({ id: taskId }).delete();
 
-      const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) throw new Error('Failed to delete task')
+      if (error) throw new Error('Failed to delete task');
     },
     onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      queryClient.invalidateQueries({ queryKey: ['agenda'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['agenda'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
-      console.error('Failed to delete task:', error)
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-    },
-  })
-}
+      console.error('Failed to delete task:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  });
+};

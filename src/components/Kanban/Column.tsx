@@ -8,6 +8,7 @@ import { Badge } from '../ui/badge';
 import { TaskCard } from './TaskCard';
 import { VStack, HStack, Box } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
+import { api } from '../../api/client';
 
 interface ColumnProps {
   column: {
@@ -29,17 +30,13 @@ export function Column({ column, onDragStart, onDrop, boardId }: ColumnProps) {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          columnId: column.id,
-          userId: 'temp-user-id', // TODO: Get from auth
-          title
-        })
+      const { data, error } = await api.api.tasks.post({
+        columnId: column.id,
+        userId: 'temp-user-id', // TODO: Get from auth
+        title
       });
-      if (!response.ok) throw new Error('Failed to create task');
-      return response.json();
+      if (error) throw new Error('Failed to create task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });

@@ -13,7 +13,7 @@ export const HAMAUTH_CONFIG = {
   issuer: 'https://auth.ham-san.net/realms/ham-auth',
   clientId: 'ham-flow-mobile',
   // For mobile, we don't need client secret (PKCE is used instead)
-  scopes: ['openid', 'profile', 'email'],
+  scopes: ['openid', 'profile', 'email']
 };
 
 // OIDC Endpoints (derived from issuer)
@@ -21,7 +21,7 @@ export const OIDC_ENDPOINTS = {
   authorization: `${HAMAUTH_CONFIG.issuer}/protocol/openid-connect/auth`,
   token: `${HAMAUTH_CONFIG.issuer}/protocol/openid-connect/token`,
   userInfo: `${HAMAUTH_CONFIG.issuer}/protocol/openid-connect/userinfo`,
-  revocation: `${HAMAUTH_CONFIG.issuer}/protocol/openid-connect/revoke`,
+  revocation: `${HAMAUTH_CONFIG.issuer}/protocol/openid-connect/revoke`
 };
 
 export interface HamAuthUserInfo {
@@ -46,7 +46,7 @@ export interface HamAuthTokens {
 export const createDiscovery = (): AuthSession.DiscoveryDocument => ({
   authorizationEndpoint: OIDC_ENDPOINTS.authorization,
   tokenEndpoint: OIDC_ENDPOINTS.token,
-  revocationEndpoint: OIDC_ENDPOINTS.revocation,
+  revocationEndpoint: OIDC_ENDPOINTS.revocation
 });
 
 /**
@@ -54,9 +54,7 @@ export const createDiscovery = (): AuthSession.DiscoveryDocument => ({
  * @param redirectUri - The redirect URI (from expo-auth-session)
  * @returns Authentication result with tokens
  */
-export async function performOIDCLogin(
-  redirectUri: string
-): Promise<HamAuthTokens | null> {
+export async function performOIDCLogin(redirectUri: string): Promise<HamAuthTokens | null> {
   try {
     const discovery = createDiscovery();
 
@@ -66,7 +64,7 @@ export async function performOIDCLogin(
       scopes: HAMAUTH_CONFIG.scopes,
       redirectUri,
       usePKCE: true, // PKCE for mobile security
-      responseType: AuthSession.ResponseType.Code,
+      responseType: AuthSession.ResponseType.Code
     };
 
     const authRequest = new AuthSession.AuthRequest(authRequestConfig);
@@ -86,8 +84,8 @@ export async function performOIDCLogin(
         code: result.params.code,
         redirectUri,
         extraParams: {
-          code_verifier: authRequest.codeVerifier || '',
-        },
+          code_verifier: authRequest.codeVerifier || ''
+        }
       },
       discovery
     );
@@ -97,7 +95,7 @@ export async function performOIDCLogin(
       refreshToken: tokenResult.refreshToken,
       idToken: tokenResult.idToken,
       expiresIn: tokenResult.expiresIn,
-      tokenType: tokenResult.tokenType || 'Bearer',
+      tokenType: tokenResult.tokenType || 'Bearer'
     };
   } catch (error) {
     console.error('OIDC login error:', error);
@@ -110,14 +108,12 @@ export async function performOIDCLogin(
  * @param accessToken - The access token
  * @returns User information
  */
-export async function fetchUserInfo(
-  accessToken: string
-): Promise<HamAuthUserInfo | null> {
+export async function fetchUserInfo(accessToken: string): Promise<HamAuthUserInfo | null> {
   try {
     const response = await fetch(OIDC_ENDPOINTS.userInfo, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+        Authorization: `Bearer ${accessToken}`
+      }
     });
 
     if (!response.ok) {
@@ -144,16 +140,14 @@ export async function fetchUserInfo(
  * @param refreshToken - The refresh token
  * @returns New tokens
  */
-export async function refreshAccessToken(
-  refreshToken: string
-): Promise<HamAuthTokens | null> {
+export async function refreshAccessToken(refreshToken: string): Promise<HamAuthTokens | null> {
   try {
     const discovery = createDiscovery();
 
     const tokenResult = await AuthSession.refreshAsync(
       {
         clientId: HAMAUTH_CONFIG.clientId,
-        refreshToken,
+        refreshToken
       },
       discovery
     );
@@ -163,7 +157,7 @@ export async function refreshAccessToken(
       refreshToken: tokenResult.refreshToken,
       idToken: tokenResult.idToken,
       expiresIn: tokenResult.expiresIn,
-      tokenType: tokenResult.tokenType || 'Bearer',
+      tokenType: tokenResult.tokenType || 'Bearer'
     };
   } catch (error) {
     console.error('Error refreshing token:', error);
@@ -182,7 +176,7 @@ export async function revokeToken(token: string): Promise<boolean> {
     await AuthSession.revokeAsync(
       {
         clientId: HAMAUTH_CONFIG.clientId,
-        token,
+        token
       },
       discovery
     );

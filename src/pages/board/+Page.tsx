@@ -11,6 +11,7 @@ import { Heading } from '../../components/ui/heading';
 import { Badge } from '../../components/ui/badge';
 import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
 import type { Board as BoardInfo } from '~/shared/types/board';
+import { api } from '../../api/client';
 
 export default function BoardsListPage() {
   const { currentSpace } = useSpace();
@@ -22,28 +23,21 @@ export default function BoardsListPage() {
   const { data: boards, isLoading } = useQuery<BoardInfo[]>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${currentSpace}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch boards');
+      return data;
     }
   });
 
   // Create board mutation
   const createBoard = useMutation({
     mutationFn: async (name: string) => {
-      const response = await fetch('/api/boards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name,
-          space: currentSpace
-        })
+      const { data, error } = await api.api.boards.post({
+        name,
+        space: currentSpace
       });
-      if (!response.ok) throw new Error('Failed to create board');
-      return response.json();
+      if (error) throw new Error('Failed to create board');
+      return data;
     },
     onSuccess: (newBoard) => {
       queryClient.invalidateQueries({ queryKey: ['boards'] });

@@ -17,6 +17,7 @@ import type { BoardWithColumns } from '../../shared/types/board';
 import { Spinner } from '../../components/ui/spinner';
 import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
+import { api } from '../../api/client';
 
 const getSourceIcon = (source: string) => {
   switch (source) {
@@ -45,9 +46,9 @@ export default function InboxPage() {
   const { data: items, isLoading } = useQuery<InboxItem[]>({
     queryKey: ['inbox', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/inbox?space=${currentSpace}`);
-      if (!response.ok) throw new Error('Failed to fetch inbox items');
-      return response.json();
+      const { data, error } = await api.api.inbox.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch inbox items');
+      return data;
     }
   });
 
@@ -55,9 +56,9 @@ export default function InboxPage() {
   const { data: boards } = useQuery<BoardWithColumns[]>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${currentSpace}`);
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch boards');
+      return data;
     }
   });
 
@@ -74,13 +75,9 @@ export default function InboxPage() {
   // Convert to task mutation
   const convertToTask = useMutation({
     mutationFn: async ({ itemId, columnId }: { itemId: string; columnId: string }) => {
-      const response = await fetch('/api/inbox/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, columnId })
-      });
-      if (!response.ok) throw new Error('Failed to convert item');
-      return response.json();
+      const { data, error } = await api.api.inbox.convert.post({ itemId, columnId });
+      if (error) throw new Error('Failed to convert item');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });
@@ -96,13 +93,9 @@ export default function InboxPage() {
   // Delete items mutation
   const deleteItems = useMutation({
     mutationFn: async (itemIds: string[]) => {
-      const response = await fetch('/api/inbox/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds })
-      });
-      if (!response.ok) throw new Error('Failed to delete items');
-      return response.json();
+      const { data, error } = await api.api.inbox.delete.post({ itemIds });
+      if (error) throw new Error('Failed to delete items');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inbox', currentSpace] });

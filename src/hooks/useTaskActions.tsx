@@ -4,8 +4,8 @@ import { navigate } from 'vike/client/router';
 import { LayoutGrid } from 'lucide-react';
 import { useDialogs } from '../utils/useDialogs';
 import { useSpace } from '../contexts/SpaceContext';
-import type { CalendarEvent, ExtendedTask } from '../shared/types/calendar';
-import type { Task } from '../shared/types';
+import type { CalendarEvent, ExtendedTask, Task } from '@hamflow/shared';
+import { api } from '../api/client';
 
 interface UseTaskActionsOptions {
   onTaskEdit?: (task: CalendarEvent | ExtendedTask | Task) => void;
@@ -22,12 +22,9 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
   // Delete mutation
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to delete task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskId }).delete();
+      if (error) throw new Error('Failed to delete task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
@@ -41,12 +38,8 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
   const duplicateTaskMutation = useMutation({
     mutationFn: async (task: CalendarEvent | ExtendedTask | Task) => {
       // Fetch full task data
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch task');
-      const fullTask = await response.json();
+      const { data: fullTask, error: fetchError } = await api.api.tasks({ id: task.id }).get();
+      if (fetchError) throw new Error('Failed to fetch task');
 
       // Create duplicate
       const payload: Record<string, unknown> = {
@@ -67,14 +60,9 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
       }
       if (fullTask.link) payload.link = fullTask.link;
 
-      const duplicateResponse = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      });
-      if (!duplicateResponse.ok) throw new Error('Failed to duplicate task');
-      return duplicateResponse.json();
+      const { data, error } = await api.api.tasks.post(payload);
+      if (error) throw new Error('Failed to duplicate task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
@@ -87,14 +75,9 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
   // Move mutation
   const moveTaskMutation = useMutation({
     mutationFn: async ({ taskId, columnId }: { taskId: string; columnId: string }) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ columnId })
-      });
-      if (!response.ok) throw new Error('Failed to move task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskId }).patch({ columnId });
+      if (error) throw new Error('Failed to move task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });

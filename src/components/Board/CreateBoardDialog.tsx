@@ -10,6 +10,7 @@ import { Textarea } from '../ui/textarea';
 import { Text } from '../ui/text';
 import * as Dialog from '../ui/styled/dialog';
 import { Box, VStack, HStack } from 'styled-system/jsx';
+import { api } from '../../api/client';
 
 interface CreateBoardDialogProps {
   open: boolean;
@@ -38,18 +39,13 @@ export function CreateBoardDialog({ open, onOpenChange, onSuccess }: CreateBoard
 
   const createBoard = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/boards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || undefined,
-          space: currentSpace
-        })
+      const { data, error } = await api.api.boards.post({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        space: currentSpace
       });
-      if (!response.ok) throw new Error('Failed to create board');
-      return response.json();
+      if (error) throw new Error('Failed to create board');
+      return data;
     },
     onSuccess: (newBoard) => {
       queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });

@@ -24,6 +24,7 @@ import type { BoardWithColumns, Task, Column } from '../../shared/types';
 import { TaskDialog } from './TaskDialog';
 import { KanbanColumn } from './KanbanColumn';
 import { Box, HStack, VStack } from 'styled-system/jsx';
+import { api } from '../../api/client';
 
 interface KanbanBoardProps {
   board: BoardWithColumns;
@@ -79,25 +80,18 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   const { data: allBoards = [] } = useQuery<BoardWithColumns[]>({
     queryKey: ['boards', board.space],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${board.space}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: board.space } });
+      if (error) throw new Error('Failed to fetch boards');
+      return data;
     }
   });
 
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error('Failed to create task');
-      return response.json();
+      const { data: result, error } = await api.api.tasks.post(data);
+      if (error) throw new Error('Failed to create task');
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
@@ -110,14 +104,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<Task> }) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates)
-      });
-      if (!response.ok) throw new Error('Failed to update task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskId }).patch(updates);
+      if (error) throw new Error('Failed to update task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
@@ -130,12 +119,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Delete task mutation
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to delete task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskId }).delete();
+      if (error) throw new Error('Failed to delete task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
@@ -146,22 +132,17 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Duplicate task mutation
   const duplicateTaskMutation = useMutation({
     mutationFn: async (task: Task) => {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          columnId: task.columnId,
-          title: `${task.title} (Copy)`,
-          description: task.description,
-          priority: task.priority,
-          dueDate: task.dueDate,
-          labels: task.labels,
-          subtasks: task.subtasks?.map((st) => ({ title: st.title, completed: false }))
-        })
+      const { data, error } = await api.api.tasks.post({
+        columnId: task.columnId,
+        title: `${task.title} (Copy)`,
+        description: task.description,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        labels: task.labels,
+        subtasks: task.subtasks?.map((st) => ({ title: st.title, completed: false }))
       });
-      if (!response.ok) throw new Error('Failed to duplicate task');
-      return response.json();
+      if (error) throw new Error('Failed to duplicate task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
@@ -173,14 +154,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Move task mutation
   const moveTaskMutation = useMutation({
     mutationFn: async ({ taskId, columnId }: { taskId: string; columnId: string }) => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ columnId })
-      });
-      if (!response.ok) throw new Error('Failed to move task');
-      return response.json();
+      const { data, error } = await api.api.tasks({ id: taskId }).patch({ columnId });
+      if (error) throw new Error('Failed to move task');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', board.id] });
@@ -195,14 +171,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Create column mutation
   const createColumnMutation = useMutation({
     mutationFn: async (name: string) => {
-      const response = await fetch('/api/columns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ boardId: board.id, name })
-      });
-      if (!response.ok) throw new Error('Failed to create column');
-      return response.json();
+      const { data, error } = await api.api.columns.post({ boardId: board.id, name });
+      if (error) throw new Error('Failed to create column');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });
@@ -214,14 +185,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Update column mutation
   const updateColumnMutation = useMutation({
     mutationFn: async ({ columnId, updates }: { columnId: string; updates: Partial<Column> }) => {
-      const response = await fetch(`/api/columns/${columnId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates)
-      });
-      if (!response.ok) throw new Error('Failed to update column');
-      return response.json();
+      const { data, error } = await api.api.columns({ columnId }).patch(updates);
+      if (error) throw new Error('Failed to update column');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });
@@ -231,15 +197,11 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Delete column mutation
   const deleteColumnMutation = useMutation({
     mutationFn: async (columnId: string) => {
-      const response = await fetch(`/api/columns/${columnId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to delete column');
+      const { data, error } = await api.api.columns({ columnId }).delete();
+      if (error) {
+        throw new Error(error.value || 'Failed to delete column');
       }
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });
@@ -256,14 +218,12 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Reorder columns mutation (currently unused but kept for future column reordering feature)
   const _reorderColumnsMutation = useMutation({
     mutationFn: async (columnOrder: string[]) => {
-      const response = await fetch('/api/columns/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ boardId: board.id, columnOrder })
+      const { data, error } = await api.api.columns.reorder.post({
+        boardId: board.id,
+        columnOrder
       });
-      if (!response.ok) throw new Error('Failed to reorder columns');
-      return response.json();
+      if (error) throw new Error('Failed to reorder columns');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });
@@ -273,14 +233,9 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   // Task reorder mutation
   const reorderTasksMutation = useMutation({
     mutationFn: async ({ columnId, taskIds }: { columnId: string; taskIds: string[] }) => {
-      const response = await fetch('/api/tasks/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ columnId, taskIds })
-      });
-      if (!response.ok) throw new Error('Failed to reorder tasks');
-      return response.json();
+      const { data, error } = await api.api.tasks.reorder.post({ columnId, taskIds });
+      if (error) throw new Error('Failed to reorder tasks');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', board.id] });

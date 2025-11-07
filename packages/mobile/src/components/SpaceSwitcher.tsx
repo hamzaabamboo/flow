@@ -1,24 +1,24 @@
-import { StyleSheet, Pressable } from 'react-native'
-import { Text, useTheme } from 'react-native-paper'
-import { useSpaceStore } from '@/store/spaceStore'
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import * as Haptics from 'expo-haptics'
+import { StyleSheet, Pressable } from 'react-native';
+import { useTheme } from 'react-native-paper';
+import { useSpaceStore } from '@/store/spaceStore';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import * as Haptics from 'expo-haptics';
 
 export const SpaceSwitcher = () => {
-  const theme = useTheme()
-  const { currentSpace, setSpace } = useSpaceStore()
+  const theme = useTheme();
+  const { currentSpace, setSpace } = useSpaceStore();
 
   const handleToggle = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    setSpace(currentSpace === 'work' ? 'personal' : 'work')
-  }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSpace(currentSpace === 'work' ? 'personal' : 'work');
+  };
 
   return (
     <Pressable
       style={[
         styles.button,
         {
-          backgroundColor: theme.colors.primary,
+          backgroundColor: theme.colors.primary
         }
       ]}
       onPress={handleToggle}
@@ -29,8 +29,8 @@ export const SpaceSwitcher = () => {
         color="#000"
       />
     </Pressable>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   button: {
@@ -44,6 +44,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 2,
-  },
-})
+    elevation: 2
+  }
+});

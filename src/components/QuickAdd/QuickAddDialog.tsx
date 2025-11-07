@@ -11,6 +11,7 @@ import { Spinner } from '../ui/spinner';
 import { Dialog } from '../ui/dialog';
 import { TaskDialog } from '../Board/TaskDialog';
 import { HStack, VStack, Box } from 'styled-system/jsx';
+import { api } from '../../api/client';
 
 interface QuickAddDialogProps {
   open: boolean;
@@ -60,18 +61,12 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     setIsParsing(true);
 
     try {
-      const response = await fetch('/api/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          command: `Add task: ${input}`,
-          space: currentSpace
-        })
+      const { data: result, error } = await api.api.command.post({
+        command: `Add task: ${input}`,
+        space: currentSpace
       });
 
-      if (response.ok) {
-        const result = await response.json();
-
+      if (!error && result) {
         // Extract parsed data from command response
         if (result.action === 'create_task' || result.action === 'create_inbox_item') {
           // Calculate smart defaults
@@ -167,14 +162,9 @@ export function QuickAddDialog({ open, onOpenChange }: QuickAddDialogProps) {
     };
 
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(taskData)
-      });
+      const { error } = await api.api.tasks.post(taskData);
 
-      if (response.ok) {
+      if (!error) {
         toast?.('Task created successfully!', { type: 'success' });
         queryClient.invalidateQueries({ queryKey: ['tasks', currentSpace] });
         queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });

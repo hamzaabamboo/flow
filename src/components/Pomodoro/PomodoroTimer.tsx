@@ -8,6 +8,7 @@ import { Badge } from '../ui/badge';
 import { IconButton } from '../ui/icon-button';
 import { Box, HStack } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
+import { api } from '../../api/client';
 
 const TIMERS = {
   work: 25 * 60, // 25 minutes
@@ -127,11 +128,9 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   const { data: serverState } = useQuery<ActivePomodoroState | null>({
     queryKey: ['pomodoro', 'active'],
     queryFn: async () => {
-      const response = await fetch('/api/pomodoro/active', {
-        credentials: 'include'
-      });
-      if (!response.ok) return null;
-      return response.json();
+      const { data, error } = await api.api.pomodoro.active.get();
+      if (error) return null;
+      return data;
     },
     // Disable polling - rely on local timer and WebSocket for updates
     refetchInterval: false,
@@ -160,14 +159,9 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   // Update server state
   const updateStateMutation = useMutation({
     mutationFn: async (state: ActivePomodoroState) => {
-      const response = await fetch('/api/pomodoro/active', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(state)
-      });
-      if (!response.ok) throw new Error('Failed to update state');
-      return response.json();
+      const { data, error } = await api.api.pomodoro.active.post(state);
+      if (error) throw new Error('Failed to update state');
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pomodoro', 'active'] });
@@ -177,18 +171,13 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   // Save completed session
   const saveSessionMutation = useMutation({
     mutationFn: async (session: PomodoroSession) => {
-      const response = await fetch('/api/pomodoro', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          taskId: session.taskId,
-          duration: Math.floor(session.duration / 60),
-          startTime: new Date().toISOString()
-        })
+      const { data, error } = await api.api.pomodoro.post({
+        taskId: session.taskId,
+        duration: Math.floor(session.duration / 60),
+        startTime: new Date().toISOString()
       });
-      if (!response.ok) throw new Error('Failed to save session');
-      return response.json();
+      if (error) throw new Error('Failed to save session');
+      return data;
     }
   });
 
