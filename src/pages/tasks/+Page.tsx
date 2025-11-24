@@ -89,6 +89,27 @@ export default function TasksPage() {
     }
   });
 
+  // Bulk complete mutation for hobby tasks
+  const bulkCompleteMutation = useMutation({
+    mutationFn: async (taskIds: string[]) => {
+      const response = await fetch('/api/tasks/bulk-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ taskIds, completed: true })
+      });
+      if (!response.ok) throw new Error('Failed to bulk complete tasks');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks', currentSpace] });
+      alert(`Successfully marked ${data.updated.length} hobby tasks as done!`);
+    },
+    onError: (error) => {
+      alert(`Failed to mark hobby tasks as done: ${error.message}`);
+    }
+  });
+
   // Priority weights for sorting
   const priorityWeight: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
 
@@ -157,6 +178,31 @@ export default function TasksPage() {
     },
     {} as Record<string, ExtendedTask[]>
   );
+
+  // Filter active hobby tasks (tasks with "hobby" label that are not completed)
+  const activeHobbyTasks = allTasks.filter(
+    (task) =>
+      task.labels &&
+      Array.isArray(task.labels) &&
+      task.labels.includes('hobby') &&
+      !isTaskCompleted(task)
+  );
+
+  const handleMarkAllHobbyAsDone = () => {
+    if (activeHobbyTasks.length === 0) {
+      alert('No active hobby tasks found!');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to mark ${activeHobbyTasks.length} hobby task(s) as done?`
+    );
+
+    if (confirmed) {
+      const taskIds = activeHobbyTasks.map((task) => task.id);
+      bulkCompleteMutation.mutate(taskIds);
+    }
+  };
 
   const handleTaskSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -404,6 +450,19 @@ export default function TasksPage() {
                     Boards
                   </Button>
                 </HStack>
+
+                {/* Bulk Actions */}
+                {activeHobbyTasks.length > 0 && (
+                  <Button
+                    variant="solid"
+                    colorPalette="green"
+                    onClick={handleMarkAllHobbyAsDone}
+                    size="sm"
+                    loading={bulkCompleteMutation.isPending}
+                  >
+                    Mark all hobby as done ({activeHobbyTasks.length})
+                  </Button>
+                )}
               </HStack>
             </HStack>
           </Box>

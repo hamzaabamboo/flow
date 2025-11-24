@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { and, eq, isNotNull, inArray, gte, lte } from 'drizzle-orm';
+import { and, eq, isNotNull, inArray, gte, lte, sql } from 'drizzle-orm';
 import ical, { ICalEventStatus, ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
 import { db } from '../db';
 import {
@@ -273,7 +273,13 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .get(
     '/events',
     async ({ query, db, user }) => {
-      const { start, end, space = 'all', includeOverdue = 'false' } = query;
+      const {
+        start,
+        end,
+        space = 'all',
+        includeOverdue = 'false',
+        includeNoDueDate = 'false'
+      } = query;
 
       // Convert UNIX timestamps (seconds) to Date objects
       const startDate = new Date(parseInt(start) * 1000);
@@ -415,6 +421,58 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       const uniqueRecurringTasks = recurringTasks.filter((t) => !existingTaskIds.has(t.id));
 
       allTasks = [...allTasks, ...uniqueRecurringTasks];
+
+      // If includeNoDueDate is true, fetch tasks without due dates
+      if (includeNoDueDate === 'true') {
+        const noDueDateConditions = [eq(tasks.userId, user.id), sql`${tasks.dueDate} IS NULL`];
+        if (space !== 'all') {
+          noDueDateConditions.push(eq(boards.space, space as 'work' | 'personal'));
+        }
+
+        const noDueDateQueryBuilder = db
+          .select({
+            id: tasks.id,
+            columnId: tasks.columnId,
+            userId: tasks.userId,
+            title: tasks.title,
+            description: tasks.description,
+            dueDate: tasks.dueDate,
+            priority: tasks.priority,
+            noteId: tasks.noteId,
+            labels: tasks.labels,
+            recurringPattern: tasks.recurringPattern,
+            recurringEndDate: tasks.recurringEndDate,
+            parentTaskId: tasks.parentTaskId,
+            metadata: tasks.metadata,
+            createdAt: tasks.createdAt,
+            updatedAt: tasks.updatedAt,
+            space: boards.space,
+            boardId: boards.id,
+            boardName: boards.name,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .leftJoin(boards, eq(columns.boardId, boards.id))
+          .where(and(...noDueDateConditions));
+
+        const noDueDateTasks = await noDueDateQueryBuilder;
+
+        // Filter out completed tasks (in "Done" column) unless they're recurring
+        const filteredNoDueDateTasks = noDueDateTasks.filter((task) => {
+          const isNotDone = task.columnName?.toLowerCase() !== 'done';
+          const isRecurring = !!task.recurringPattern;
+          return isNotDone || isRecurring;
+        });
+
+        // Merge with existing tasks, avoiding duplicates
+        const currentTaskIds = new Set(allTasks.map((t) => t.id));
+        const uniqueNoDueDateTasks = filteredNoDueDateTasks.filter(
+          (t) => !currentTaskIds.has(t.id)
+        );
+
+        allTasks = [...allTasks, ...uniqueNoDueDateTasks];
+      }
 
       // Fetch subtasks separately for the fetched tasks
       const taskIds = allTasks.map((t) => t.id);
@@ -563,7 +621,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         start: t.String(),
         end: t.String(),
         space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])),
-        includeOverdue: t.Optional(t.String())
+        includeOverdue: t.Optional(t.String()),
+        includeNoDueDate: t.Optional(t.String())
       })
     }
   );

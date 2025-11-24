@@ -410,6 +410,96 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     }
   )
   .post(
+    '/bulk-complete',
+    async ({ body, db, user }) => {
+      const { taskIds, completed = true } = body;
+
+      if (!taskIds || taskIds.length === 0) {
+        return { success: false, message: 'No task IDs provided', updated: [] };
+      }
+
+      const targetColumnName = completed ? 'Done' : 'In Progress';
+
+      // Process tasks in parallel using Promise.all
+      const results = await Promise.all(
+        taskIds.map(async (taskId) => {
+          try {
+            // Get the current task
+            const [currentTask] = await db
+              .select()
+              .from(tasks)
+              .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
+
+            if (!currentTask) {
+              console.warn(`Task ${taskId} not found or not owned by user`);
+              return null;
+            }
+
+            // Get the current column to find the board
+            const [currentColumn] = await db
+              .select()
+              .from(columns)
+              .where(eq(columns.id, currentTask.columnId));
+
+            if (!currentColumn) {
+              console.warn(`Column ${currentTask.columnId} not found for task ${taskId}`);
+              return null;
+            }
+
+            const boardId = currentColumn.boardId;
+
+            // Find the target column
+            const [targetColumn] = await db
+              .select()
+              .from(columns)
+              .where(and(eq(columns.boardId, boardId), eq(columns.name, targetColumnName)));
+
+            if (!targetColumn) {
+              console.warn(`${targetColumnName} column not found in board ${boardId}`);
+              return null;
+            }
+
+            // Update the task
+            const [updated] = await db
+              .update(tasks)
+              .set({
+                columnId: targetColumn.id,
+                updatedAt: new Date()
+              })
+              .where(eq(tasks.id, taskId))
+              .returning();
+
+            // Broadcast task update
+            wsManager.broadcastTaskUpdate(updated.id, updated.columnId, 'updated');
+
+            return updated;
+          } catch (error) {
+            console.error(`Error updating task ${taskId}:`, error);
+            return null;
+          }
+        })
+      );
+
+      const updatedTasks = results.filter((task) => task !== null);
+
+      return {
+        success: true,
+        message: `Successfully updated ${updatedTasks.length} of ${taskIds.length} tasks`,
+        updated: updatedTasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          columnId: task.columnId
+        }))
+      };
+    },
+    {
+      body: t.Object({
+        taskIds: t.Array(t.String()),
+        completed: t.Optional(t.Boolean())
+      })
+    }
+  )
+  .post(
     '/reorder',
     async ({ body, db, user }) => {
       const { columnId, taskIds } = body;

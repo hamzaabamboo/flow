@@ -53,6 +53,7 @@ export default function AgendaPage() {
   );
   const [autoOrganizeSummary, setAutoOrganizeSummary] = useState<string>('');
   const [totalTasksAnalyzed, setTotalTasksAnalyzed] = useState<number>(0);
+  const [showUnscheduled, setShowUnscheduled] = useState(false);
 
   const autoOrganizeMutation = useAutoOrganize();
   const applyAutoOrganizeMutation = useApplyAutoOrganize();
@@ -76,7 +77,7 @@ export default function AgendaPage() {
     isLoading: isLoadingEvents,
     isError: isErrorEvents
   } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace],
+    queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace, showUnscheduled],
     queryFn: async () => {
       let start: Date, end: Date;
 
@@ -106,7 +107,8 @@ export default function AgendaPage() {
           start: startUnix.toString(),
           end: endUnix.toString(),
           space: currentSpace,
-          ...(viewMode === 'day' ? { includeOverdue: 'true' } : {})
+          ...(viewMode === 'day' ? { includeOverdue: 'true' } : {}),
+          ...(showUnscheduled ? { includeNoDueDate: 'true' } : {})
         }
       });
       if (error) throw new Error('Failed to fetch events');
@@ -412,6 +414,24 @@ export default function AgendaPage() {
     return overdue;
   }, [events, viewMode]);
 
+  // Separate unscheduled tasks (tasks without due dates)
+  const unscheduledTasks = useMemo(() => {
+    if (!events || !showUnscheduled) {
+      return [];
+    }
+
+    const unscheduled: CalendarEvent[] = [];
+
+    events.forEach((event) => {
+      // Include tasks that don't have a due date and aren't completed
+      if (!event.dueDate && !isTaskCompleted(event)) {
+        unscheduled.push(event);
+      }
+    });
+
+    return unscheduled;
+  }, [events, showUnscheduled]);
+
   const groupedEvents = useMemo(() => {
     const grouped: Record<string, CalendarEvent[]> = {};
 
@@ -524,6 +544,21 @@ export default function AgendaPage() {
             </VStack>
 
             <HStack gap="2" justifyContent={{ base: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
+              {/* Show Unscheduled Toggle */}
+              {viewMode === 'day' && (
+                <Button
+                  variant={showUnscheduled ? 'solid' : 'outline'}
+                  colorPalette={showUnscheduled ? 'blue' : 'gray'}
+                  size={{ base: 'xs', sm: 'sm' }}
+                  onClick={() => setShowUnscheduled(!showUnscheduled)}
+                >
+                  <Box display={{ base: 'none', sm: 'block' }}>
+                    {showUnscheduled ? 'Hide' : 'Show'} Unscheduled
+                  </Box>
+                  <Box display={{ base: 'block', sm: 'none' }}>Unscheduled</Box>
+                </Button>
+              )}
+
               {/* Auto Organize Button */}
               <Button
                 variant="outline"
@@ -703,6 +738,74 @@ export default function AgendaPage() {
                   onCreateCopy={handleCreateCopy}
                   extraActions={taskActions.extraActions}
                 />
+
+                {/* Unscheduled Tasks */}
+                {showUnscheduled && unscheduledTasks.length > 0 && (
+                  <Box
+                    borderColor="border.default"
+                    borderRadius="lg"
+                    borderWidth="1px"
+                    w="full"
+                    p="4"
+                    bg="bg.muted"
+                  >
+                    <VStack gap="3" alignItems="stretch">
+                      <HStack justifyContent="space-between" alignItems="center">
+                        <Heading size="md">Unscheduled Tasks ({unscheduledTasks.length})</Heading>
+                        <Text color="fg.muted" fontSize="sm">
+                          Tasks without due dates
+                        </Text>
+                      </HStack>
+                      <VStack gap="2" alignItems="stretch">
+                        {unscheduledTasks.map((event) => (
+                          <Box
+                            key={event.id}
+                            borderColor="border.default"
+                            borderRadius="md"
+                            borderWidth="1px"
+                            p="3"
+                            bg="bg.default"
+                            _hover={{ bg: 'bg.subtle' }}
+                            cursor="pointer"
+                            onClick={() => taskActions.handleEdit(event)}
+                          >
+                            <HStack justifyContent="space-between">
+                              <VStack gap="1" alignItems="start" flex="1">
+                                <Text fontWeight="medium">{event.title}</Text>
+                                {event.description && (
+                                  <Text color="fg.muted" fontSize="sm">
+                                    {event.description}
+                                  </Text>
+                                )}
+                              </VStack>
+                              <HStack gap="1">
+                                {event.priority && (
+                                  <Text
+                                    fontSize="xs"
+                                    px="2"
+                                    py="1"
+                                    borderRadius="sm"
+                                    bg={
+                                      event.priority === 'urgent'
+                                        ? 'red.subtle'
+                                        : event.priority === 'high'
+                                          ? 'orange.subtle'
+                                          : event.priority === 'medium'
+                                            ? 'yellow.subtle'
+                                            : 'gray.subtle'
+                                    }
+                                  >
+                                    {event.priority}
+                                  </Text>
+                                )}
+                              </HStack>
+                            </HStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    </VStack>
+                  </Box>
+                )}
               </VStack>
             </Box>
 

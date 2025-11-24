@@ -11,7 +11,8 @@ import {
   LogOut,
   CheckSquare,
   Settings,
-  X
+  X,
+  BarChart3
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useSpace } from '../../contexts/SpaceContext';
@@ -36,7 +37,8 @@ const navItems: SidebarNavItem[] = [
   { label: 'Boards', href: '/boards', icon: LayoutGrid },
   { label: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
   { label: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'inbox' },
-  { label: 'Habits', href: '/habits', icon: Target }
+  { label: 'Habits', href: '/habits', icon: Target },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3 }
 ];
 
 interface SidebarContentProps {

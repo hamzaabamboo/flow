@@ -92,7 +92,7 @@ class AgendaWidgetProvider : AppWidgetProvider() {
             }.start()
         }
 
-        private fun fetchTodaysTasks(context: Context): List<Task> {
+        internal fun fetchTodaysTasks(context: Context): List<Task> {
             // Get stored API token and server URL from SharedPreferences
             val prefs = context.getSharedPreferences("hamflow_prefs", Context.MODE_PRIVATE)
             val token = prefs.getString("api_token", null) ?: return emptyList()

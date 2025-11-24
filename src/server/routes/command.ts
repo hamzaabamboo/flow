@@ -119,10 +119,43 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             .replace(/^```\s*/, '')
             .replace(/```\s*$/, '')
             .trim();
-          intent = JSON.parse(cleanedText) as z.infer<typeof CommandIntentSchema>;
+
+          try {
+            intent = JSON.parse(cleanedText) as z.infer<typeof CommandIntentSchema>;
+
+            // Validate that required fields are present for the action
+            if (intent.action === 'create_task' && !intent.title) {
+              console.warn(
+                'Command parsing: create_task action missing title, using command as fallback'
+              );
+              intent.title = command;
+            }
+            if (intent.action === 'create_inbox_item' && !intent.content) {
+              console.warn(
+                'Command parsing: create_inbox_item action missing content, using command as fallback'
+              );
+              intent.content = command;
+            }
+            if (intent.action === 'create_reminder' && !intent.message) {
+              console.warn(
+                'Command parsing: create_reminder action missing message, using command as fallback'
+              );
+              intent.message = command;
+            }
+          } catch (parseError) {
+            console.error('Command parsing: JSON parse failed', {
+              error: parseError,
+              rawText: result.text,
+              cleanedText,
+              command
+            });
+            // Fall through to return inbox item
+            intent = null;
+          }
         }
 
         if (!intent || intent.action === 'unknown') {
+          console.log('Command parsing: Unknown action or failed to parse', { command, intent });
           return {
             action: 'create_inbox_item',
             data: { title: command },

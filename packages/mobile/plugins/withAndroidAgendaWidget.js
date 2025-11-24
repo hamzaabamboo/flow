@@ -84,6 +84,7 @@ function withAndroidAgendaWidget(config) {
     async (config) => {
       await createWidgetFiles(config.modRequest.projectRoot)
       await copyWidgetKotlinFiles(config.modRequest.projectRoot)
+      await addWidgetStrings(config.modRequest.projectRoot)
       return config
     },
   ])
@@ -241,6 +242,40 @@ async function createWidgetFiles(projectRoot) {
   )
 
   console.log('✅ Android widget files created successfully')
+}
+
+async function addWidgetStrings(projectRoot) {
+  const stringsPath = path.join(
+    projectRoot,
+    'android',
+    'app',
+    'src',
+    'main',
+    'res',
+    'values',
+    'strings.xml'
+  )
+
+  if (!fs.existsSync(stringsPath)) {
+    console.warn('⚠️  strings.xml not found, skipping string addition')
+    return
+  }
+
+  let stringsContent = fs.readFileSync(stringsPath, 'utf-8')
+
+  // Check if the string already exists
+  if (stringsContent.includes('agenda_widget_description')) {
+    console.log('✅ Widget strings already exist')
+    return
+  }
+
+  // Add the widget description string before the closing </resources> tag
+  const widgetString =
+    '  <string name="agenda_widget_description">View your daily tasks and agenda at a glance</string>\n'
+  stringsContent = stringsContent.replace('</resources>', `${widgetString}</resources>`)
+
+  fs.writeFileSync(stringsPath, stringsContent)
+  console.log('✅ Widget strings added successfully')
 }
 
 module.exports = createRunOncePlugin(

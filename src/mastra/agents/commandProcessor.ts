@@ -125,6 +125,15 @@ Output: { "action": "start_pomodoro" }
 Input: "Add fix bug to Done column"
 Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column-id>", "boardId": "<board-id>", "directToBoard": true }
 
+Input: "Practice guitar for hobby project"
+Output: { "action": "create_task", "title": "Practice guitar", "description": "For hobby project", "labels": ["hobby"], "priority": "medium" }
+
+Input: "Buy art supplies #hobby #shopping"
+Output: { "action": "create_task", "title": "Buy art supplies", "labels": ["hobby", "shopping"], "priority": "medium" }
+
+Input: "Work on side project tomorrow"
+Output: { "action": "create_task", "title": "Work on side project", "labels": ["hobby"], "priority": "medium", "deadline": "<tomorrow-date>T00:00:00+09:00" }
+
 ## Rules
 
 1. Extract the action enum that best matches user intent
@@ -230,7 +239,13 @@ Output: { "action": "create_task", "title": "fix bug", "columnId": "<done-column
      * Default to "To Do" column if only board is mentioned
      * If no board mentioned, leave unset (goes to inbox)
    - **Description**: Extract additional context from the input as description
-   - **Labels**: Extract any obvious tags or categories (e.g., "bug", "feature", "docs")
+   - **Labels**: Extract any obvious tags or categories. Common labels include:
+     * **Work**: "bug", "feature", "docs", "meeting", "review", "deployment", "testing"
+     * **Personal**: "hobby", "shopping", "health", "home", "family"
+     * **Priority**: "urgent", "important"
+     * Look for hashtags or explicit labels: "buy milk #shopping" → labels: ["shopping"]
+     * Look for keywords that indicate categories: "fix auth bug for hobby project" → labels: ["bug", "hobby"]
+     * If user explicitly mentions a label/tag/category, always include it
 4. **For reminders with time expressions**:
    - Parse relative times ("in 30 minutes", "in 2 hours", "tomorrow", "next Friday")
    - Calculate the actual ISO 8601 datetime with JST timezone
