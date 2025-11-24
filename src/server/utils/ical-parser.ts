@@ -21,11 +21,25 @@ interface ICalEvent {
   [key: string]: unknown;
 }
 
+// In-memory cache for iCal feeds
+// Cache TTL: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
+const icalCache = new Map<string, { data: Record<string, ICalEvent>; timestamp: number }>();
+
 /**
- * Fetch and parse an iCal feed from a URL
+ * Fetch and parse an iCal feed from a URL (with in-memory caching)
  */
 export async function fetchAndParseIcal(url: string): Promise<Record<string, ICalEvent>> {
   try {
+    // Check cache first
+    const cached = icalCache.get(url);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < CACHE_TTL) {
+      logger.debug(`Using cached iCal data for ${url}`);
+      return cached.data;
+    }
+
     // Fetch the .ics file
     const response = await fetch(url, {
       headers: {
@@ -41,6 +55,14 @@ export async function fetchAndParseIcal(url: string): Promise<Record<string, ICa
 
     // Parse using node-ical
     const parsed = ical.parseICS(icsData);
+
+    // Cache the result
+    icalCache.set(url, {
+      data: parsed as Record<string, ICalEvent>,
+      timestamp: now
+    });
+
+    logger.debug(`Fetched and cached iCal data for ${url}`);
 
     return parsed as Record<string, ICalEvent>;
   } catch (error) {

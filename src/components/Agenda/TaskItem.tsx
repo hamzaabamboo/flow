@@ -49,11 +49,12 @@ export function TaskItem({
   onCreateCopy?: (event: CalendarEvent) => void;
 }) {
   // Check if task is overdue (has due date in the past and not completed)
+  // External calendar events should never be marked as overdue
   const now = new Date();
   const completed = isTaskCompleted(event);
-  const isOverdue = event.dueDate && new Date(event.dueDate) < now && !completed;
-  const [showCarryOver, setShowCarryOver] = useState(false);
   const isExternal = event.type === 'external';
+  const isOverdue = event.dueDate && new Date(event.dueDate) < now && !completed && !isExternal;
+  const [showCarryOver, setShowCarryOver] = useState(false);
 
   return (
     <>

@@ -6,6 +6,43 @@
 
 Moving towards Phase 4 - Advanced Features & Integrations
 
+## Latest Updates (2025-11-24)
+
+### ✅ Completed This Session - UX Improvements & Redis Caching 🚀
+
+- **External Calendar Events Fix** - No longer show as overdue
+  - Modified `src/components/Agenda/TaskItem.tsx` to exclude external events from overdue check
+  - External calendar events in the past now display normally without overdue styling
+  - Improves clarity for synced calendar events
+
+- **In-Memory Caching for External Calendars** ⚡
+  - Updated `src/server/utils/ical-parser.ts` with in-memory cache
+  - 5-minute TTL for iCal feeds
+  - Reduces redundant API calls to external calendar services
+  - **Performance improvement** for calendar fetching
+
+- **Upcoming & Unscheduled Tasks Combined** 📋
+  - Removed "Show Unscheduled" toggle button - tasks always visible
+  - Combined upcoming and unscheduled tasks into single "Upcoming & Unscheduled" section
+  - **Upcoming**: Tasks with future due dates (after today)
+  - **Unscheduled**: Tasks without due dates
+  - Sorted intelligently: unscheduled first, then upcoming by date
+  - Due dates displayed inline with task title (📅 MMM d format)
+  - Improved task visibility and planning
+
+- **Complete All Habits Button** 🔥
+  - Added "Complete All" button to Daily Habits card header
+  - One-click completion for all incomplete habits
+  - Button only shows when there are incomplete habits
+  - Located in `src/components/Agenda/HabitsCard.tsx`
+  - Wired up in `src/pages/index/+Page.tsx`
+
+- **Android Build Setup** 📱
+  - Fixed widget string resources and Kotlin visibility issues
+  - Updated Expo config plugin to auto-inject required resources
+  - Modified GitHub Actions workflow to manual-only triggers
+  - Ready for CI/CD builds
+
 ## Latest Updates (2025-10-30)
 
 ### ✅ Completed This Session - Auto Organize Feature 🎯

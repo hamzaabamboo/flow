@@ -53,7 +53,6 @@ export default function AgendaPage() {
   );
   const [autoOrganizeSummary, setAutoOrganizeSummary] = useState<string>('');
   const [totalTasksAnalyzed, setTotalTasksAnalyzed] = useState<number>(0);
-  const [showUnscheduled, setShowUnscheduled] = useState(false);
 
   const autoOrganizeMutation = useAutoOrganize();
   const applyAutoOrganizeMutation = useApplyAutoOrganize();
@@ -77,7 +76,7 @@ export default function AgendaPage() {
     isLoading: isLoadingEvents,
     isError: isErrorEvents
   } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace, showUnscheduled],
+    queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace],
     queryFn: async () => {
       let start: Date, end: Date;
 
@@ -108,7 +107,7 @@ export default function AgendaPage() {
           end: endUnix.toString(),
           space: currentSpace,
           ...(viewMode === 'day' ? { includeOverdue: 'true' } : {}),
-          ...(showUnscheduled ? { includeNoDueDate: 'true' } : {})
+          includeNoDueDate: 'true'
         }
       });
       if (error) throw new Error('Failed to fetch events');
@@ -414,23 +413,41 @@ export default function AgendaPage() {
     return overdue;
   }, [events, viewMode]);
 
-  // Separate unscheduled tasks (tasks without due dates)
-  const unscheduledTasks = useMemo(() => {
-    if (!events || !showUnscheduled) {
+  // Separate unscheduled and upcoming tasks
+  const unscheduledAndUpcomingTasks = useMemo(() => {
+    if (!events) {
       return [];
     }
 
-    const unscheduled: CalendarEvent[] = [];
+    const tasks: CalendarEvent[] = [];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
 
     events.forEach((event) => {
-      // Include tasks that don't have a due date and aren't completed
-      if (!event.dueDate && !isTaskCompleted(event)) {
-        unscheduled.push(event);
+      // Skip completed tasks
+      if (isTaskCompleted(event)) return;
+
+      // Include unscheduled tasks (no due date)
+      if (!event.dueDate) {
+        tasks.push({ ...event, isUpcoming: false });
+        return;
+      }
+
+      // Include upcoming tasks (due date after today)
+      const dueDate = new Date(event.dueDate);
+      if (dueDate > today) {
+        tasks.push({ ...event, isUpcoming: true });
       }
     });
 
-    return unscheduled;
-  }, [events, showUnscheduled]);
+    // Sort: unscheduled first, then upcoming by due date
+    return tasks.toSorted((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return -1;
+      if (!b.dueDate) return 1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+  }, [events]);
 
   const groupedEvents = useMemo(() => {
     const grouped: Record<string, CalendarEvent[]> = {};
@@ -544,21 +561,6 @@ export default function AgendaPage() {
             </VStack>
 
             <HStack gap="2" justifyContent={{ base: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
-              {/* Show Unscheduled Toggle */}
-              {viewMode === 'day' && (
-                <Button
-                  variant={showUnscheduled ? 'solid' : 'outline'}
-                  colorPalette={showUnscheduled ? 'blue' : 'gray'}
-                  size={{ base: 'xs', sm: 'sm' }}
-                  onClick={() => setShowUnscheduled(!showUnscheduled)}
-                >
-                  <Box display={{ base: 'none', sm: 'block' }}>
-                    {showUnscheduled ? 'Hide' : 'Show'} Unscheduled
-                  </Box>
-                  <Box display={{ base: 'block', sm: 'none' }}>Unscheduled</Box>
-                </Button>
-              )}
-
               {/* Auto Organize Button */}
               <Button
                 variant="outline"
@@ -702,6 +704,18 @@ export default function AgendaPage() {
                     completed: !habit.completedToday
                   })
                 }
+                onCompleteAll={() => {
+                  // Complete all incomplete habits
+                  habits
+                    ?.filter((habit) => !habit.completedToday)
+                    .forEach((habit) => {
+                      toggleHabitMutation.mutate({
+                        habitId: habit.id,
+                        date: selectedDate,
+                        completed: true
+                      });
+                    });
+                }}
               />
             </Box>
 
@@ -739,8 +753,8 @@ export default function AgendaPage() {
                   extraActions={taskActions.extraActions}
                 />
 
-                {/* Unscheduled Tasks */}
-                {showUnscheduled && unscheduledTasks.length > 0 && (
+                {/* Unscheduled & Upcoming Tasks */}
+                {unscheduledAndUpcomingTasks.length > 0 && (
                   <Box
                     borderColor="border.default"
                     borderRadius="lg"
@@ -751,13 +765,15 @@ export default function AgendaPage() {
                   >
                     <VStack gap="3" alignItems="stretch">
                       <HStack justifyContent="space-between" alignItems="center">
-                        <Heading size="md">Unscheduled Tasks ({unscheduledTasks.length})</Heading>
+                        <Heading size="md">
+                          Upcoming & Unscheduled ({unscheduledAndUpcomingTasks.length})
+                        </Heading>
                         <Text color="fg.muted" fontSize="sm">
-                          Tasks without due dates
+                          Future tasks & tasks without due dates
                         </Text>
                       </HStack>
                       <VStack gap="2" alignItems="stretch">
-                        {unscheduledTasks.map((event) => (
+                        {unscheduledAndUpcomingTasks.map((event) => (
                           <Box
                             key={event.id}
                             borderColor="border.default"
@@ -771,7 +787,14 @@ export default function AgendaPage() {
                           >
                             <HStack justifyContent="space-between">
                               <VStack gap="1" alignItems="start" flex="1">
-                                <Text fontWeight="medium">{event.title}</Text>
+                                <HStack gap="2">
+                                  <Text fontWeight="medium">{event.title}</Text>
+                                  {event.dueDate && (
+                                    <Text fontSize="xs" color="blue.fg" fontWeight="medium">
+                                      📅 {format(new Date(event.dueDate), 'MMM d')}
+                                    </Text>
+                                  )}
+                                </HStack>
                                 {event.description && (
                                   <Text color="fg.muted" fontSize="sm">
                                     {event.description}

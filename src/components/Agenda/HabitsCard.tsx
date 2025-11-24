@@ -1,8 +1,9 @@
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, CheckCheck } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { Text } from '../ui/text';
 import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import type { Habit } from '../../shared/types/calendar';
 import { Center, HStack, VStack } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
@@ -12,13 +13,30 @@ interface HabitsCardProps {
   isLoading: boolean;
   isError: boolean;
   onToggleHabit: (habit: Habit) => void;
+  onCompleteAll?: () => void;
 }
 
-export function HabitsCard({ habits, isLoading, isError, onToggleHabit }: HabitsCardProps) {
+export function HabitsCard({
+  habits,
+  isLoading,
+  isError,
+  onToggleHabit,
+  onCompleteAll
+}: HabitsCardProps) {
+  const hasIncompleteHabits = habits?.some((h) => !h.completedToday) ?? false;
+
   return (
     <Card.Root w="full" h="full">
       <Card.Header p="3">
-        <Card.Title fontSize="sm">Daily Habits</Card.Title>
+        <HStack justifyContent="space-between" alignItems="center">
+          <Card.Title fontSize="sm">Daily Habits</Card.Title>
+          {onCompleteAll && hasIncompleteHabits && !isLoading && !isError && (
+            <Button size="xs" variant="ghost" onClick={onCompleteAll}>
+              <CheckCheck width="14" height="14" />
+              Complete All
+            </Button>
+          )}
+        </HStack>
       </Card.Header>
       <Card.Body p="3" pt="0">
         {isLoading ? (
