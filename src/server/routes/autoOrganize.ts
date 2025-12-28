@@ -220,7 +220,7 @@ For each suggestion:
 Focus on changes that will have the most positive impact on productivity.`;
 
         // Call AI agent for suggestions
-        const result = await autoOrganizer.generate(
+        const result = await autoOrganizer.generate<typeof AutoOrganizeOutputSchema>(
           [
             {
               role: 'user',
@@ -228,25 +228,13 @@ Focus on changes that will have the most positive impact on productivity.`;
             }
           ],
           {
-            providerOptions: {
-              google: {
-                structuredOutputs: true
-              }
+            structuredOutput: {
+              schema: AutoOrganizeOutputSchema
             }
           }
         );
 
-        // Parse AI response
-        let output: z.infer<typeof AutoOrganizeOutputSchema> | null = null;
-        if (result.text) {
-          // Strip markdown code blocks if present (defensive)
-          const cleanedText = result.text
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/, '')
-            .replace(/```\s*$/, '')
-            .trim();
-          output = JSON.parse(cleanedText) as z.infer<typeof AutoOrganizeOutputSchema>;
-        }
+        const output = result.object;
 
         if (!output) {
           return {

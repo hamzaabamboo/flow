@@ -54,7 +54,7 @@
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/static": "^1.4.6",
     "@expo/config-plugins": "^54.0.2",
-    "@mastra/core": "^0.23.3",
+    "@mastra/core": "^0.24.9",
     "@sinclair/typebox": "^0.34.41",
     "@touch4it/ical-timezones": "^1.9.0",
     "ai": "^5.0.87",
