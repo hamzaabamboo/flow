@@ -3,8 +3,7 @@ import type { z } from 'zod';
 import { eq, and, inArray } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { inboxItems, reminders, boards, columns, tasks } from '../../../drizzle/schema';
-import type { CommandIntentSchema } from '../../mastra/agents/commandProcessor';
-import { commandProcessor } from '../../mastra/agents/commandProcessor';
+import { CommandIntentSchema, commandProcessor } from '../../mastra/agents/commandProcessor';
 import { jstToUtc, nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
@@ -94,7 +93,7 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             'Use this conversation history to understand follow-up commands. For example, if the user says "change it to tomorrow" or "make it high priority", refer to the most recent command.';
         }
 
-        const result = await commandProcessor.generate(
+        const result = await commandProcessor.generate<typeof CommandIntentSchema>(
           [
             {
               role: 'user',
@@ -102,57 +101,13 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             }
           ],
           {
-            providerOptions: {
-              google: {
-                structuredOutputs: true
-              }
+            structuredOutput: {
+              schema: CommandIntentSchema
             }
           }
         );
 
-        // AI returns structured output via Zod schema
-        let intent: z.infer<typeof CommandIntentSchema> | null = null;
-        if (result.text) {
-          // Strip markdown code blocks if present (defensive)
-          const cleanedText = result.text
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/, '')
-            .replace(/```\s*$/, '')
-            .trim();
-
-          try {
-            intent = JSON.parse(cleanedText) as z.infer<typeof CommandIntentSchema>;
-
-            // Validate that required fields are present for the action
-            if (intent.action === 'create_task' && !intent.title) {
-              console.warn(
-                'Command parsing: create_task action missing title, using command as fallback'
-              );
-              intent.title = command;
-            }
-            if (intent.action === 'create_inbox_item' && !intent.content) {
-              console.warn(
-                'Command parsing: create_inbox_item action missing content, using command as fallback'
-              );
-              intent.content = command;
-            }
-            if (intent.action === 'create_reminder' && !intent.message) {
-              console.warn(
-                'Command parsing: create_reminder action missing message, using command as fallback'
-              );
-              intent.message = command;
-            }
-          } catch (parseError) {
-            console.error('Command parsing: JSON parse failed', {
-              error: parseError,
-              rawText: result.text,
-              cleanedText,
-              command
-            });
-            // Fall through to return inbox item
-            intent = null;
-          }
-        }
+        const intent = result.object;
 
         if (!intent || intent.action === 'unknown') {
           console.log('Command parsing: Unknown action or failed to parse', { command, intent });
@@ -162,6 +117,26 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             description:
               'Could not understand command. Will be added to inbox for manual processing.'
           };
+        }
+
+        // Validate that required fields are present for the action
+        if (intent.action === 'create_task' && !intent.title) {
+          console.warn(
+            'Command parsing: create_task action missing title, using command as fallback'
+          );
+          intent.title = command;
+        }
+        if (intent.action === 'create_inbox_item' && !intent.content) {
+          console.warn(
+            'Command parsing: create_inbox_item action missing content, using command as fallback'
+          );
+          intent.content = command;
+        }
+        if (intent.action === 'create_reminder' && !intent.message) {
+          console.warn(
+            'Command parsing: create_reminder action missing message, using command as fallback'
+          );
+          intent.message = command;
         }
 
         // Build response based on action
