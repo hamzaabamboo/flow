@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import * as Card from '../../components/ui/styled/card';
 import { Text } from '../../components/ui/text';
-import { CreateBoardDialog } from '../../components/Board/CreateBoardDialog';
+import { BoardDialog } from '../../components/Board/BoardDialog';
 import { VStack, HStack, Box } from 'styled-system/jsx';
 import type { BoardInfo } from '~/shared/types/board';
 import { Heading } from '~/components/ui/heading';
@@ -61,7 +61,7 @@ export default function HomePage() {
 
   return (
     <>
-      <CreateBoardDialog
+      <BoardDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSuccess={(boardId) => void navigate(`/board/${boardId}`)}

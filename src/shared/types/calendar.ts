@@ -28,6 +28,7 @@ export interface CalendarEvent {
   externalCalendarName?: string;
   externalCalendarColor?: string; // Park UI color token
   isExternal?: boolean; // Helper flag
+  isUpcoming?: boolean; // Helper flag for agenda view
 }
 
 export interface ExtendedTask {

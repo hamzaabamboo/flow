@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { and, eq, isNotNull, inArray, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, inArray, gte, lte, gt, sql } from 'drizzle-orm';
 import ical, { ICalEventStatus, ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
 import { db } from '../db';
 import {
@@ -278,7 +278,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         end,
         space = 'all',
         includeOverdue = 'false',
-        includeNoDueDate = 'false'
+        includeNoDueDate = 'false',
+        includeUpcoming = 'false'
       } = query;
 
       // Convert UNIX timestamps (seconds) to Date objects
@@ -326,60 +327,6 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       }
 
       let allTasks = await queryBuilder.where(and(...whereConditions));
-
-      // If includeOverdue is true, fetch overdue incomplete tasks separately
-      if (includeOverdue === 'true') {
-        const overdueConditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
-        if (space !== 'all') {
-          overdueConditions.push(eq(boards.space, space));
-        }
-
-        const overdueQueryBuilder = db
-          .select({
-            id: tasks.id,
-            columnId: tasks.columnId,
-            userId: tasks.userId,
-            title: tasks.title,
-            description: tasks.description,
-            dueDate: tasks.dueDate,
-            priority: tasks.priority,
-            noteId: tasks.noteId,
-            labels: tasks.labels,
-            recurringPattern: tasks.recurringPattern,
-            recurringEndDate: tasks.recurringEndDate,
-            parentTaskId: tasks.parentTaskId,
-            metadata: tasks.metadata,
-            createdAt: tasks.createdAt,
-            updatedAt: tasks.updatedAt,
-            space: boards.space,
-            boardId: boards.id,
-            boardName: boards.name,
-            columnName: columns.name
-          })
-          .from(tasks)
-          .leftJoin(columns, eq(tasks.columnId, columns.id))
-          .leftJoin(boards, eq(columns.boardId, boards.id))
-          .where(and(...overdueConditions));
-
-        const overdueTasks = await overdueQueryBuilder;
-
-        // Filter overdue tasks: due date < start date AND (not in Done column OR is recurring)
-        const filteredOverdueTasks = overdueTasks.filter((task) => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          const isOverdue = dueDate < startDate;
-          const isNotDone = task.columnName?.toLowerCase() !== 'done';
-          const isRecurring = !!task.recurringPattern;
-          // Include if: (overdue AND not done) OR (overdue AND recurring)
-          return isOverdue && (isNotDone || isRecurring);
-        });
-
-        // Merge with main tasks, avoiding duplicates
-        const mainTaskIds = new Set(allTasks.map((t) => t.id));
-        const uniqueOverdueTasks = filteredOverdueTasks.filter((t) => !mainTaskIds.has(t.id));
-
-        allTasks = [...allTasks, ...uniqueOverdueTasks];
-      }
 
       // Fetch recurring tasks without dueDates (so they can still appear in calendar)
       const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
@@ -480,8 +427,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
         : [];
 
-      // Manually attach subtasks to their parent tasks and normalize types
-      const tasksWithSubtasks = allTasks.map((task) => ({
+      // Helper to format tasks
+      const formatTask = (task: any) => ({
         ...task,
         description: task.description ?? undefined,
         dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
@@ -505,23 +452,31 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             createdAt: st.createdAt.toISOString(),
             updatedAt: st.updatedAt.toISOString()
           }))
-      }));
+      });
 
-      // Fetch all task completions for the user's tasks in the date range
-      const completions = await db
+      const tasksWithSubtasks = allTasks.map(formatTask);
+
+      // Fetch completions for the main window
+      const mainCompletions = await db
         .select()
         .from(taskCompletions)
         .where(
           and(
             eq(taskCompletions.userId, user.id),
-            gte(taskCompletions.completedDate, startDate.toISOString().split('T')[0]),
-            lte(taskCompletions.completedDate, endDate.toISOString().split('T')[0])
+            // Expand range slightly to catch edge cases
+            gte(
+              taskCompletions.completedDate,
+              new Date(startDate.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            ),
+            lte(
+              taskCompletions.completedDate,
+              new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            )
           )
         );
 
-      // Create a map of task completions by taskId and date
       const completionMap = new Map<string, Set<string>>();
-      for (const completion of completions) {
+      for (const completion of mainCompletions) {
         const taskId = completion.taskId;
         const dateStr = completion.completedDate;
         if (!completionMap.has(taskId)) {
@@ -538,34 +493,243 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         completionMap
       );
 
-      // If includeOverdue is true, add overdue tasks that were filtered out by expandRecurringTasks
       let finalEvents = [...taskEvents];
+
+      // --- HANDLE OVERDUE TASKS ---
       if (includeOverdue === 'true') {
-        const overdueTasksFiltered = tasksWithSubtasks.filter((task) => {
+        const overdueConditions = [eq(tasks.userId, user.id), isNotNull(tasks.dueDate)];
+        if (space !== 'all') {
+          overdueConditions.push(eq(boards.space, space));
+        }
+
+        const overdueTasksRaw = await db
+          .select({
+            id: tasks.id,
+            columnId: tasks.columnId,
+            userId: tasks.userId,
+            title: tasks.title,
+            description: tasks.description,
+            dueDate: tasks.dueDate,
+            priority: tasks.priority,
+            noteId: tasks.noteId,
+            labels: tasks.labels,
+            recurringPattern: tasks.recurringPattern,
+            recurringEndDate: tasks.recurringEndDate,
+            parentTaskId: tasks.parentTaskId,
+            metadata: tasks.metadata,
+            createdAt: tasks.createdAt,
+            updatedAt: tasks.updatedAt,
+            space: boards.space,
+            boardId: boards.id,
+            boardName: boards.name,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .leftJoin(boards, eq(columns.boardId, boards.id))
+          .where(and(...overdueConditions));
+
+        // 1. NON-RECURRING OVERDUE
+        const overdueNonRecurring = overdueTasksRaw.filter((task) => {
           if (!task.dueDate || task.recurringPattern) return false;
-          const taskDueDate = new Date(task.dueDate);
-          return taskDueDate < startDate;
+          const isNotDone = task.columnName?.toLowerCase() !== 'done';
+          const isPast = new Date(task.dueDate) < startDate;
+          return isPast && isNotDone;
         });
 
-        // Add overdue tasks back to the results
-        for (const overdueTask of overdueTasksFiltered) {
-          finalEvents.push({
-            ...overdueTask,
-            space: overdueTask.space,
-            type: 'task' as const,
-            completed: false,
-            instanceDate: overdueTask.dueDate as string,
-            dueDate: new Date(overdueTask.dueDate as string),
-            priority: overdueTask.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
-            metadata: overdueTask.metadata || undefined
+        // Add non-recurring overdue
+        for (const t of overdueNonRecurring) {
+          // Avoid duplicates
+          if (!finalEvents.find((e) => e.id === t.id)) {
+            finalEvents.push({
+              ...formatTask(t),
+              space: t.space as 'work' | 'personal',
+              type: 'task' as const,
+              completed: false,
+              instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
+              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+            });
+          }
+        }
+
+        // 2. RECURRING OVERDUE
+        const overdueRecurring = overdueTasksRaw.filter((task) => !!task.recurringPattern);
+
+        if (overdueRecurring.length > 0) {
+          // Lookback 30 days max for performance
+          const lookbackStart = new Date(startDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+          // Fetch completion data for this lookback period
+          const overdueCompletions = await db
+            .select()
+            .from(taskCompletions)
+            .where(
+              and(
+                eq(taskCompletions.userId, user.id),
+                gte(taskCompletions.completedDate, lookbackStart.toISOString().split('T')[0]),
+                lte(taskCompletions.completedDate, startDate.toISOString().split('T')[0])
+              )
+            );
+
+          const overdueCompletionMap = new Map<string, Set<string>>();
+          for (const completion of overdueCompletions) {
+            const taskId = completion.taskId;
+            const dateStr = completion.completedDate;
+            if (!overdueCompletionMap.has(taskId)) {
+              overdueCompletionMap.set(taskId, new Set());
+            }
+            overdueCompletionMap.get(taskId)!.add(dateStr);
+          }
+
+          const overdueFormatted = overdueRecurring.map(formatTask);
+
+          // Expand instances from lookbackStart to startDate (exclusive)
+          // We'll treat startDate as the "end" for expansion, so we get strictly past tasks
+          const overdueInstances = expandRecurringTasks(
+            overdueFormatted as Task[],
+            lookbackStart,
+            startDate, // End is exclusive effectively in our logic check below
+            overdueCompletionMap
+          );
+
+          // Filter to keep only those strictly BEFORE startDate and NOT completed
+          const actualOverdueInstances = overdueInstances.filter((inst) => {
+            if (!inst.dueDate) return false;
+            // Must be strictly past
+            if (inst.dueDate >= startDate) return false;
+            // Must not be completed
+            if (inst.completed) return false;
+            return true;
           });
+
+          finalEvents.push(...actualOverdueInstances);
         }
       }
 
-      // Fetch external calendar events
+      // --- HANDLE UPCOMING TASKS ---
+      if (includeUpcoming === 'true') {
+        const upcomingEndDate = new Date(endDate.getTime() + 14 * 24 * 60 * 60 * 1000); // +14 days
+
+        const upcomingConditions = [
+          eq(tasks.userId, user.id),
+          isNotNull(tasks.dueDate),
+          gt(tasks.dueDate, endDate),
+          lte(tasks.dueDate, upcomingEndDate)
+        ];
+        if (space !== 'all') {
+          upcomingConditions.push(eq(boards.space, space));
+        }
+
+        const upcomingTasksRaw = await db
+          .select({
+            id: tasks.id,
+            columnId: tasks.columnId,
+            userId: tasks.userId,
+            title: tasks.title,
+            description: tasks.description,
+            dueDate: tasks.dueDate,
+            priority: tasks.priority,
+            noteId: tasks.noteId,
+            labels: tasks.labels,
+            recurringPattern: tasks.recurringPattern,
+            recurringEndDate: tasks.recurringEndDate,
+            parentTaskId: tasks.parentTaskId,
+            metadata: tasks.metadata,
+            createdAt: tasks.createdAt,
+            updatedAt: tasks.updatedAt,
+            space: boards.space,
+            boardId: boards.id,
+            boardName: boards.name,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .leftJoin(boards, eq(columns.boardId, boards.id))
+          .where(and(...upcomingConditions));
+
+        // 1. NON-RECURRING UPCOMING
+        const upcomingNonRecurring = upcomingTasksRaw.filter((task) => {
+          if (!task.dueDate || task.recurringPattern) return false;
+          // Only show if not done
+          return task.columnName?.toLowerCase() !== 'done';
+        });
+
+        for (const t of upcomingNonRecurring) {
+          if (!finalEvents.find((e) => e.id === t.id)) {
+            finalEvents.push({
+              ...formatTask(t),
+              space: t.space as 'work' | 'personal',
+              type: 'task' as const,
+              completed: false,
+              instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
+              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+            });
+          }
+        }
+
+        // 2. RECURRING UPCOMING
+        // We need to fetch recurring tasks that MIGHT occur in this upcoming window
+        const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
+        if (space !== 'all') recurringConditions.push(eq(boards.space, space));
+
+        const possibleRecurringTasks = await db
+          .select({
+            id: tasks.id,
+            columnId: tasks.columnId,
+            userId: tasks.userId,
+            title: tasks.title,
+            description: tasks.description,
+            dueDate: tasks.dueDate,
+            priority: tasks.priority,
+            noteId: tasks.noteId,
+            labels: tasks.labels,
+            recurringPattern: tasks.recurringPattern,
+            recurringEndDate: tasks.recurringEndDate,
+            parentTaskId: tasks.parentTaskId,
+            metadata: tasks.metadata,
+            createdAt: tasks.createdAt,
+            updatedAt: tasks.updatedAt,
+            space: boards.space,
+            boardId: boards.id,
+            boardName: boards.name,
+            columnName: columns.name
+          })
+          .from(tasks)
+          .leftJoin(columns, eq(tasks.columnId, columns.id))
+          .leftJoin(boards, eq(columns.boardId, boards.id))
+          .where(and(...recurringConditions));
+
+        const formattedRecurring = possibleRecurringTasks.map(formatTask);
+        // We won't check completions for upcoming - assumption: future tasks are usually not complete yet.
+        // But if needed we could. Let's pass empty map for efficiency.
+
+        const upcomingInstances = expandRecurringTasks(
+          formattedRecurring as Task[],
+          endDate, // Start expansion from end of main period
+          upcomingEndDate,
+          new Map() // No completions check for future
+        ).filter((inst) => {
+          // Must be strictly after endDate
+          return inst.dueDate && inst.dueDate > endDate;
+        });
+
+        // Deduplicate: Only take the FIRST instance for each task ID
+        const seenRecurringIds = new Set<string>();
+        for (const inst of upcomingInstances) {
+          if (!seenRecurringIds.has(inst.id)) {
+            seenRecurringIds.add(inst.id);
+            finalEvents.push(inst);
+          }
+        }
+      }
+
+      // Fetch external calendar events (unchanged logic, skipping for brevity of diff but implied kept if not touched)
+      // NOTE: The previous code block handling external calendars is preserved if we don't overwrite it.
+      // But verify_file returned lines 1-629. I need to make sure I don't lose the external calendar part.
+      // I will include it to be safe.
+
       const externalCalendarEvents: any[] = [];
       try {
-        // Fetch user's enabled external calendars
         const userCalendars = await db
           .select()
           .from(externalCalendars)
@@ -577,14 +741,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             )
           );
 
-        // Fetch and parse each calendar in parallel
         const calendarPromises = userCalendars.map(async (calendar) => {
           try {
             const icalData = await fetchAndParseIcal(calendar.icalUrl);
             const events = convertIcalToEvents(
               icalData,
               startDate,
-              endDate,
+              endDate, // External events usually only needed for main view?
+              // If user wants upcoming external events too, we'd need to expand window.
+              // For now, let's keep it to the main view window to match previous behavior unless requested.
               calendar.id,
               calendar.name,
               calendar.color
@@ -592,7 +757,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
             return events;
           } catch (error) {
             logger.error(error, `Failed to fetch external calendar: ${calendar.name}`);
-            return []; // Return empty array on error, don't fail the whole request
+            return [];
           }
         });
 
@@ -600,18 +765,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         externalCalendarEvents.push(...calendarResults.flat());
       } catch (error) {
         logger.error(error, 'Failed to fetch external calendars');
-        // Continue without external events if there's an error
       }
 
       // Combine HamFlow events and external calendar events, then sort by date
       const allEvents = [...finalEvents, ...externalCalendarEvents].toSorted((a, b) => {
-        const aDate = a.dueDate;
-        const bDate = b.dueDate;
+        const aDate = a.dueDate ? new Date(a.dueDate) : null;
+        const bDate = b.dueDate ? new Date(b.dueDate) : null;
+
         if (!aDate || !bDate) return 0;
-        if (aDate instanceof Date && bDate instanceof Date) {
-          return aDate.getTime() - bDate.getTime();
-        }
-        return 0;
+        return aDate.getTime() - bDate.getTime();
       });
 
       return allEvents;
@@ -622,7 +784,8 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         end: t.String(),
         space: t.Optional(t.Union([t.Literal('all'), t.Literal('work'), t.Literal('personal')])),
         includeOverdue: t.Optional(t.String()),
-        includeNoDueDate: t.Optional(t.String())
+        includeNoDueDate: t.Optional(t.String()),
+        includeUpcoming: t.Optional(t.String())
       })
     }
   );

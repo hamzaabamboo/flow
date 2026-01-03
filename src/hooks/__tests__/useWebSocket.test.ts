@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -36,13 +36,24 @@ class MockWebSocket {
   }
 }
 
-global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+// Track WebSocket instances
+const wsInstances: MockWebSocket[] = [];
+
+// oxlint-disable-next-line typescript-eslint/no-extraneous-class
+global.WebSocket = class {
+  constructor(url: string) {
+    const instance = new MockWebSocket(url);
+    wsInstances.push(instance);
+    return instance as any;
+  }
+} as any;
 
 describe('useWebSocket', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    wsInstances.length = 0; // Clear instances
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
     });
@@ -70,9 +81,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
 
     act(() => {
       if (ws.onmessage) {
@@ -96,9 +105,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
 
     act(() => {
       if (ws.onmessage) {
@@ -125,9 +132,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
 
     act(() => {
       if (ws.onmessage) {
@@ -140,7 +145,7 @@ describe('useWebSocket', () => {
     });
 
     expect(mockNotification).toHaveBeenCalledWith(
-      'HamFlow Reminder',
+      '⏰ HamFlow Reminder',
       expect.objectContaining({ body: 'Test reminder' })
     );
   });
@@ -152,9 +157,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
     const sendSpy = vi.spyOn(ws, 'send');
 
     act(() => {
@@ -173,12 +176,11 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
 
     act(() => {
-      if (ws.onclose) ws.onclose();
+      // @ts-ignore
+      if (ws.onclose) ws.onclose({ code: 1006 } as CloseEvent);
     });
 
     // Should attempt to reconnect
@@ -198,9 +200,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
 
     act(() => {
       if (ws.onmessage) {
@@ -223,9 +223,7 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    const ws = (
-      global as unknown as { WebSocket: { mock: { results: Array<{ value: MockWebSocket }> } } }
-    ).WebSocket.mock.results[0].value;
+    const ws = wsInstances[0];
     const closeSpy = vi.spyOn(ws, 'close');
 
     unmount();

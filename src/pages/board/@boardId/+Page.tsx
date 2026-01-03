@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
 import { usePageContext } from 'vike-react/usePageContext';
-import { ArrowLeft, MoreVertical, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, MoreVertical, FileText, Sparkles, Edit } from 'lucide-react';
 import type { Task } from '../../../components/Board/KanbanColumn';
 import { useSpace } from '../../../contexts/SpaceContext';
 import { KanbanBoard } from '../../../components/Board/KanbanBoard';
@@ -17,6 +17,7 @@ import type { BoardWithColumns } from '../../../shared/types/board';
 import { useToaster } from '../../../contexts/ToasterContext';
 import { Box, HStack, VStack } from 'styled-system/jsx';
 import { AutoOrganizeDialog } from '../../../components/AutoOrganize/AutoOrganizeDialog';
+import { BoardDialog } from '../../../components/Board/BoardDialog';
 import {
   useAutoOrganize,
   useApplyAutoOrganize
@@ -31,6 +32,7 @@ export default function BoardPage() {
   const { toast } = useToaster();
 
   const [isAutoOrganizeDialogOpen, setIsAutoOrganizeDialogOpen] = useState(false);
+  const [isEditBoardDialogOpen, setIsEditBoardDialogOpen] = useState(false);
   const [autoOrganizeSuggestions, setAutoOrganizeSuggestions] = useState<AutoOrganizeSuggestion[]>(
     []
   );
@@ -185,6 +187,16 @@ export default function BoardPage() {
               <Menu.Content>
                 <Menu.ItemGroup>
                   <Menu.Item
+                    value="edit-board"
+                    asChild
+                    onClick={() => setIsEditBoardDialogOpen(true)}
+                  >
+                    <HStack gap="2">
+                      <Edit width="16" height="16" />
+                      Edit Board
+                    </HStack>
+                  </Menu.Item>
+                  <Menu.Item
                     value="copy-board-summary"
                     asChild
                     onClick={() => void handleCopySummary()}
@@ -217,6 +229,13 @@ export default function BoardPage() {
         isApplying={applyAutoOrganizeMutation.isPending}
         summary={autoOrganizeSummary}
         totalTasksAnalyzed={totalTasksAnalyzed}
+      />
+
+      {/* Edit Board Dialog */}
+      <BoardDialog
+        open={isEditBoardDialogOpen}
+        onOpenChange={setIsEditBoardDialogOpen}
+        board={board}
       />
     </Box>
   );

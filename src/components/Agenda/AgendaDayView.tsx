@@ -49,7 +49,7 @@ export function AgendaDayView({
   });
 
   return (
-    <Card.Root minH="lg">
+    <Card.Root>
       <Card.Body p="4">
         <VStack gap="2" alignItems="stretch">
           <Text mb="2" fontSize="lg" fontWeight="semibold">

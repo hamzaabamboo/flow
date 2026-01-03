@@ -19,6 +19,7 @@ import { AgendaWeekView } from '../../components/Agenda/AgendaWeekView';
 import { AgendaDayView } from '../../components/Agenda/AgendaDayView';
 import { AgendaSidebar } from '../../components/Agenda/AgendaSidebar';
 import { OverdueTasksCard } from '../../components/Agenda/OverdueTasksCard';
+import { UpcomingTasksCard } from '../../components/Agenda/UpcomingTasksCard';
 import { StatsCard } from '../../components/Agenda/StatsCard';
 import { calendarEventToExtendedTask } from '../../utils/type-converters';
 import { Spinner } from '../../components/ui/spinner';
@@ -106,7 +107,7 @@ export default function AgendaPage() {
           start: startUnix.toString(),
           end: endUnix.toString(),
           space: currentSpace,
-          ...(viewMode === 'day' ? { includeOverdue: 'true' } : {}),
+          ...(viewMode === 'day' ? { includeOverdue: 'true', includeUpcoming: 'true' } : {}),
           includeNoDueDate: 'true'
         }
       });
@@ -396,16 +397,25 @@ export default function AgendaPage() {
       return [];
     }
 
+    // Now we rely on the backend to provide correct Overdue instances (including recurring)
     const now = new Date();
+    // Use start of today to be strict about what is "overdue" (before today)
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
     const overdue: CalendarEvent[] = [];
 
     events.forEach((event) => {
+      // Logic for backend-provided events:
+      // If it has a dueDate < startOfToday -> it's overdue
       if (!event.dueDate || isTaskCompleted(event)) return;
 
       const eventDate = new Date(event.dueDate);
 
-      // Include tasks that are past their due date/time
-      if (eventDate < now) {
+      // Note: Backend 'includeOverdue' returns tasks strictly < startDate (today 00:00)
+      // So we can generally trust that if it's in the list and < startOfToday, it's overdue.
+      // We also check it's not 'upcoming'
+      if (eventDate < startOfToday && !(event as any).isUpcoming) {
         overdue.push(event);
       }
     });
@@ -755,79 +765,16 @@ export default function AgendaPage() {
 
                 {/* Unscheduled & Upcoming Tasks */}
                 {unscheduledAndUpcomingTasks.length > 0 && (
-                  <Box
-                    borderColor="border.default"
-                    borderRadius="lg"
-                    borderWidth="1px"
-                    w="full"
-                    p="4"
-                    bg="bg.muted"
-                  >
-                    <VStack gap="3" alignItems="stretch">
-                      <HStack justifyContent="space-between" alignItems="center">
-                        <Heading size="md">
-                          Upcoming & Unscheduled ({unscheduledAndUpcomingTasks.length})
-                        </Heading>
-                        <Text color="fg.muted" fontSize="sm">
-                          Future tasks & tasks without due dates
-                        </Text>
-                      </HStack>
-                      <VStack gap="2" alignItems="stretch">
-                        {unscheduledAndUpcomingTasks.map((event) => (
-                          <Box
-                            key={event.id}
-                            borderColor="border.default"
-                            borderRadius="md"
-                            borderWidth="1px"
-                            p="3"
-                            bg="bg.default"
-                            _hover={{ bg: 'bg.subtle' }}
-                            cursor="pointer"
-                            onClick={() => taskActions.handleEdit(event)}
-                          >
-                            <HStack justifyContent="space-between">
-                              <VStack gap="1" alignItems="start" flex="1">
-                                <HStack gap="2">
-                                  <Text fontWeight="medium">{event.title}</Text>
-                                  {event.dueDate && (
-                                    <Text fontSize="xs" color="blue.fg" fontWeight="medium">
-                                      📅 {format(new Date(event.dueDate), 'MMM d')}
-                                    </Text>
-                                  )}
-                                </HStack>
-                                {event.description && (
-                                  <Text color="fg.muted" fontSize="sm">
-                                    {event.description}
-                                  </Text>
-                                )}
-                              </VStack>
-                              <HStack gap="1">
-                                {event.priority && (
-                                  <Text
-                                    fontSize="xs"
-                                    px="2"
-                                    py="1"
-                                    borderRadius="sm"
-                                    bg={
-                                      event.priority === 'urgent'
-                                        ? 'red.subtle'
-                                        : event.priority === 'high'
-                                          ? 'orange.subtle'
-                                          : event.priority === 'medium'
-                                            ? 'yellow.subtle'
-                                            : 'gray.subtle'
-                                    }
-                                  >
-                                    {event.priority}
-                                  </Text>
-                                )}
-                              </HStack>
-                            </HStack>
-                          </Box>
-                        ))}
-                      </VStack>
-                    </VStack>
-                  </Box>
+                  <UpcomingTasksCard
+                    tasks={unscheduledAndUpcomingTasks}
+                    onToggleComplete={completeTask}
+                    onTaskClick={(event) => taskActions.handleEdit(event)}
+                    onDuplicate={(event) => taskActions.handleDuplicate(event)}
+                    onDelete={(event) => taskActions.handleDelete(event)}
+                    onMove={(event) => taskActions.handleMove(event)}
+                    onCreateCopy={handleCreateCopy}
+                    extraActions={taskActions.extraActions}
+                  />
                 )}
               </VStack>
             </Box>

@@ -50,6 +50,7 @@ export interface Column {
 export interface Board {
   id: string;
   name: string;
+  description?: string;
   space: 'work' | 'personal';
   columnOrder: string[];
   createdAt?: string;
