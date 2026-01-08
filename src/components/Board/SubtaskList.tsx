@@ -99,7 +99,7 @@ export function SubtaskList({ taskId, compact = false }: SubtaskListProps) {
             Subtasks ({completedCount}/{totalCount})
           </Text>
           {!isAdding && (
-            <IconButton size="xs" variant="ghost" onClick={() => setIsAdding(true)}>
+            <IconButton size="xs" variant="ghost" onClick={() => setIsAdding(true)} aria-label="Add subtask">
               <Plus size={14} />
             </IconButton>
           )}

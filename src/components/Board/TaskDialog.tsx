@@ -679,6 +679,7 @@ export function TaskDialog({
                               <IconButton
                                 size="xs"
                                 variant="ghost"
+                                aria-label="Remove subtask"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();

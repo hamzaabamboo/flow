@@ -12,8 +12,9 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       exclude: [
         'node_modules/',
-        'src/test/',
+        '**/test/*',
         'styled-system/',
+        'src/components/ui',
         'dist/',
         '.sample_code_do_not_copy/'
       ]

@@ -8,7 +8,7 @@ interface SpaceContextType {
   toggleSpace: () => void;
 }
 
-const SpaceContext = createContext<SpaceContextType | undefined>(undefined);
+export const SpaceContext = createContext<SpaceContextType | undefined>(undefined);
 
 export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const [currentSpace, setCurrentSpace] = useState<Space>('work');

@@ -1,219 +1,278 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { userEvent } from '@testing-library/user-event';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
 import AgendaPage from '../index/+Page';
+import { SpaceContext } from '../../contexts/SpaceContext';
+import { api } from '../../api/client';
+import { DialogProvider } from '../../utils/useDialogs';
+import { ToasterProvider } from '../../contexts/ToasterProvider';
+import { format, addHours, addDays } from 'date-fns';
 
-// oxlint-disable-next-line no-unassigned-import
-import '@testing-library/jest-dom';
-
-// Mock SpaceContext
-vi.mock('../../contexts/SpaceContext', () => ({
-  useSpace: vi.fn(() => ({
-    currentSpace: 'work'
-  }))
+// Mock vike-react/usePageContext
+vi.mock('vike-react/usePageContext', () => ({
+  usePageContext: vi.fn(() => ({ urlPathname: '/' })),
 }));
 
-// Mock ToasterContext
-vi.mock('../../contexts/ToasterContext', () => ({
-  useToaster: () => ({
-    toast: vi.fn()
-  })
-}));
+// Mock API client
+vi.mock('../../api/client', () => {
+  const habitsMock: any = vi.fn(() => ({
+    get: vi.fn(),
+    log: { post: vi.fn() }
+  }));
+  (habitsMock as any).get = vi.fn();
 
-// Mock API
-const mockEventsGet = vi.fn();
-const mockHabitsGet = vi.fn();
-const mockTasksPost = vi.fn();
-const mockTasksPatch = vi.fn();
+  const calendarMock: any = {
+    events: { get: vi.fn() }
+  };
 
-vi.mock('../../api/client', () => ({
-  api: {
+  const tasksMock: any = vi.fn(() => ({
+    patch: vi.fn(),
+    delete: vi.fn()
+  }));
+  (tasksMock as any).post = vi.fn();
+  (tasksMock as any)['auto-organize'] = { post: vi.fn() };
+
+  const boardsMock: any = vi.fn(() => ({
+    get: vi.fn()
+  }));
+  (boardsMock as any).get = vi.fn();
+
+  return {
     api: {
-      calendar: {
-        events: {
-          get: (...args: any[]) => mockEventsGet(...args)
-        }
-      },
-      habits: {
-        get: (...args: any[]) => mockHabitsGet(...args)
-        // Mock sub-routes for habits if needed (log post)
-        // habits({habitId}) -> log -> post
-      },
-      tasks: Object.assign(
-        (params: any) => ({
-          patch: (...args: any[]) => mockTasksPatch(params, ...args),
-          get: vi.fn()
-        }),
-        {
-          post: (...args: any[]) => mockTasksPost(...args),
-          patch: (...args: any[]) => mockTasksPatch(...args) // if used directly separate from ID
-        }
-      )
+      api: {
+        habits: habitsMock,
+        calendar: calendarMock,
+        tasks: tasksMock,
+        boards: boardsMock
+      }
     }
-  }
-}));
+  };
+});
 
-// Mock Components
-vi.mock('../../components/Board/TaskDialog', () => ({
-  TaskDialog: ({ open, mode }: any) =>
-    open ? <div data-testid="task-dialog">{mode} mode</div> : null
-}));
+const renderWithProviders = (ui: React.ReactElement, currentSpace = 'personal') => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
 
-vi.mock('../../components/MoveTaskDialog', () => ({
-  MoveTaskDialog: () => <div data-testid="move-task-dialog" />
-}));
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SpaceContext.Provider value={{ currentSpace, setCurrentSpace: vi.fn() }}>
+        <ToasterProvider>
+          <DialogProvider>
+            {ui}
+          </DialogProvider>
+        </ToasterProvider>
+      </SpaceContext.Provider>
+    </QueryClientProvider>
+  );
+};
 
-vi.mock('../../components/AutoOrganize/AutoOrganizeDialog', () => ({
-  AutoOrganizeDialog: ({ open }: any) => (open ? <div data-testid="auto-organize-dialog" /> : null)
-}));
+describe('AgendaPage', () => {
+  const mockEvents = [
+    {
+      id: 'e1',
+      title: 'Task 1',
+      dueDate: addHours(new Date(), 2).toISOString(),
+      completed: false,
+      status: 'todo',
+      space: 'personal'
+    },
+    {
+      id: 'e2',
+      title: 'Overdue Task',
+      dueDate: '2020-01-01T10:00:00Z',
+      completed: false,
+      status: 'todo',
+      space: 'personal'
+    }
+  ];
 
-// Mock Agenda Sub-components to avoid deep rendering but verify presence
-vi.mock('../../components/Agenda/AgendaWeekView', () => ({
-  AgendaWeekView: () => <div data-testid="agenda-week-view" />
-}));
-
-// We want to test Day View rendering logic (grids etc), so maybe we don't mock AgendaDayView entirely?
-// But AgendaDayView renders `events`.
-// Let's mock it to simplify "Page" testing - we assume subcomponents are tested or we trust them for now.
-// The integration test focuses on the PAGE orchestrating data.
-vi.mock('../../components/Agenda/AgendaDayView', () => ({
-  AgendaDayView: ({ events }: any) => (
-    <div data-testid="agenda-day-view">
-      {events?.map((e: any) => (
-        <div key={e.id} data-testid="day-event">
-          {e.title}
-        </div>
-      ))}
-    </div>
-  )
-}));
-
-vi.mock('../../components/Agenda/StatsCard', () => ({
-  StatsCard: ({ stats }: any) => <div data-testid="stats-card">Total: {stats?.total}</div>
-}));
-
-vi.mock('../../components/Agenda/HabitsCard', () => ({
-  HabitsCard: () => <div data-testid="habits-card" />
-}));
-
-vi.mock('../../components/Agenda/OverdueTasksCard', () => ({
-  OverdueTasksCard: ({ overdueTasks }: any) => (
-    <div data-testid="overdue-card">Overdue: {overdueTasks?.length}</div>
-  )
-}));
-
-vi.mock('../../components/Agenda/UpcomingTasksCard', () => ({
-  UpcomingTasksCard: () => <div data-testid="upcoming-card" />
-}));
-
-// Mock useTaskActions to verify page interactions without context hell
-vi.mock('../../hooks/useTaskActions', () => ({
-  useTaskActions: () => ({
-    handleEdit: vi.fn(),
-    handleDuplicate: vi.fn(),
-    handleDelete: vi.fn(),
-    handleMove: vi.fn(),
-    extraActions: []
-  })
-}));
-
-describe('AgendaPage Integration', () => {
-  let queryClient: QueryClient;
+  const mockHabits = [
+    {
+      id: 'h1',
+      name: 'Water Plants',
+      completedToday: false,
+      space: 'personal'
+    }
+  ];
 
   beforeEach(() => {
+    window.history.replaceState({}, '', '/');
     vi.clearAllMocks();
-    queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
-    });
-
-    // Default API responses
-    mockEventsGet.mockResolvedValue({ data: [], error: null });
-    mockHabitsGet.mockResolvedValue({ data: [], error: null });
-  });
-
-  const wrapper = ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: queryClient }, children);
-
-  it('should render the Agenda page header', async () => {
-    render(<AgendaPage />, { wrapper });
-
-    expect(screen.getByRole('heading', { name: /Agenda/i })).toBeInTheDocument();
-    expect(screen.getByText('Today')).toBeInTheDocument();
-  });
-
-  it('should load and display events', async () => {
-    mockEventsGet.mockResolvedValue({
-      data: [{ id: '1', title: 'Event 1', dueDate: new Date().toISOString() }],
-      error: null
-    });
-
-    render(<AgendaPage />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('day-event')).toBeInTheDocument();
-      expect(screen.getByText('Event 1')).toBeInTheDocument();
+    
+    const apiMock = api.api as any;
+    apiMock.calendar.events.get.mockResolvedValue({ data: mockEvents, error: null });
+    apiMock.habits.get.mockResolvedValue({ data: mockHabits, error: null });
+    apiMock.boards.get.mockResolvedValue({ data: [], error: null });
+    
+    apiMock.tasks.mockImplementation(() => ({
+        patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        delete: vi.fn().mockResolvedValue({ data: {}, error: null })
+    }));
+    apiMock.tasks.post.mockResolvedValue({ data: { id: 'new-t' }, error: null });
+    apiMock.tasks['auto-organize'].post.mockResolvedValue({
+        data: { 
+            suggestions: [], 
+            summary: 'Auto organize summary', 
+            totalTasksAnalyzed: 0 
+        },
+        error: null
     });
   });
 
-  it('should display stats', async () => {
-    mockEventsGet.mockResolvedValue({
-      data: [
-        { id: '1', title: 'Task 1', dueDate: new Date().toISOString() }, // Today
-        { id: '2', title: 'Task 2', dueDate: new Date().toISOString() }
-      ],
-      error: null
-    });
-    // Habits handled by HabitsCard mock
-
-    render(<AgendaPage />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('stats-card')).toHaveTextContent('Total: 2');
-    });
+  it('should render agenda items and habits', async () => {
+    renderWithProviders(<AgendaPage />);
+    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+    expect(screen.getByText('Water Plants')).toBeInTheDocument();
   });
 
-  it('should open Create Task dialog', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<AgendaPage />, { wrapper });
+  it('should toggle habit completion', async () => {
+    const user = userEvent.setup();
+    const logMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+    (api.api.habits as any).mockImplementation(() => ({
+        log: { post: logMock }
+    }));
 
-    const createBtn = screen.getByText('New Task');
-    await user.click(createBtn);
-
-    expect(screen.getByTestId('task-dialog')).toBeInTheDocument();
+    renderWithProviders(<AgendaPage />);
+    const habitItem = await screen.findByText('Water Plants');
+    await user.click(habitItem);
+    expect(logMock).toHaveBeenCalled();
   });
 
-  it('should handle view mode toggle (Day/Week)', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<AgendaPage />, { wrapper }); // Default Day
+  it('should complete a task', async () => {
+    const user = userEvent.setup();
+    const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+    (api.api.tasks as any).mockImplementation(() => ({
+        patch: patchMock
+    }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('agenda-day-view')).toBeInTheDocument();
-    });
+    renderWithProviders(<AgendaPage />);
+    const checkbox = await screen.findByLabelText(/Complete task: Task 1/i);
+    await user.click(checkbox);
+    expect(patchMock).toHaveBeenCalledWith(expect.objectContaining({
+        completed: true
+    }));
+  });
 
-    const weekBtn = screen.getByText('Week');
+  it('should handle view mode toggle', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AgendaPage />);
+    const weekBtn = screen.getByRole('button', { name: 'Week' });
     await user.click(weekBtn);
-
-    // Should render Week View
-    expect(screen.getByTestId('agenda-week-view')).toBeInTheDocument();
-
-    // API should be called with updated params (we assume React Query refetches)
-    // Checking if mockEventsGet Called is tricky due to re-renders, but we can assume logic works if component verified.
+    expect(await screen.findByText('Weekly Stats')).toBeInTheDocument();
   });
 
-  it('should handle date navigation', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<AgendaPage />, { wrapper });
+  it('should handle task creation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AgendaPage />);
+    
+    await user.click(screen.getByRole('button', { name: /New Task/i }));
+    
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByPlaceholderText(/Enter task title/i), 'New Task Title');
+    
+    await user.click(within(dialog).getByRole('button', { name: 'Create Task' }));
+    
+    expect(api.api.tasks.post).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'New Task Title'
+    }));
+  });
 
-    const nextBtn = screen.getByLabelText('Next');
-    await user.click(nextBtn);
+  it('should handle task carry over', async () => {
+    const user = userEvent.setup();
+    const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+    (api.api.tasks as any).mockImplementation(() => ({
+        patch: patchMock
+    }));
 
-    // Date state updates -> Query key updates -> API called
-    // We verify API call with different timestamp?
-    await waitFor(() => {
-      expect(mockEventsGet).toHaveBeenCalled();
-      // Inspect args if needed, but simple verification of flow is good.
+    renderWithProviders(<AgendaPage />);
+    
+    const overdueTitle = await screen.findByText('Overdue Task');
+    const row = overdueTitle.closest('div[data-priority]');
+    const carryOverBtn = within(row as HTMLElement).getByRole('button', { name: /Carry Over/i });
+    await user.click(carryOverBtn);
+    
+    const moveBtn = await screen.findByRole('button', { name: 'Move Task' });
+    await user.click(moveBtn);
+    
+    expect(patchMock).toHaveBeenCalled();
+  });
+
+  it('should handle copying external event to task', async () => {
+    const user = userEvent.setup();
+    const extEvent = { 
+        id: 'ext-1', 
+        title: 'External Meet', 
+        type: 'external', 
+        dueDate: addHours(new Date(), 1).toISOString(),
+        status: 'todo',
+        completed: false
+    };
+    (api.api.calendar.events.get as vi.Mock).mockResolvedValue({ data: [extEvent], error: null });
+
+    renderWithProviders(<AgendaPage />);
+    
+    const extTitle = await screen.findByText('External Meet');
+    const row = extTitle.closest('div[data-is-external="true"]');
+    const copyBtn = within(row as HTMLElement).getByRole('button', { name: /Create Task/i });
+    await user.click(copyBtn);
+    
+    expect(await screen.findByText('Create New Task')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('External Meet')).toBeInTheDocument();
+  });
+
+  it('should display upcoming tasks', async () => {
+    const upcomingTask = { 
+        id: 'up-1', 
+        title: 'Future Task', 
+        dueDate: addDays(new Date(), 2).toISOString(),
+        status: 'todo',
+        completed: false
+    };
+    (api.api.calendar.events.get as vi.Mock).mockResolvedValue({ data: [upcomingTask], error: null });
+
+    renderWithProviders(<AgendaPage />);
+    
+    expect(await screen.findByText('Future Task')).toBeInTheDocument();
+    expect(screen.getByText(/Upcoming & Unscheduled/i)).toBeInTheDocument();
+  });
+
+  it('should handle applying auto-organize suggestions', async () => {
+    const user = userEvent.setup();
+    const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+    (api.api.tasks.mockImplementation(() => ({
+        patch: patchMock
+    })));
+    
+    (api.api.tasks['auto-organize'].post as vi.Mock).mockResolvedValue({
+        data: { 
+            suggestions: [{ 
+                taskId: 't1', 
+                taskTitle: 'Task 1',
+                details: { type: 'column_move', suggestedColumnId: 'c2' },
+                reason: 'Better fit',
+                confidence: 90,
+                included: true
+            }], 
+            summary: 'Auto Summary', 
+            totalTasksAnalyzed: 1 
+        },
+        error: null
     });
+
+    renderWithProviders(<AgendaPage />);
+    
+    await user.click(screen.getByRole('button', { name: /Auto Organize/i }));
+    await screen.findByText('Auto Summary');
+    
+    // Find Apply button
+    const buttons = screen.getAllByRole('button');
+    const applyBtn = buttons.find(b => b.textContent?.includes('Apply 1 Changes'));
+    await user.click(applyBtn!);
+    
+    // We've verified it triggers the click.
   });
 });

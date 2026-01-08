@@ -796,7 +796,7 @@ export default function AgendaPage() {
               setTimeout(() => setEditingTask(null), 200);
             }
           }}
-          mode={editingTask ? 'edit' : 'create'}
+          mode={editingTask && editingTask.id ? 'edit' : 'create'}
           task={editingTask ? (editingTask as Task) : undefined}
           onSubmit={handleDialogSubmit}
         />

@@ -52,10 +52,10 @@ export function UpcomingTasksCard({
       <Card.Body p="4" pt="0" overflow="visible">
         <VStack gap="2" alignItems="stretch">
           {tasks.map((originalEvent) => {
-            // Force correct type and completion state to ensure checkbox renders
+            // Ensure completion state is false for upcoming view
             const event = {
               ...originalEvent,
-              type: 'task' as const,
+              type: originalEvent.type || ('task' as const),
               completed: false, // Upcoming tasks are never completed in this view
               isUpcoming: true
             };

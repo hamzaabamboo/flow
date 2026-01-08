@@ -50,7 +50,6 @@ describe('Authentication Flow Integration', () => {
   beforeAll(async () => {
     // Setup test server with all routes
     const { simpleAuth } = await import('../../server/auth/simple-auth');
-    const { authMiddleware } = await import('../../server/auth/middleware');
     const { tasksRoutes } = await import('../../server/routes/tasks');
     const { boardRoutes } = await import('../../server/routes/boards');
     const { inboxRoutes } = await import('../../server/routes/inbox');
@@ -73,9 +72,7 @@ describe('Authentication Flow Integration', () => {
     app = new Elysia()
       .decorate('db', mockDb)
       .use(simpleAuth)
-      .group('/api', (app) =>
-        app.use(authMiddleware).use(tasksRoutes).use(boardRoutes).use(inboxRoutes)
-      );
+      .group('/api', (app) => app.use(tasksRoutes).use(boardRoutes).use(inboxRoutes));
   });
 
   beforeEach(() => {

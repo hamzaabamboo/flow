@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
   }, [dateRange]);
 
   // Fetch completion stats
-  const { data: completions = [], isLoading } = useQuery<CalendarEvent[]>({
+  const { data: completions = [], isLoading, isError } = useQuery<CalendarEvent[]>({
     queryKey: ['analytics', 'completions', startDate, endDate, currentSpace],
     queryFn: async () => {
       const startStr = format(startDate, 'yyyy-MM-dd');
@@ -143,6 +143,10 @@ export default function AnalyticsPage() {
           <VStack gap="3" justifyContent="center" alignItems="center" minH="40vh" p="8">
             <Spinner size="lg" />
             <Text color="fg.muted">Loading analytics...</Text>
+          </VStack>
+        ) : isError ? (
+          <VStack gap="3" justifyContent="center" alignItems="center" minH="40vh" p="8">
+            <Text color="fg.destructive">Failed to load analytics data. Please try again later.</Text>
           </VStack>
         ) : (
           <>

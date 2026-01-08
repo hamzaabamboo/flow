@@ -1,8 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useWebSocket } from '../useWebSocket';
+
+// Mock WebSocket constants
+const WS_CONNECTING = 0;
+const WS_OPEN = 1;
+const WS_CLOSING = 2;
+const WS_CLOSED = 3;
 
 // Mock WebSocket
 class MockWebSocket {
@@ -11,45 +17,57 @@ class MockWebSocket {
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((error: Event) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number }) => void) | null = null;
+
+  static CONNECTING = WS_CONNECTING;
+  static OPEN = WS_OPEN;
+  static CLOSING = WS_CLOSING;
+  static CLOSED = WS_CLOSED;
 
   constructor(url: string) {
     this.url = url;
-    this.readyState = WebSocket.CONNECTING;
+    this.readyState = WS_CONNECTING;
 
     // Simulate connection
     setTimeout(() => {
-      this.readyState = WebSocket.OPEN;
+      this.readyState = WS_OPEN;
       if (this.onopen) this.onopen();
     }, 10);
   }
 
   send(_data: string) {
-    if (this.readyState !== WebSocket.OPEN) {
+    if (this.readyState !== WS_OPEN) {
       throw new Error('WebSocket is not open');
     }
   }
 
-  close() {
-    this.readyState = WebSocket.CLOSED;
-    if (this.onclose) this.onclose();
+  close(code?: number) {
+    this.readyState = WS_CLOSED;
+    if (this.onclose) this.onclose({ code: code || 1000 });
   }
 }
 
 // Track WebSocket instances
 const wsInstances: MockWebSocket[] = [];
 
-// oxlint-disable-next-line typescript-eslint/no-extraneous-class
-global.WebSocket = class {
+// @ts-expect-error Mocking global WebSocket
+global.WebSocket = class extends MockWebSocket {
   constructor(url: string) {
-    const instance = new MockWebSocket(url);
-    wsInstances.push(instance);
-    return instance as any;
+    super(url);
+    wsInstances.push(this);
   }
-} as any;
+};
+// Ensure constants are on the class
+Object.assign(global.WebSocket, {
+    CONNECTING: WS_CONNECTING,
+    OPEN: WS_OPEN,
+    CLOSING: WS_CLOSING,
+    CLOSED: WS_CLOSED
+});
 
 describe('useWebSocket', () => {
   let queryClient: QueryClient;
+  const originalLocation = global.window.location;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +75,19 @@ describe('useWebSocket', () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
     });
+    
+    // Mock location
+    // @ts-expect-error Mocking location
+    delete global.window.location;
+    global.window.location = {
+        ...originalLocation,
+        protocol: 'http:',
+        host: 'localhost:3000'
+    };
+  });
+
+  afterEach(() => {
+    global.window.location = originalLocation;
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) =>
@@ -70,9 +101,10 @@ describe('useWebSocket', () => {
     });
 
     expect(result.current.sendMessage).toBeDefined();
+    expect(wsInstances.length).toBe(1);
   });
 
-  it('should handle incoming messages', async () => {
+  it('should handle task-update messages', async () => {
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     renderHook(() => useWebSocket(), { wrapper });
@@ -96,7 +128,7 @@ describe('useWebSocket', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['board'] });
   });
 
-  it('should handle board update messages', async () => {
+  it('should handle board-update messages', async () => {
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     renderHook(() => useWebSocket(), { wrapper });
@@ -120,11 +152,54 @@ describe('useWebSocket', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['boards'] });
   });
 
+  it('should handle column-update messages', async () => {
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useWebSocket(), { wrapper });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'column-update', data: { boardId: 'b1' } })
+      }));
+    });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['board', 'b1'] }));
+  });
+
+  it('should handle subtask-update messages', async () => {
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useWebSocket(), { wrapper });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'subtask-update', data: { taskId: 't1' } })
+      }));
+    });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['subtasks', 't1'] }));
+  });
+
+  it('should handle inbox-update messages', async () => {
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useWebSocket(), { wrapper });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'inbox-update', data: { space: 'work' } })
+      }));
+    });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['inbox', 'work'] }));
+  });
+
   it('should handle reminder messages', async () => {
+    // @ts-expect-error Mocking global Notification
     const mockNotification = vi.fn() as unknown as typeof Notification & { permission: string };
     mockNotification.permission = 'granted';
-    (global as unknown as { Notification: typeof mockNotification }).Notification =
-      mockNotification;
+    // @ts-expect-error Mocking global Notification
+    global.Notification = mockNotification;
 
     renderHook(() => useWebSocket(), { wrapper });
 
@@ -150,11 +225,25 @@ describe('useWebSocket', () => {
     );
   });
 
+  it('should handle pomodoro events', async () => {
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useWebSocket(), { wrapper });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'pomodoro-event' })
+      }));
+    });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['pomodoro'] }));
+  });
+
   it('should send messages when connected', async () => {
     const { result } = renderHook(() => useWebSocket(), { wrapper });
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
     const ws = wsInstances[0];
@@ -179,8 +268,7 @@ describe('useWebSocket', () => {
     const ws = wsInstances[0];
 
     act(() => {
-      // @ts-ignore
-      if (ws.onclose) ws.onclose({ code: 1006 } as CloseEvent);
+      if (ws.onclose) ws.onclose({ code: 1006 });
     });
 
     // Should attempt to reconnect
@@ -188,7 +276,23 @@ describe('useWebSocket', () => {
       await new Promise((resolve) => setTimeout(resolve, 3100));
     });
 
+    expect(wsInstances.length).toBeGreaterThan(1);
     unmount();
+  });
+
+  it('should handle server-shutdown', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    renderHook(() => useWebSocket(), { wrapper });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'server-shutdown' })
+      }));
+    });
+    expect(logSpy).toHaveBeenCalledWith('Server is shutting down, stopping reconnection attempts');
+    logSpy.mockRestore();
   });
 
   it('should handle malformed messages gracefully', async () => {

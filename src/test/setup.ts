@@ -1,5 +1,6 @@
 // Test setup file for Vitest
 import { afterEach, vi } from 'vitest';
+import '@testing-library/jest-dom';
 
 // Mock fetch globally
 global.fetch = vi.fn(() =>
@@ -34,6 +35,22 @@ global.WebSocket = vi.fn(() => ({
 afterEach(() => {
   vi.clearAllMocks();
 });
+
+// Mock Bun global for Vitest environment
+if (typeof (global as any).Bun === 'undefined') {
+  (global as any).Bun = {
+    version: '1.0.0',
+    revision: 'mock',
+    env: process.env,
+    gc: () => {},
+    CryptoHasher: class {
+      private data: string = '';
+      constructor(private algo: string) {}
+      update(data: string) { this.data += data; return this; }
+      digest(encoding: string = 'hex') { return `mock-hash-${this.algo}-${encoding}-${this.data}`; }
+    }
+  };
+}
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
