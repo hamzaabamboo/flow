@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { navigate } from 'vike/client/router';
 import { usePageContext } from 'vike-react/usePageContext';
 import { ArrowLeft, MoreVertical, FileText, Sparkles, Edit } from 'lucide-react';
-import type { Task } from '../../../components/Board/KanbanColumn';
 import { useSpace } from '../../../contexts/SpaceContext';
 import { KanbanBoard } from '../../../components/Board/KanbanBoard';
 import { IconButton } from '../../../components/ui/icon-button';
@@ -13,7 +12,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Menu } from '../../../components/ui/menu';
 import { Spinner } from '../../../components/ui/spinner';
 import { Button } from '../../../components/ui/button';
-import type { BoardWithColumns } from '../../../shared/types/board';
+import type { BoardWithColumns, Task } from '../../../shared/types/board';
 import { useToaster } from '../../../contexts/ToasterContext';
 import { Box, HStack, VStack } from 'styled-system/jsx';
 import { AutoOrganizeDialog } from '../../../components/AutoOrganize/AutoOrganizeDialog';
@@ -46,9 +45,9 @@ export default function BoardPage() {
   const { data: board, isLoading: boardLoading } = useQuery<BoardWithColumns>({
     queryKey: ['board', boardId],
     queryFn: async () => {
-      const { data, error } = await api.api.boards({ boardId }).get();
+      const { data, error } = await api.api.boards({ id: boardId }).get();
       if (error) throw new Error('Failed to fetch board');
-      return data;
+      return data as BoardWithColumns;
     }
   });
 
@@ -59,9 +58,9 @@ export default function BoardPage() {
       if (!board) return [];
 
       const tasksPromises = board.columns.map(async (column) => {
-        const { data, error } = await api.api.tasks({ id: column.id }).get();
+        const { data, error } = await api.api.tasks.get({ query: { columnId: column.id } });
         if (error) return [];
-        return data;
+        return data as Task[];
       });
 
       const tasksByColumn = await Promise.all(tasksPromises);
@@ -92,12 +91,15 @@ export default function BoardPage() {
 
   const handleCopySummary = async (columnId?: string) => {
     try {
+      const boardApi = api.api.boards({ id: boardId });
+      if (!boardApi) throw new Error('Board API not found');
+
       const { data, error } = columnId
-        ? await api.api.boards({ boardId }).summary.get({ query: { columnId } })
-        : await api.api.boards({ boardId }).summary.get();
+        ? await boardApi.summary.get({ query: { columnId } })
+        : await boardApi.summary.get();
       if (error) throw new Error('Failed to fetch summary');
 
-      await navigator.clipboard.writeText(data.summary);
+      await navigator.clipboard.writeText(data.summary || '');
       toast?.('Summary copied to clipboard!', { type: 'success' });
     } catch (error) {
       console.error('Failed to copy summary:', error);

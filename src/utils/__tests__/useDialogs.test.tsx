@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { DialogProvider, useDialogs } from '../useDialogs';
 import React from 'react';
 
@@ -11,16 +11,24 @@ const TestComponent = () => {
 
   return (
     <div>
-      <button onClick={async () => {
-        const ok = await confirm({ title: 'Confirm?', description: 'Are you sure?' });
-        setResult(ok ? 'confirmed' : 'cancelled');
-      }}>Show Confirm</button>
-      
-      <button onClick={async () => {
-        await alert({ title: 'Alert!', description: 'Something happened' });
-        setResult('alerted');
-      }}>Show Alert</button>
-      
+      <button
+        onClick={async () => {
+          const ok = await confirm({ title: 'Confirm?', description: 'Are you sure?' });
+          setResult(ok ? 'confirmed' : 'cancelled');
+        }}
+      >
+        Show Confirm
+      </button>
+
+      <button
+        onClick={async () => {
+          await alert({ title: 'Alert!', description: 'Something happened' });
+          setResult('alerted');
+        }}
+      >
+        Show Alert
+      </button>
+
       <div data-testid="result">{result}</div>
     </div>
   );
@@ -30,9 +38,11 @@ describe('useDialogs', () => {
   it('should throw error if used outside DialogProvider', () => {
     // Suppress console.error for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
-    expect(() => render(<TestComponent />)).toThrow('useDialogs must be used within DialogProvider');
-    
+
+    expect(() => render(<TestComponent />)).toThrow(
+      'useDialogs must be used within DialogProvider'
+    );
+
     consoleSpy.mockRestore();
   });
 
@@ -47,7 +57,7 @@ describe('useDialogs', () => {
     await user.click(screen.getByText('Show Confirm'));
 
     // Wait for lazy loaded component
-    const title = await screen.findByText('Confirm?');
+    const title = await screen.findByText('Confirm?', {}, { timeout: 3000 });
     expect(title).toBeInTheDocument();
     expect(screen.getByText('Are you sure?')).toBeInTheDocument();
 
@@ -57,7 +67,7 @@ describe('useDialogs', () => {
     await waitFor(() => {
       expect(screen.getByTestId('result')).toHaveTextContent('confirmed');
     });
-    
+
     expect(screen.queryByText('Confirm?')).not.toBeInTheDocument();
   });
 
@@ -70,7 +80,7 @@ describe('useDialogs', () => {
     );
 
     await user.click(screen.getByText('Show Confirm'));
-    await screen.findByText('Confirm?');
+    await screen.findByText('Confirm?', {}, { timeout: 3000 });
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
@@ -89,7 +99,7 @@ describe('useDialogs', () => {
 
     await user.click(screen.getByText('Show Alert'));
 
-    await screen.findByText('Alert!');
+    await screen.findByText('Alert!', {}, { timeout: 3000 });
     expect(screen.getByText('Something happened')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'OK' }));

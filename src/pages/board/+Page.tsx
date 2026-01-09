@@ -25,7 +25,7 @@ export default function BoardsListPage() {
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data;
+      return data as BoardInfo[];
     }
   });
 
@@ -37,9 +37,10 @@ export default function BoardsListPage() {
         space: currentSpace
       });
       if (error) throw new Error('Failed to create board');
-      return data;
+      return data as { data: { id: string } };
     },
-    onSuccess: (newBoard) => {
+    onSuccess: (response) => {
+      const newBoard = response.data;
       queryClient.invalidateQueries({ queryKey: ['boards'] });
       void navigate(`/board/${newBoard.id}`);
       setNewBoardName('');
@@ -149,7 +150,7 @@ export default function BoardsListPage() {
                     <VStack flex="1" gap="1" alignItems="flex-start">
                       <Card.Title>{board.name}</Card.Title>
                       <Card.Description>
-                        {board.columnOrder?.length || 3} columns • Updated{' '}
+                        {(board.columnOrder as string[])?.length || 3} columns • Updated{' '}
                         {board.updatedAt ? new Date(board.updatedAt).toLocaleDateString() : 'Never'}
                       </Card.Description>
                     </VStack>
@@ -164,7 +165,7 @@ export default function BoardsListPage() {
                     <HStack gap="1">
                       <Users width="14" height="14" />
                       <Text color="fg.muted" fontSize="sm">
-                        {board.columnOrder?.length || 3} columns
+                        {(board.columnOrder as string[])?.length || 3} columns
                       </Text>
                     </HStack>
 

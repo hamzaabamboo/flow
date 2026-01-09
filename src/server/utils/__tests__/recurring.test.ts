@@ -132,7 +132,7 @@ describe('expandRecurringTasks', () => {
     const events = expandRecurringTasks([task], start, end, new Map());
     // Should start from Jan 5
     expect(events.length).toBe(3); // 5, 6, 7
-    expect(events.map(e => e.instanceDate)).toEqual(['2025-01-05', '2025-01-06', '2025-01-07']);
+    expect(events.map((e) => e.instanceDate)).toEqual(['2025-01-05', '2025-01-06', '2025-01-07']);
   });
 
   it('should respect recurringEndDate', () => {

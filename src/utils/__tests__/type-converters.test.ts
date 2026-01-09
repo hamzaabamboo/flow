@@ -19,7 +19,7 @@ describe('type-converters', () => {
     };
 
     const task = calendarEventToExtendedTask(event);
-    
+
     expect(task.id).toBe('e1');
     expect(task.title).toBe('Title');
     expect(task.dueDate).toBe('2024-01-01T10:00:00.000Z');
@@ -36,7 +36,7 @@ describe('type-converters', () => {
     };
 
     const task = calendarEventToExtendedTask(event);
-    
+
     expect(task.id).toBe('e1');
     expect(task.columnId).toBe('');
     expect(task.boardSpace).toBe('personal');

@@ -53,38 +53,48 @@ describe('Auto Organize Routes', () => {
     vi.clearAllMocks();
     vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
     vi.mocked(autoOrganizer.generate).mockResolvedValue({
-        text: JSON.stringify({ 
-            summary: 'AI Summary', 
-            suggestions: [{ 
-                taskId: 't1', 
-                reason: 'Reason', 
-                confidence: 90, 
-                details: { type: 'column_move', currentColumnId: 'c1', suggestedColumnId: 'c2' } 
-            }] 
-        })
+      text: JSON.stringify({
+        summary: 'AI Summary',
+        suggestions: [
+          {
+            taskId: 't1',
+            reason: 'Reason',
+            confidence: 90,
+            details: { type: 'column_move', currentColumnId: 'c1', suggestedColumnId: 'c2' }
+          }
+        ]
+      })
     });
-    
+
     app = new Elysia()
-        .onError(({ error }) => {
-            console.error('AUTO_ORG_ERROR', error);
-            return { error: error.message };
-        })
-        .decorate('db', db)
-        .derive(() => ({ user: { id: 'user-1' } }))
-        .use(autoOrganizeRoutes);
+      .onError(({ error }) => {
+        console.error('AUTO_ORG_ERROR', error);
+        return { error: error.message };
+      })
+      .decorate('db', db)
+      .derive(() => ({ user: { id: 'user-1' } }))
+      .use(autoOrganizeRoutes);
   });
 
   it('POST / should return suggestions', async () => {
     const apiMock = db;
-    vi.mocked(apiMock.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }]));
-    vi.mocked(apiMock.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }]));
-    vi.mocked(apiMock.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 't1', title: 'T', columnId: 'c1', columnName: 'C1' }]));
+    vi.mocked(apiMock.select).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }])
+    );
+    vi.mocked(apiMock.select).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }])
+    );
+    vi.mocked(apiMock.select).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 't1', title: 'T', columnId: 'c1', columnName: 'C1' }])
+    );
 
-    const res = await app.handle(new Request('http://localhost/tasks/auto-organize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ space: 'work' })
-    }));
+    const res = await app.handle(
+      new Request('http://localhost/tasks/auto-organize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ space: 'work' })
+      })
+    );
 
     expect(res.status).toBe(200);
     const json = await res.json();

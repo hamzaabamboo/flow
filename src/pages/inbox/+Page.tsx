@@ -19,7 +19,7 @@ import { VStack, HStack, Box, Grid } from 'styled-system/jsx';
 import { css } from 'styled-system/css';
 import { api } from '../../api/client';
 
-const getSourceIcon = (source: string) => {
+const getSourceIcon = (source: string | null) => {
   switch (source) {
     case 'command':
       return <MessageCircle width="16" height="16" />;
@@ -48,7 +48,7 @@ export default function InboxPage() {
     queryFn: async () => {
       const { data, error } = await api.api.inbox.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch inbox items');
-      return data;
+      return data as InboxItem[];
     }
   });
 
@@ -58,13 +58,13 @@ export default function InboxPage() {
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data;
+      return data as BoardWithColumns[];
     }
   });
 
   // Get all columns from all boards for selection
   const allColumns =
-    boards?.flatMap((board) =>
+    boards?.flatMap((board: BoardWithColumns) =>
       board.columns.map((col) => ({
         id: col.id,
         name: col.name,
@@ -133,7 +133,7 @@ export default function InboxPage() {
     }
 
     // Find the board ID for navigation
-    const selectedBoardId = boards?.find((board) =>
+    const selectedBoardId = boards?.find((board: BoardWithColumns) =>
       board.columns.some((col) => col.id === selectedColumn)
     )?.id;
 
@@ -231,7 +231,7 @@ export default function InboxPage() {
           </Card.Root>
         ) : (
           <VStack gap="2">
-            {items.map((item) => (
+            {items.map((item: InboxItem) => (
               <HStack
                 key={item.id}
                 onClick={() => toggleItemSelection(item.id)}
@@ -338,7 +338,7 @@ export default function InboxPage() {
               </VStack>
 
               <VStack gap="4" alignItems="stretch">
-                {boards?.map((board) => (
+                {boards?.map((board: BoardWithColumns) => (
                   <Box key={board.id}>
                     <Text mb="3" color="fg.muted" fontSize="sm" fontWeight="semibold">
                       {board.name}

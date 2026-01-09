@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import LoginPage from '../login/+Page';
 
 describe('LoginPage', () => {
@@ -11,7 +11,7 @@ describe('LoginPage', () => {
     window.location = {
       ...originalLocation,
       href: '',
-      search: '',
+      search: ''
     };
   });
 

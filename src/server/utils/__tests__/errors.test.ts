@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { 
-  HTTPError, 
-  notFound, 
-  unauthorized, 
-  forbidden, 
-  badRequest, 
-  conflict, 
+import {
+  HTTPError,
+  notFound,
+  unauthorized,
+  forbidden,
+  badRequest,
+  conflict,
   internalError,
   errorResponse,
   successResponse
@@ -34,6 +34,10 @@ describe('error utils', () => {
 
   it('successResponse should return correct object', () => {
     expect(successResponse({ id: 1 })).toEqual({ success: true, data: { id: 1 } });
-    expect(successResponse({ id: 1 }, 'Saved')).toEqual({ success: true, message: 'Saved', data: { id: 1 } });
+    expect(successResponse({ id: 1 }, 'Saved')).toEqual({
+      success: true,
+      message: 'Saved',
+      data: { id: 1 }
+    });
   });
 });

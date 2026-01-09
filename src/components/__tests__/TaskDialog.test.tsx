@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -34,12 +34,20 @@ vi.mock('../../api/client', () => ({
 
 // Mock SimpleDatePicker
 vi.mock('../ui/simple-date-picker', () => ({
-  SimpleDatePicker: ({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) => (
-    <input 
+  SimpleDatePicker: ({
+    value,
+    onChange,
+    placeholder
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+  }) => (
+    <input
       role="textbox"
       placeholder={placeholder}
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
     />
   )
 }));
@@ -98,7 +106,7 @@ describe('TaskDialog', () => {
     );
 
     await user.type(screen.getByPlaceholderText('Enter task title'), 'Complex Task');
-    
+
     // Priority - exact match
     await user.click(screen.getByLabelText(/^Urgent$/i));
 
@@ -123,15 +131,15 @@ describe('TaskDialog', () => {
   it('should handle clearing due date', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const mockTask: Partial<Task> = {
-        id: '1',
-        title: 'Task',
-        dueDate: '2026-01-01T10:00:00Z'
+      id: '1',
+      title: 'Task',
+      dueDate: '2026-01-01T10:00:00Z'
     };
 
     const handleSubmit = vi.fn((e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        expect(formData.get('dueDate')).toBe('');
+      e.preventDefault();
+      const formData = new FormData(e.currentTarget);
+      expect(formData.get('dueDate')).toBe('');
     });
 
     render(
@@ -169,7 +177,7 @@ describe('TaskDialog', () => {
 
     const subInput = screen.getByPlaceholderText('Add subtask...');
     await user.type(subInput, 'My Subtask');
-    
+
     const subtasksBox = screen.getByText('Subtasks').closest('div');
     const plusBtn = within(subtasksBox as HTMLElement).getByRole('button');
     await user.click(plusBtn);
@@ -179,7 +187,7 @@ describe('TaskDialog', () => {
     // Toggle subtask - find by checkbox near text
     const checkboxes = screen.getAllByRole('checkbox');
     await user.click(checkboxes[checkboxes.length - 1]);
-    
+
     // Remove subtask
     const removeBtn = screen.getByLabelText('Remove subtask');
     await user.click(removeBtn);

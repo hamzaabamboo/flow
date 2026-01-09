@@ -1,5 +1,5 @@
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CarryOverControls } from '../CarryOverControls';
 import { endOfDay, addDays, addWeeks, endOfMonth } from 'date-fns';
@@ -9,18 +9,14 @@ import React from 'react';
 // Mock SimpleDatePicker to avoid complex Ark UI interactions in this test
 vi.mock('../../ui/simple-date-picker', () => ({
   SimpleDatePicker: ({ value, onChange }: any) => (
-    <input 
-      role="textbox"
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
-    />
+    <input role="textbox" value={value} onChange={(e) => onChange(e.target.value)} />
   )
 }));
 
 describe('CarryOverControls', () => {
   const mockHandlers = {
     onOpenChange: vi.fn(),
-    onCarryOver: vi.fn(),
+    onCarryOver: vi.fn()
   };
 
   beforeEach(() => {
@@ -33,7 +29,7 @@ describe('CarryOverControls', () => {
 
     // Check for title
     expect(screen.getByText('Carry Over Task')).toBeInTheDocument();
-    
+
     const submitBtn = screen.getByRole('button', { name: /Move Task/i });
     await user.click(submitBtn);
 
@@ -107,7 +103,7 @@ describe('CarryOverControls', () => {
     // Should show date picker
     const datePicker = screen.getByRole('textbox');
     fireEvent.change(datePicker, { target: { value: '2026-12-31' } });
-    
+
     const submitBtn = screen.getByRole('button', { name: /Move Task/i });
     await user.click(submitBtn);
 

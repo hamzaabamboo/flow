@@ -1,5 +1,5 @@
 import { treaty } from '@elysiajs/eden';
-import type { App } from './server';
+import type { App } from '../server/app';
 
 // Get the API URL - in development it's the same origin, in production it should be configured
 const API_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';

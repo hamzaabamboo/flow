@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { userEvent } from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
 import { TaskFilterBar } from '../TaskFilterBar';
 import type { FilterOptions } from '../../../shared/types';
 import React from 'react';
@@ -8,11 +8,11 @@ import React from 'react';
 // Mock SimpleDatePicker
 vi.mock('../../ui/simple-date-picker', () => ({
   SimpleDatePicker: ({ value, onChange, placeholder }: any) => (
-    <input 
+    <input
       role="textbox"
       placeholder={placeholder}
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
     />
   )
 }));
@@ -26,7 +26,11 @@ describe('TaskFilterBar', () => {
     sortOrder: 'desc'
   };
 
-  const StatefulFilterBar = ({ onFiltersChange }: { onFiltersChange: (f: FilterOptions) => void }) => {
+  const StatefulFilterBar = ({
+    onFiltersChange
+  }: {
+    onFiltersChange: (f: FilterOptions) => void;
+  }) => {
     const [filters, setFilters] = React.useState(initialFilters);
     const handleChange = (newFilters: FilterOptions) => {
       setFilters(newFilters);
@@ -44,9 +48,11 @@ describe('TaskFilterBar', () => {
     await user.type(input, 'test query');
 
     await waitFor(() => {
-        expect(onFiltersChange).toHaveBeenLastCalledWith(expect.objectContaining({
-            search: 'test query'
-        }));
+      expect(onFiltersChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          search: 'test query'
+        })
+      );
     });
   });
 
@@ -63,9 +69,11 @@ describe('TaskFilterBar', () => {
     const option = await screen.findByRole('option', { name: 'Urgent' });
     await user.click(option);
 
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         priority: 'urgent'
-    }));
+      })
+    );
   });
 
   it('should handle label selection', async () => {
@@ -73,9 +81,9 @@ describe('TaskFilterBar', () => {
     const onFiltersChange = vi.fn();
     const availableLabels = ['bug', 'feature'];
     render(
-      <TaskFilterBar 
-        filters={initialFilters} 
-        onFiltersChange={onFiltersChange} 
+      <TaskFilterBar
+        filters={initialFilters}
+        onFiltersChange={onFiltersChange}
         availableLabels={availableLabels}
       />
     );
@@ -83,13 +91,15 @@ describe('TaskFilterBar', () => {
     // Click label filter button
     const labelBtn = screen.getByRole('button', { name: /All Labels/i });
     await user.click(labelBtn);
-    
+
     const bugBtn = await screen.findByRole('button', { name: 'bug' });
     await user.click(bugBtn);
 
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         label: 'bug'
-    }));
+      })
+    );
   });
 
   it('should handle date filters', async () => {
@@ -98,18 +108,22 @@ describe('TaskFilterBar', () => {
     render(<TaskFilterBar filters={initialFilters} onFiltersChange={onFiltersChange} />);
 
     await user.click(screen.getByRole('button', { name: /Due Date/i }));
-    
+
     const dateInputs = screen.getAllByPlaceholderText('Select date');
     // First is "before", second is "after"
     fireEvent.change(dateInputs[0], { target: { value: '2024-12-31' } });
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         dueBefore: '2024-12-31'
-    }));
+      })
+    );
 
     fireEvent.change(dateInputs[1], { target: { value: '2024-01-01' } });
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         dueAfter: '2024-01-01'
-    }));
+      })
+    );
   });
 
   it('should handle sort change', async () => {
@@ -124,9 +138,11 @@ describe('TaskFilterBar', () => {
     const option = await screen.findByRole('option', { name: 'Priority' });
     await user.click(option);
 
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         sortBy: 'priority'
-    }));
+      })
+    );
   });
 
   it('should toggle sort order', async () => {
@@ -137,9 +153,11 @@ describe('TaskFilterBar', () => {
     const sortOrderBtn = screen.getByRole('button', { name: /Sort Descending/i });
     await user.click(sortOrderBtn);
 
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
         sortOrder: 'asc'
-    }));
+      })
+    );
   });
 
   it('should show clear filters button when filters are active', async () => {
@@ -149,7 +167,7 @@ describe('TaskFilterBar', () => {
     render(<TaskFilterBar filters={activeFilters} onFiltersChange={onFiltersChange} />);
 
     expect(screen.getByText('Clear Filters')).toBeInTheDocument();
-    
+
     await user.click(screen.getByText('Clear Filters'));
     expect(onFiltersChange).toHaveBeenCalledWith(initialFilters);
   });

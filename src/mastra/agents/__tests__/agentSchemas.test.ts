@@ -56,26 +56,26 @@ describe('Agent Schemas', () => {
     });
 
     it('should validate a column move suggestion', () => {
-        const validSuggestion = {
-          taskId: '123',
-          taskTitle: 'Important task',
-          details: {
-            type: 'column_move',
-            currentBoardId: 'b1',
-            currentBoardName: 'Board 1',
-            currentColumnId: 'c1',
-            currentColumnName: 'Col 1',
-            suggestedBoardId: 'b1',
-            suggestedBoardName: 'Board 1',
-            suggestedColumnId: 'c2',
-            suggestedColumnName: 'Col 2'
-          },
-          reason: 'Better organized here',
-          confidence: 80
-        };
-        const result = AutoOrganizeSuggestionSchema.safeParse(validSuggestion);
-        expect(result.success).toBe(true);
-      });
+      const validSuggestion = {
+        taskId: '123',
+        taskTitle: 'Important task',
+        details: {
+          type: 'column_move',
+          currentBoardId: 'b1',
+          currentBoardName: 'Board 1',
+          currentColumnId: 'c1',
+          currentColumnName: 'Col 1',
+          suggestedBoardId: 'b1',
+          suggestedBoardName: 'Board 1',
+          suggestedColumnId: 'c2',
+          suggestedColumnName: 'Col 2'
+        },
+        reason: 'Better organized here',
+        confidence: 80
+      };
+      const result = AutoOrganizeSuggestionSchema.safeParse(validSuggestion);
+      expect(result.success).toBe(true);
+    });
 
     it('should validate complete output schema', () => {
       const validOutput = {
@@ -120,17 +120,17 @@ describe('Agent Schemas', () => {
     });
 
     it('should invalidate if type is incorrect', () => {
-        const invalidRefinements = {
-          suggestions: [
-            {
-              type: 'invalid_type',
-              text: 'Some text',
-              description: 'Some desc'
-            }
-          ]
-        };
-        const result = RefinementSuggestionSchema.safeParse(invalidRefinements);
-        expect(result.success).toBe(false);
-      });
+      const invalidRefinements = {
+        suggestions: [
+          {
+            type: 'invalid_type',
+            text: 'Some text',
+            description: 'Some desc'
+          }
+        ]
+      };
+      const result = RefinementSuggestionSchema.safeParse(invalidRefinements);
+      expect(result.success).toBe(false);
+    });
   });
 });

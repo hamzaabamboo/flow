@@ -1,5 +1,6 @@
 // Test setup file for Vitest
 import { afterEach, vi } from 'vitest';
+
 import '@testing-library/jest-dom';
 
 // Mock fetch globally
@@ -46,8 +47,13 @@ if (typeof (global as any).Bun === 'undefined') {
     CryptoHasher: class {
       private data: string = '';
       constructor(private algo: string) {}
-      update(data: string) { this.data += data; return this; }
-      digest(encoding: string = 'hex') { return `mock-hash-${this.algo}-${encoding}-${this.data}`; }
+      update(data: string) {
+        this.data += data;
+        return this;
+      }
+      digest(encoding: string = 'hex') {
+        return `mock-hash-${this.algo}-${encoding}-${this.data}`;
+      }
     }
   };
 }

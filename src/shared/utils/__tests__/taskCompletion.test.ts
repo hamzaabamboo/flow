@@ -17,8 +17,8 @@ describe('shared taskCompletion utils', () => {
     expect(isTaskCompleted(recurringTask)).toBe(true);
 
     const recurringTaskIncomplete = {
-        ...recurringTask,
-        completed: false
+      ...recurringTask,
+      completed: false
     };
     expect(isTaskCompleted(recurringTaskIncomplete)).toBe(false);
   });

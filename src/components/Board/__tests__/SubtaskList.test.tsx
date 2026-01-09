@@ -1,60 +1,62 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SubtaskList } from '../SubtaskList';
-import { api } from '../../../api/client';
+import { mockApi, getMockFn, getMockRoute } from '../../../test/mocks/api';
 
-// Mock API
-vi.mock('../../../api/client', () => ({
-  api: {
-    api: {
-      subtasks: Object.assign(vi.fn(), {
-        post: vi.fn(),
-        task: vi.fn(() => ({
-            get: vi.fn()
-        })),
-      })
-    }
-  }
-}));
-
-// Mock nested calls
-const mockSubtaskPatch = vi.fn();
-const mockSubtaskDelete = vi.fn();
-(api.api.subtasks as any).mockImplementation((idObj: any) => ({
-    patch: mockSubtaskPatch,
-    delete: mockSubtaskDelete,
-}));
+// Correctly mock using dynamic import to avoid hoisting issues with shared mocks
+vi.mock('../../../api/client', async () => {
+  const mocks = await import('../../../test/mocks/api');
+  return {
+    api: mocks.mockApi
+  };
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
-    mutations: { retry: false },
-  },
+    mutations: { retry: false }
+  }
 });
 
 const renderWithProviders = (ui: React.ReactElement) => {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 };
 
 describe('SubtaskList', () => {
   const taskId = 'task-1';
   const mockSubtasks = [
-    { id: 's1', title: 'Sub 1', completed: false },
-    { id: 's2', title: 'Sub 2', completed: true },
+    {
+      id: 's1',
+      taskId,
+      title: 'Sub 1',
+      completed: false,
+      order: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 's2',
+      taskId,
+      title: 'Sub 2',
+      completed: true,
+      order: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
-    
-    (api.api.subtasks.task as any).mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: mockSubtasks, error: null })
+
+    // Access the shared mock directly
+    const subtasks = mockApi.api.subtasks;
+
+    // We mock the .task({}).get() chain
+    getMockFn(subtasks.task).mockReturnValue({
+      get: vi.fn().mockResolvedValue({ data: mockSubtasks, error: null })
     });
   });
 
@@ -62,9 +64,9 @@ describe('SubtaskList', () => {
     renderWithProviders(<SubtaskList taskId={taskId} />);
 
     await waitFor(() => {
-        expect(screen.getByText('Sub 1')).toBeInTheDocument();
-        expect(screen.getByText('Sub 2')).toBeInTheDocument();
-        expect(screen.getByText(/Subtasks \(1\/2\)/)).toBeInTheDocument();
+      expect(screen.getByText('Sub 1')).toBeInTheDocument();
+      expect(screen.getByText('Sub 2')).toBeInTheDocument();
+      expect(screen.getByText(/Subtasks \(1\/2\)/)).toBeInTheDocument();
     });
   });
 
@@ -72,9 +74,9 @@ describe('SubtaskList', () => {
     renderWithProviders(<SubtaskList taskId={taskId} compact={true} />);
 
     await waitFor(() => {
-        expect(screen.getByText('1/2')).toBeInTheDocument();
-        expect(screen.getByText('subtasks')).toBeInTheDocument();
-        expect(screen.queryByText('Sub 1')).not.toBeInTheDocument();
+      expect(screen.getByText('1/2')).toBeInTheDocument();
+      expect(screen.getByText('subtasks')).toBeInTheDocument();
+      expect(screen.queryByText('Sub 1')).not.toBeInTheDocument();
     });
   });
 
@@ -88,18 +90,32 @@ describe('SubtaskList', () => {
     fireEvent.click(screen.getByLabelText('Add subtask'));
 
     const input = await screen.findByPlaceholderText('Add subtask...');
-    
-    (api.api.subtasks.post as vi.Mock).mockResolvedValue({ data: { id: 's3' }, error: null });
+
+    // Setup post response
+    getMockRoute(mockApi.api.subtasks).post.mockResolvedValue({ data: { id: 's3' }, error: null });
 
     await user.type(input, 'New Subtask{Enter}');
 
     await waitFor(() => {
-        expect(api.api.subtasks.post).toHaveBeenCalledWith(expect.objectContaining({ title: 'New Subtask' }));
+      expect(mockApi.api.subtasks.post).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'New Subtask' })
+      );
     });
   });
 
   it('should handle toggling subtask completion', async () => {
-    mockSubtaskPatch.mockResolvedValue({ data: {}, error: null });
+    // subtasks({ id }) is a function call on the route
+    const subtasksRoute = getMockRoute(mockApi.api.subtasks);
+
+    const itemMock = {
+      patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      delete: vi.fn(),
+      get: vi.fn(),
+      post: vi.fn()
+    };
+
+    getMockFn(subtasksRoute).mockReturnValue(itemMock);
+
     renderWithProviders(<SubtaskList taskId={taskId} />);
 
     await waitFor(() => screen.getByText('Sub 1'));
@@ -108,28 +124,35 @@ describe('SubtaskList', () => {
     fireEvent.click(checkboxes[0]); // Toggle Sub 1
 
     await waitFor(() => {
-        expect(api.api.subtasks).toHaveBeenCalledWith({ id: 's1' });
-        expect(mockSubtaskPatch).toHaveBeenCalledWith({ completed: true });
+      expect(subtasksRoute).toHaveBeenCalledWith({ id: 's1' });
+      expect(itemMock.patch).toHaveBeenCalledWith({ completed: true });
     });
   });
 
   it('should handle subtask deletion', async () => {
-    mockSubtaskDelete.mockResolvedValue({ data: {}, error: null });
+    const subtasksRoute = getMockRoute(mockApi.api.subtasks);
+
+    const itemMock = {
+      delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      patch: vi.fn(),
+      get: vi.fn(),
+      post: vi.fn()
+    };
+
+    getMockFn(subtasksRoute).mockReturnValue(itemMock);
+
     renderWithProviders(<SubtaskList taskId={taskId} />);
 
     await waitFor(() => screen.getByText('Sub 1'));
 
-    // Find X buttons
-    const deleteBtns = screen.getAllByRole('button');
-    // Sub 1 row is HStack(Checkbox, Text, IconButton(X))
-    // We can use within if we identify the row
     const subRow = screen.getByText('Sub 1').closest('div');
-    const xBtn = within(subRow as HTMLElement).getByRole('button');
-    fireEvent.click(xBtn);
+    const buttons = within(subRow as HTMLElement).getAllByRole('button');
+
+    fireEvent.click(buttons[buttons.length - 1]);
 
     await waitFor(() => {
-        expect(api.api.subtasks).toHaveBeenCalledWith({ id: 's1' });
-        expect(mockSubtaskDelete).toHaveBeenCalled();
+      expect(subtasksRoute).toHaveBeenCalledWith({ id: 's1' });
+      expect(itemMock.delete).toHaveBeenCalled();
     });
   });
 });

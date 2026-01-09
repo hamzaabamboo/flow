@@ -20,8 +20,8 @@ describe('hamauth-utils', () => {
   it('validateHamAuthToken should return userInfo on success', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockUserInfo),
-    } as any);
+      json: () => Promise.resolve(mockUserInfo)
+    }) as unknown as typeof fetch;
 
     const result = await validateHamAuthToken(mockAccessToken);
     expect(result).toEqual(mockUserInfo);
@@ -38,8 +38,8 @@ describe('hamauth-utils', () => {
   it('validateHamAuthToken should return null if email missing in response', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ sub: 'u1' }), // No email
-    } as any);
+      json: () => Promise.resolve({ sub: 'u1' }) // No email
+    }) as unknown as typeof fetch;
 
     const result = await validateHamAuthToken(mockAccessToken);
     expect(result).toBeNull();
@@ -49,8 +49,8 @@ describe('hamauth-utils', () => {
     const token = 'token-cache';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockUserInfo),
-    } as any);
+      json: () => Promise.resolve(mockUserInfo)
+    }) as unknown as typeof fetch;
 
     // First call - should fetch
     const result1 = await validateHamAuthTokenCached(token);
@@ -67,8 +67,8 @@ describe('hamauth-utils', () => {
     const token = 'token-exp';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockUserInfo),
-    } as any);
+      json: () => Promise.resolve(mockUserInfo)
+    }) as unknown as typeof fetch;
 
     await validateHamAuthTokenCached(token);
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -85,17 +85,17 @@ describe('hamauth-utils', () => {
     // 1. Success first
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockUserInfo),
-    } as any);
+      json: () => Promise.resolve(mockUserInfo)
+    }) as unknown as typeof fetch;
 
     await validateHamAuthTokenCached(token);
-    
+
     // 2. Failure next (after expiration)
     vi.advanceTimersByTime(2 * 60 * 1000);
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 401
-    } as any);
+    }) as unknown as typeof fetch;
 
     const result = await validateHamAuthTokenCached(token);
     expect(result).toBeNull();

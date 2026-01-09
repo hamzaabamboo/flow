@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BoardsPage from '../boards/+Page';
 import { SpaceContext } from '../../contexts/SpaceContext';
@@ -9,21 +9,26 @@ import { DialogProvider } from '../../utils/useDialogs';
 
 // Mock vike/client/router
 vi.mock('vike/client/router', () => ({
-  navigate: vi.fn(),
+  navigate: vi.fn()
 }));
 
-const renderWithProviders = (ui: React.ReactElement, { isAuthenticated = true, currentSpace = 'personal' } = {}) => {
+const renderWithProviders = (
+  ui: React.ReactElement,
+  { isAuthenticated = true, currentSpace = 'personal' } = {}
+) => {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false } }
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ isAuthenticated, login: vi.fn(), logout: vi.fn(), user: null, loading: false } as any}>
+      <AuthContext.Provider
+        value={
+          { isAuthenticated, login: vi.fn(), logout: vi.fn(), user: null, loading: false } as any
+        }
+      >
         <SpaceContext.Provider value={{ currentSpace, setCurrentSpace: vi.fn() } as any}>
-          <DialogProvider>
-            {ui}
-          </DialogProvider>
+          <DialogProvider>{ui}</DialogProvider>
         </SpaceContext.Provider>
       </AuthContext.Provider>
     </QueryClientProvider>
@@ -33,14 +38,14 @@ const renderWithProviders = (ui: React.ReactElement, { isAuthenticated = true, c
 describe('BoardsPage', () => {
   const mockBoards = [
     { id: 'b1', name: 'Project Alpha', updatedAt: new Date().toISOString() },
-    { id: 'b2', name: 'Project Beta', updatedAt: new Date(Date.now() - 1000).toISOString() },
+    { id: 'b2', name: 'Project Beta', updatedAt: new Date(Date.now() - 1000).toISOString() }
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockBoards),
+      json: () => Promise.resolve(mockBoards)
     } as any);
   });
 
@@ -61,7 +66,7 @@ describe('BoardsPage', () => {
   it('should show empty state when no boards', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([]),
+      json: () => Promise.resolve([])
     } as any);
 
     renderWithProviders(<BoardsPage />);

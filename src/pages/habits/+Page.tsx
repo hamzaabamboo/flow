@@ -36,6 +36,12 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Sat' }
 ];
 
+interface HabitStats {
+  habitId: string;
+  totalCompletions: number;
+  completionRate: number;
+}
+
 export default function HabitsPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
@@ -68,9 +74,10 @@ export default function HabitsPage() {
       if (!habits || habits.length === 0) return [];
 
       const statsPromises = habits.map(async (habit) => {
-        const { data, error } = await api.api.habits({ habitId: habit.id }).stats.get();
-        if (error) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
-        return data;
+        const { data, error } = await api.api.habits({ id: habit.id }).stats.get();
+        if (error)
+          return { habitId: habit.id, totalCompletions: 0, completionRate: 0 } as HabitStats;
+        return data as HabitStats;
       });
 
       return Promise.all(statsPromises);
@@ -81,7 +88,10 @@ export default function HabitsPage() {
   // Create habit
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { data: result, error } = await api.api.habits.post({ ...data, space: currentSpace });
+      const { data: result, error } = await api.api.habits.post({
+        ...data,
+        space: currentSpace
+      } as any);
       if (error) throw new Error('Failed to create habit');
       return result;
     },
@@ -95,7 +105,7 @@ export default function HabitsPage() {
   // Update habit
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      const { data: result, error } = await api.api.habits({ habitId: id }).patch(data);
+      const { data: result, error } = await api.api.habits({ id }).patch(data as any);
       if (error) throw new Error('Failed to update habit');
       return result;
     },
@@ -109,7 +119,7 @@ export default function HabitsPage() {
   // Delete habit
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api.habits({ habitId: id }).delete();
+      const { data, error } = await api.api.habits({ id }).delete();
       if (error) throw new Error('Failed to delete habit');
       return data;
     },
@@ -121,7 +131,7 @@ export default function HabitsPage() {
   // Toggle habit completion (used in Agenda view, not here)
   const _toggleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api.habits({ habitId: id }).log.post({});
+      const { data, error } = await api.api.habits({ id }).log.post({} as any);
       if (error) throw new Error('Failed to log habit');
       return data;
     },
@@ -133,7 +143,7 @@ export default function HabitsPage() {
   // Toggle habit active status
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { data, error } = await api.api.habits({ habitId: id }).patch({ active });
+      const { data, error } = await api.api.habits({ id }).patch({ active } as any);
       if (error) throw new Error('Failed to toggle habit');
       return data;
     },
@@ -167,7 +177,7 @@ export default function HabitsPage() {
     setFormData({
       name: habit.name,
       description: habit.description || '',
-      frequency: habit.frequency === 'custom' ? 'weekly' : habit.frequency,
+      frequency: habit.frequency === 'custom' ? 'weekly' : (habit.frequency as 'daily' | 'weekly'),
       targetDays: habit.targetDays || [],
       reminderTime: habit.reminderTime || '',
       color: habit.color || '#3b82f6',
@@ -280,7 +290,7 @@ export default function HabitsPage() {
             }}
           >
             {filteredHabits.map((habit) => {
-              const habitStats = habitsStats?.find((s) => s.habitId === habit.id);
+              const habitStats = habitsStats?.find((s: HabitStats) => s.habitId === habit.id);
               return (
                 <Card.Root
                   key={habit.id}

@@ -64,7 +64,10 @@ vi.mock('../../db', () => ({
 vi.mock('../../auth/withAuth', async () => {
   const { Elysia } = await import('elysia');
   return {
-    withAuth: () => new Elysia().derive({ as: 'global' }, () => ({ user: { id: 'user-123', email: 'test@example.com' } }))
+    withAuth: () =>
+      new Elysia().derive({ as: 'global' }, () => ({
+        user: { id: 'user-123', email: 'test@example.com' }
+      }))
   };
 });
 
@@ -147,14 +150,14 @@ describe('Inbox Routes', () => {
 
       vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
         const tx = {
-            select: vi.fn().mockReturnValue(createMockQueryBuilder([mockItem])),
-            from: vi.fn().mockReturnThis(),
-            where: vi.fn().mockReturnThis(),
-            insert: vi.fn().mockReturnThis(),
-            values: vi.fn().mockReturnThis(),
-            returning: vi.fn().mockResolvedValue([createdTask]),
-            update: vi.fn().mockReturnThis(),
-            set: vi.fn().mockReturnThis()
+          select: vi.fn().mockReturnValue(createMockQueryBuilder([mockItem])),
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          values: vi.fn().mockReturnThis(),
+          returning: vi.fn().mockResolvedValue([createdTask]),
+          update: vi.fn().mockReturnThis(),
+          set: vi.fn().mockReturnThis()
         };
         return cb(tx);
       });
@@ -174,36 +177,43 @@ describe('Inbox Routes', () => {
 
     it('should return error if item not found during conversion', async () => {
       vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
-          const tx = {
-              select: vi.fn().mockReturnValue(createMockQueryBuilder([])),
-              from: vi.fn().mockReturnThis(),
-              where: vi.fn().mockReturnThis(),
-          };
-          return cb(tx);
+        const tx = {
+          select: vi.fn().mockReturnValue(createMockQueryBuilder([])),
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis()
+        };
+        return cb(tx);
       });
 
-      const res = await app.handle(new Request('http://localhost/inbox/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: 'bad', columnId: 'c1' })
-      }));
-      
+      const res = await app.handle(
+        new Request('http://localhost/inbox/convert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: 'bad', columnId: 'c1' })
+        })
+      );
+
       expect(res.status).toBe(500);
     });
   });
 
   describe('POST /inbox/delete', () => {
     it('should handle multiple items deletion', async () => {
-      const mockItems = [{ id: 'i1', space: 'work' }, { id: 'i2', space: 'personal' }];
+      const mockItems = [
+        { id: 'i1', space: 'work' },
+        { id: 'i2', space: 'personal' }
+      ];
       vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockItems) as any);
       vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]) as any);
 
-      const res = await app.handle(new Request('http://localhost/inbox/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: ['i1', 'i2'] })
-      }));
-      
+      const res = await app.handle(
+        new Request('http://localhost/inbox/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemIds: ['i1', 'i2'] })
+        })
+      );
+
       expect(res.status).toBe(200);
       expect(db.delete).toHaveBeenCalled();
     });

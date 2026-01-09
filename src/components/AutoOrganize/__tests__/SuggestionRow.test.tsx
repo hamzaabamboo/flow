@@ -1,43 +1,42 @@
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SuggestionRow } from '../SuggestionRow';
-import { SpaceContext } from '../../../contexts/SpaceContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SpaceContext } from '../../../contexts/SpaceContext';
+import { SuggestionRow } from '../SuggestionRow';
 import type { AutoOrganizeSuggestion } from '../../../shared/types/autoOrganize';
-import { api } from '../../../api/client';
 import React from 'react';
+import { mockApi, getMockRoute } from '../../../test/mocks/api';
 
 // Mock API
-vi.mock('../../../api/client', () => ({
-  api: {
-    api: {
-      boards: { get: vi.fn() }
-    }
-  }
-}));
+vi.mock('../../../api/client', async () => {
+  const mocks = await import('../../../test/mocks/api');
+  return {
+    api: mocks.mockApi
+  };
+});
 
 // Mock SimpleDatePicker
 vi.mock('../../ui/simple-date-picker', () => ({
-  SimpleDatePicker: ({ value, onChange }: any) => (
-    <input 
-      role="textbox"
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
-    />
+  SimpleDatePicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <input role="textbox" value={value} onChange={(e) => onChange(e.target.value)} />
   )
 }));
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false } },
+  defaultOptions: { queries: { retry: false } }
 });
+
+const mockSpaceContext = {
+  currentSpace: 'work' as const,
+  setCurrentSpace: vi.fn(),
+  toggleSpace: vi.fn()
+};
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={{ currentSpace: 'work', setCurrentSpace: vi.fn() } as any}>
-        {ui}
-      </SpaceContext.Provider>
+      <SpaceContext.Provider value={mockSpaceContext}>{ui}</SpaceContext.Provider>
     </QueryClientProvider>
   );
 };
@@ -64,7 +63,9 @@ describe('SuggestionRow', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (api.api.boards.get as vi.Mock).mockResolvedValue({ data: [], error: null });
+    queryClient.clear();
+    const boardsRoute = getMockRoute(mockApi.api.boards);
+    boardsRoute.get.mockResolvedValue({ data: [], error: null });
   });
 
   it('should handle editing priority', async () => {
@@ -80,16 +81,17 @@ describe('SuggestionRow', () => {
     };
 
     renderWithProviders(
-      <SuggestionRow 
-        suggestion={suggestion} 
-        onToggleIncluded={vi.fn()} 
-        onUpdateSuggestion={onUpdateSuggestion} 
+      <SuggestionRow
+        suggestion={suggestion}
+        onToggleIncluded={vi.fn()}
+        onUpdateSuggestion={onUpdateSuggestion}
       />
     );
 
     // Enter edit mode
     const buttons = screen.getAllByRole('button');
-    const editBtn = buttons.find(b => b.innerHTML.includes('lucide-pen'));
+    // Look for button containing an svg (Edit2 icon)
+    const editBtn = buttons.find((b) => b.querySelector('svg'));
     await user.click(editBtn!);
 
     // Change priority (combobox)
@@ -101,11 +103,14 @@ describe('SuggestionRow', () => {
     // Save
     await user.click(screen.getByRole('button', { name: /Save/i }));
 
-    expect(onUpdateSuggestion).toHaveBeenCalledWith('t1', expect.objectContaining({
+    expect(onUpdateSuggestion).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({
         details: expect.objectContaining({
-            suggestedPriority: 'high'
+          suggestedPriority: 'high'
         })
-    }));
+      })
+    );
   });
 
   it('should handle editing due date', async () => {
@@ -121,16 +126,16 @@ describe('SuggestionRow', () => {
     };
 
     renderWithProviders(
-      <SuggestionRow 
-        suggestion={suggestion} 
-        onToggleIncluded={vi.fn()} 
-        onUpdateSuggestion={onUpdateSuggestion} 
+      <SuggestionRow
+        suggestion={suggestion}
+        onToggleIncluded={vi.fn()}
+        onUpdateSuggestion={onUpdateSuggestion}
       />
     );
 
     // Enter edit mode
     const buttons = screen.getAllByRole('button');
-    const editBtn = buttons.find(b => b.innerHTML.includes('lucide-pen'));
+    const editBtn = buttons.find((b) => b.querySelector('svg'));
     await user.click(editBtn!);
 
     // Change due date (mocked textbox)
@@ -140,37 +145,48 @@ describe('SuggestionRow', () => {
     // Save
     await user.click(screen.getByRole('button', { name: /Save/i }));
 
-    expect(onUpdateSuggestion).toHaveBeenCalledWith('t1', expect.objectContaining({
+    expect(onUpdateSuggestion).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({
         details: expect.objectContaining({
-            suggestedDueDate: expect.stringContaining('2024-12-31')
+          suggestedDueDate: expect.stringContaining('2024-12-31')
         })
-    }));
+      })
+    );
   });
 
   it('should handle editing column move', async () => {
     const user = userEvent.setup();
     const onUpdateSuggestion = vi.fn();
     const mockBoards = [
-        { id: 'b1', name: 'Board 1', columns: [{ id: 'c1', name: 'To Do' }, { id: 'c2', name: 'Done' }] },
-        { id: 'b2', name: 'Board 2', columns: [{ id: 'c3', name: 'Inbox' }] }
+      {
+        id: 'b1',
+        name: 'Board 1',
+        columns: [
+          { id: 'c1', name: 'To Do' },
+          { id: 'c2', name: 'Done' }
+        ]
+      },
+      { id: 'b2', name: 'Board 2', columns: [{ id: 'c3', name: 'Inbox' }] }
     ];
-    (api.api.boards.get as vi.Mock).mockResolvedValue({ data: mockBoards, error: null });
+    const boardsRoute = getMockRoute(mockApi.api.boards);
+    boardsRoute.get.mockResolvedValue({ data: mockBoards, error: null });
 
     renderWithProviders(
-      <SuggestionRow 
-        suggestion={mockSuggestion} 
-        onToggleIncluded={vi.fn()} 
-        onUpdateSuggestion={onUpdateSuggestion} 
+      <SuggestionRow
+        suggestion={mockSuggestion}
+        onToggleIncluded={vi.fn()}
+        onUpdateSuggestion={onUpdateSuggestion}
       />
     );
 
     // Enter edit mode
     const buttons = screen.getAllByRole('button');
-    const editBtn = buttons.find(b => b.innerHTML.includes('lucide-pen'));
+    const editBtn = buttons.find((b) => b.querySelector('svg'));
     await user.click(editBtn!);
 
     // Should fetch boards
-    await waitFor(() => expect(api.api.boards.get).toHaveBeenCalled());
+    await waitFor(() => expect(boardsRoute.get).toHaveBeenCalled());
 
     // Change board
     const triggers = screen.getAllByRole('combobox');
@@ -181,11 +197,14 @@ describe('SuggestionRow', () => {
     // Save
     await user.click(screen.getByRole('button', { name: /Save/i }));
 
-    expect(onUpdateSuggestion).toHaveBeenCalledWith('t1', expect.objectContaining({
+    expect(onUpdateSuggestion).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({
         details: expect.objectContaining({
-            suggestedBoardId: 'b2',
-            suggestedColumnId: 'c3'
+          suggestedBoardId: 'b2',
+          suggestedColumnId: 'c3'
         })
-    }));
+      })
+    );
   });
 });

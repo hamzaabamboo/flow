@@ -13,23 +13,23 @@ vi.mock('../../api/client', () => ({
       tasks: vi.fn(() => ({
         delete: vi.fn(),
         get: vi.fn(),
-        patch: vi.fn(),
-      })),
-    },
-  },
+        patch: vi.fn()
+      }))
+    }
+  }
 }));
 
 // Mock vike/client/router
 vi.mock('vike/client/router', () => ({
-  navigate: vi.fn(),
+  navigate: vi.fn()
 }));
 
 // Mock custom hook useDialogs
 const mockConfirm = vi.fn();
 vi.mock('../../utils/useDialogs', () => ({
   useDialogs: () => ({
-    confirm: mockConfirm,
-  }),
+    confirm: mockConfirm
+  })
 }));
 
 const mockSpaceContext = {
@@ -38,21 +38,19 @@ const mockSpaceContext = {
   setSpaces: vi.fn(),
   setCurrentSpace: vi.fn(),
   getSpaceById: vi.fn(),
-  toggleSpace: vi.fn(),
+  toggleSpace: vi.fn()
 };
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
-    mutations: { retry: false },
-  },
+    mutations: { retry: false }
+  }
 });
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <SpaceContext.Provider value={mockSpaceContext as any}>
-      {children}
-    </SpaceContext.Provider>
+    <SpaceContext.Provider value={mockSpaceContext as any}>{children}</SpaceContext.Provider>
   </QueryClientProvider>
 );
 
@@ -62,12 +60,12 @@ describe('useTaskActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
-    
+
     // Setup nested mocks for api.api.tasks
     (api.api.tasks as any).mockReturnValue({
-        delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
-        get: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
-        patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      get: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
+      patch: vi.fn().mockResolvedValue({ data: {}, error: null })
     });
     // For tasks.post
     (api.api.tasks as any).post = vi.fn().mockResolvedValue({ data: {}, error: null });
@@ -94,10 +92,10 @@ describe('useTaskActions', () => {
     });
 
     expect(mockConfirm).toHaveBeenCalled();
-    
+
     await waitFor(() => {
-        expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
-        expect(onSuccess).toHaveBeenCalled();
+      expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
+      expect(onSuccess).toHaveBeenCalled();
     });
   });
 
@@ -110,9 +108,9 @@ describe('useTaskActions', () => {
     });
 
     expect(mockConfirm).toHaveBeenCalled();
-    
+
     await waitFor(() => {
-        expect(api.api.tasks).not.toHaveBeenCalled();
+      expect(api.api.tasks).not.toHaveBeenCalled();
     });
   });
 
@@ -125,12 +123,14 @@ describe('useTaskActions', () => {
     });
 
     await waitFor(() => {
-        expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
-        expect((api.api.tasks as any).post).toHaveBeenCalledWith(expect.objectContaining({
-            title: 'Test Task (Copy)',
-            completed: false
-        }));
-        expect(onSuccess).toHaveBeenCalled();
+      expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
+      expect((api.api.tasks as any).post).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Test Task (Copy)',
+          completed: false
+        })
+      );
+      expect(onSuccess).toHaveBeenCalled();
     });
   });
 

@@ -1,13 +1,13 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { 
-  useNotesEnabled, 
-  useTaskNote, 
-  useCreateNote, 
-  useSearchNotes, 
-  useLinkNote, 
-  useUnlinkNote 
+import {
+  useNotesEnabled,
+  useTaskNote,
+  useCreateNote,
+  useSearchNotes,
+  useLinkNote,
+  useUnlinkNote
 } from '../useNotes';
 import { api } from '../../api/client';
 
@@ -21,23 +21,21 @@ vi.mock('../../api/client', () => ({
         create: { post: vi.fn() },
         search: { post: vi.fn() },
         link: { post: vi.fn() },
-        unlink: vi.fn(() => ({ delete: vi.fn() })),
-      },
-    },
-  },
+        unlink: vi.fn(() => ({ delete: vi.fn() }))
+      }
+    }
+  }
 }));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
-    mutations: { retry: false },
-  },
+    mutations: { retry: false }
+  }
 });
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    {children}
-  </QueryClientProvider>
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 );
 
 describe('useNotes hooks', () => {
@@ -47,7 +45,10 @@ describe('useNotes hooks', () => {
   });
 
   it('useNotesEnabled should fetch status', async () => {
-    (api.api.notes.enabled.get as vi.Mock).mockResolvedValue({ data: { enabled: true }, error: null });
+    (api.api.notes.enabled.get as vi.Mock).mockResolvedValue({
+      data: { enabled: true },
+      error: null
+    });
 
     const { result } = renderHook(() => useNotesEnabled(), { wrapper });
 
@@ -59,7 +60,7 @@ describe('useNotes hooks', () => {
   it('useTaskNote should fetch note for a task', async () => {
     const mockNote = { id: 'note-1', title: 'Note 1', url: 'http://note' };
     (api.api.notes.task as any).mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: { note: mockNote }, error: null })
+      get: vi.fn().mockResolvedValue({ data: { note: mockNote }, error: null })
     });
 
     const { result } = renderHook(() => useTaskNote('task-1'), { wrapper });
@@ -70,7 +71,10 @@ describe('useNotes hooks', () => {
   });
 
   it('useCreateNote should trigger mutation', async () => {
-    (api.api.notes.create.post as vi.Mock).mockResolvedValue({ data: { id: 'new-note' }, error: null });
+    (api.api.notes.create.post as vi.Mock).mockResolvedValue({
+      data: { id: 'new-note' },
+      error: null
+    });
 
     const { result } = renderHook(() => useCreateNote(), { wrapper });
 
@@ -82,7 +86,10 @@ describe('useNotes hooks', () => {
 
   it('useSearchNotes should return search results', async () => {
     const mockDocs = [{ id: '1', title: 'Doc 1', url: 'url1', updatedAt: '' }];
-    (api.api.notes.search.post as vi.Mock).mockResolvedValue({ data: { documents: mockDocs }, error: null });
+    (api.api.notes.search.post as vi.Mock).mockResolvedValue({
+      data: { documents: mockDocs },
+      error: null
+    });
 
     const { result } = renderHook(() => useSearchNotes(), { wrapper });
 
@@ -94,7 +101,10 @@ describe('useNotes hooks', () => {
   });
 
   it('useLinkNote should link a note to a task', async () => {
-    (api.api.notes.link.post as vi.Mock).mockResolvedValue({ data: { success: true }, error: null });
+    (api.api.notes.link.post as vi.Mock).mockResolvedValue({
+      data: { success: true },
+      error: null
+    });
 
     const { result } = renderHook(() => useLinkNote(), { wrapper });
 
@@ -106,7 +116,7 @@ describe('useNotes hooks', () => {
 
   it('useUnlinkNote should unlink note from task', async () => {
     (api.api.notes.unlink as any).mockReturnValue({
-        delete: vi.fn().mockResolvedValue({ data: { success: true }, error: null })
+      delete: vi.fn().mockResolvedValue({ data: { success: true }, error: null })
     });
 
     const { result } = renderHook(() => useUnlinkNote(), { wrapper });

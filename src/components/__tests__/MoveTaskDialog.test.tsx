@@ -10,10 +10,10 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       boards: {
-        get: vi.fn(),
-      },
-    },
-  },
+        get: vi.fn()
+      }
+    }
+  }
 }));
 
 const mockSpaceContext = {
@@ -22,13 +22,13 @@ const mockSpaceContext = {
   setSpaces: vi.fn(),
   setCurrentSpace: vi.fn(),
   getSpaceById: vi.fn(),
-  toggleSpace: vi.fn(),
+  toggleSpace: vi.fn()
 };
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false },
-  },
+    queries: { retry: false }
+  }
 });
 
 const mockBoards = [
@@ -37,24 +37,20 @@ const mockBoards = [
     name: 'Work Board',
     columns: [
       { id: 'col-1', name: 'To Do' },
-      { id: 'col-2', name: 'Done' },
-    ],
+      { id: 'col-2', name: 'Done' }
+    ]
   },
   {
     id: 'board-2',
     name: 'Other Board',
-    columns: [
-      { id: 'col-3', name: 'Backlog' },
-    ],
-  },
+    columns: [{ id: 'col-3', name: 'Backlog' }]
+  }
 ];
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={mockSpaceContext as any}>
-        {ui}
-      </SpaceContext.Provider>
+      <SpaceContext.Provider value={mockSpaceContext as any}>{ui}</SpaceContext.Provider>
     </QueryClientProvider>
   );
 };
@@ -67,40 +63,42 @@ describe('MoveTaskDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
-    
+
     // Mock API response
     (api.api.boards.get as any).mockResolvedValue({
       data: mockBoards,
-      error: null,
+      error: null
     });
   });
 
   it('should render dialog when open', async () => {
     renderWithProviders(
-      <MoveTaskDialog 
-        open={true} 
-        onOpenChange={onOpenChange} 
-        task={mockTask as any} 
-        onMove={onMove} 
+      <MoveTaskDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        task={mockTask as any}
+        onMove={onMove}
       />
     );
 
     expect(screen.getByRole('heading', { name: 'Move Task' })).toBeInTheDocument();
-    expect(screen.getByText(/Move "Test Task" to a different board or column/i)).toBeInTheDocument();
-    
+    expect(
+      screen.getByText(/Move "Test Task" to a different board or column/i)
+    ).toBeInTheDocument();
+
     await waitFor(() => {
-        expect(screen.getAllByText('Work Board').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('To Do').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Work Board').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('To Do').length).toBeGreaterThan(0);
     });
   });
 
   it('should call onMove when move button is clicked', async () => {
     renderWithProviders(
-      <MoveTaskDialog 
-        open={true} 
-        onOpenChange={onOpenChange} 
-        task={mockTask as any} 
-        onMove={onMove} 
+      <MoveTaskDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        task={mockTask as any}
+        onMove={onMove}
       />
     );
 
@@ -114,11 +112,11 @@ describe('MoveTaskDialog', () => {
 
   it('should update columns when a new board is selected', async () => {
     renderWithProviders(
-      <MoveTaskDialog 
-        open={true} 
-        onOpenChange={onOpenChange} 
-        task={mockTask as any} 
-        onMove={onMove} 
+      <MoveTaskDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        task={mockTask as any}
+        onMove={onMove}
       />
     );
 

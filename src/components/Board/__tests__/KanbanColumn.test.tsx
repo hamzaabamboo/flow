@@ -4,7 +4,7 @@ import { KanbanColumn } from '../KanbanColumn';
 
 // Mock dnd-kit
 vi.mock('@dnd-kit/core', () => ({
-  useDroppable: () => ({ setNodeRef: vi.fn(), isOver: false }),
+  useDroppable: () => ({ setNodeRef: vi.fn(), isOver: false })
 }));
 
 vi.mock('@dnd-kit/sortable', () => ({
@@ -14,10 +14,10 @@ vi.mock('@dnd-kit/sortable', () => ({
     setNodeRef: vi.fn(),
     transform: null,
     transition: null,
-    isDragging: false,
+    isDragging: false
   }),
   SortableContext: ({ children }: any) => <div>{children}</div>,
-  verticalListSortingStrategy: {},
+  verticalListSortingStrategy: {}
 }));
 
 // Mock useDialogs
@@ -26,15 +26,13 @@ const mockConfirm = vi.fn();
 vi.mock('../../../utils/useDialogs', () => ({
   useDialogs: () => ({
     alert: mockAlert,
-    confirm: mockConfirm,
-  }),
+    confirm: mockConfirm
+  })
 }));
 
 describe('KanbanColumn', () => {
   const mockColumn = { id: 'col-1', name: 'To Do', position: 0, wipLimit: 5 };
-  const mockTasks = [
-    { id: 't1', title: 'Task 1', columnId: 'col-1' },
-  ];
+  const mockTasks = [{ id: 't1', title: 'Task 1', columnId: 'col-1' }];
 
   const mockHandlers = {
     onAddTask: vi.fn(),
@@ -43,7 +41,7 @@ describe('KanbanColumn', () => {
     getPriorityColor: vi.fn(() => 'blue'),
     onRenameColumn: vi.fn(),
     onDeleteColumn: vi.fn(),
-    onUpdateWipLimit: vi.fn(),
+    onUpdateWipLimit: vi.fn()
   };
 
   beforeEach(() => {
@@ -52,9 +50,9 @@ describe('KanbanColumn', () => {
 
   it('should render column header and tasks', () => {
     render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={mockTasks as any} 
+      <KanbanColumn
+        column={mockColumn as any}
+        tasks={mockTasks as any}
         boardId="b1"
         {...mockHandlers}
       />
@@ -68,9 +66,9 @@ describe('KanbanColumn', () => {
   it('should show WIP limit warning when exceeded', () => {
     const overloadedTasks = Array(6).fill({ id: 't', title: 'Task' });
     render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={overloadedTasks as any} 
+      <KanbanColumn
+        column={mockColumn as any}
+        tasks={overloadedTasks as any}
         boardId="b1"
         {...mockHandlers}
       />
@@ -81,9 +79,9 @@ describe('KanbanColumn', () => {
 
   it('should call onAddTask when plus button is clicked', () => {
     render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={mockTasks as any} 
+      <KanbanColumn
+        column={mockColumn as any}
+        tasks={mockTasks as any}
         boardId="b1"
         {...mockHandlers}
       />
@@ -95,9 +93,9 @@ describe('KanbanColumn', () => {
 
   it('should open edit dialog and handle column update', async () => {
     render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={mockTasks as any} 
+      <KanbanColumn
+        column={mockColumn as any}
+        tasks={mockTasks as any}
         boardId="b1"
         {...mockHandlers}
       />
@@ -105,7 +103,7 @@ describe('KanbanColumn', () => {
 
     // Open menu
     fireEvent.click(screen.getByLabelText('Column options'));
-    
+
     // Click Edit Column (the menu item)
     const editBtns = await screen.findAllByText('Edit Column');
     fireEvent.click(editBtns[0]);
@@ -128,9 +126,9 @@ describe('KanbanColumn', () => {
 
   it('should prevent deletion if tasks are present', async () => {
     render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={mockTasks as any} 
+      <KanbanColumn
+        column={mockColumn as any}
+        tasks={mockTasks as any}
         boardId="b1"
         {...mockHandlers}
       />
@@ -139,29 +137,24 @@ describe('KanbanColumn', () => {
     fireEvent.click(screen.getByLabelText('Column options'));
     fireEvent.click(await screen.findByText('Delete Column'));
 
-    expect(mockAlert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
         title: 'Cannot Delete Column'
-    }));
+      })
+    );
     expect(mockHandlers.onDeleteColumn).not.toHaveBeenCalled();
   });
 
   it('should call onDeleteColumn when empty and confirmed', async () => {
     mockConfirm.mockResolvedValue(true);
-    render(
-      <KanbanColumn 
-        column={mockColumn as any} 
-        tasks={[]} 
-        boardId="b1"
-        {...mockHandlers}
-      />
-    );
+    render(<KanbanColumn column={mockColumn as any} tasks={[]} boardId="b1" {...mockHandlers} />);
 
     fireEvent.click(screen.getByLabelText('Column options'));
     fireEvent.click(await screen.findByText('Delete Column'));
 
     await waitFor(() => {
-        expect(mockConfirm).toHaveBeenCalled();
-        expect(mockHandlers.onDeleteColumn).toHaveBeenCalledWith('col-1');
+      expect(mockConfirm).toHaveBeenCalled();
+      expect(mockHandlers.onDeleteColumn).toHaveBeenCalledWith('col-1');
     });
   });
 });

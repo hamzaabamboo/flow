@@ -1,29 +1,29 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { UpcomingTasksCard } from '../UpcomingTasksCard';
 import type { CalendarEvent } from '../../../shared/types/calendar';
 
 describe('UpcomingTasksCard', () => {
   const mockTasks: CalendarEvent[] = [
-    { 
-        id: '1', 
-        title: 'Task 1', 
-        dueDate: '2026-01-10T10:00:00Z',
-        type: 'task',
-        completed: false,
-        instanceDate: '2026-01-10',
-        space: 'work'
+    {
+      id: '1',
+      title: 'Task 1',
+      dueDate: '2026-01-10T10:00:00Z',
+      type: 'task',
+      completed: false,
+      instanceDate: '2026-01-10',
+      space: 'work'
     },
-    { 
-        id: '2', 
-        title: 'Task 2', 
-        dueDate: undefined,
-        type: 'task',
-        completed: false,
-        instanceDate: '',
-        space: 'personal'
-    },
+    {
+      id: '2',
+      title: 'Task 2',
+      dueDate: undefined,
+      type: 'task',
+      completed: false,
+      instanceDate: '',
+      space: 'personal'
+    }
   ];
 
   const mockHandlers = {
@@ -32,7 +32,7 @@ describe('UpcomingTasksCard', () => {
     onDuplicate: vi.fn(),
     onDelete: vi.fn(),
     onMove: vi.fn(),
-    onCreateCopy: vi.fn(),
+    onCreateCopy: vi.fn()
   };
 
   it('should render list of upcoming tasks', () => {
@@ -92,7 +92,7 @@ describe('UpcomingTasksCard', () => {
 
     // Menu actions
     await user.click(screen.getByLabelText(/Task actions/i));
-    
+
     await user.click(await screen.findByRole('menuitem', { name: /Duplicate/i }));
     expect(mockHandlers.onDuplicate).toHaveBeenCalled();
 
@@ -107,10 +107,10 @@ describe('UpcomingTasksCard', () => {
 
   it('should call onCreateCopy for external events', async () => {
     const user = userEvent.setup();
-    const extTask: CalendarEvent = { 
-        ...mockTasks[0], 
-        type: 'external', 
-        id: 'ext-1' 
+    const extTask: CalendarEvent = {
+      ...mockTasks[0],
+      type: 'external',
+      id: 'ext-1'
     };
     render(<UpcomingTasksCard tasks={[extTask]} {...mockHandlers} />);
 

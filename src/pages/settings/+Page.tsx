@@ -85,6 +85,11 @@ interface ExternalCalendar {
   updatedAt: string;
 }
 
+interface OutlineCollection {
+  id: string;
+  name: string;
+}
+
 export default function SettingsPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
@@ -122,30 +127,35 @@ export default function SettingsPage() {
       const { data, error } = await api.api.settings.get();
       if (error) throw new Error('Failed to fetch settings');
 
-      // Initialize Outline settings
-      if (data.outlineApiUrl) setOutlineApiUrl(data.outlineApiUrl);
-      if (data.outlineApiKey) setOutlineApiKey(data.outlineApiKey);
-      if (data.outlineCollectionId) setOutlineCollectionId(data.outlineCollectionId);
+      const typedData = data as any as UserSettings;
 
-      return data;
+      // Initialize Outline settings
+      if (typedData.outlineApiUrl) setOutlineApiUrl(typedData.outlineApiUrl);
+      if (typedData.outlineApiKey) setOutlineApiKey(typedData.outlineApiKey);
+      if (typedData.outlineCollectionId) setOutlineCollectionId(typedData.outlineCollectionId);
+
+      return typedData;
     }
   });
 
   // Fetch Outline collections (only when configured)
-  const { data: outlineCollections, isLoading: collectionsLoading } = useQuery({
-    queryKey: ['outline-collections', settings?.outlineApiUrl, settings?.outlineApiKey],
-    queryFn: async () => {
-      const { data, error } = await api.api.notes.collections.get();
-      if (error) return [];
-      return data.data || [];
-    },
-    enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
-  });
+  const { data: outlineCollections, isLoading: collectionsLoading } = useQuery<OutlineCollection[]>(
+    {
+      queryKey: ['outline-collections', settings?.outlineApiUrl, settings?.outlineApiKey],
+      queryFn: async () => {
+        const { data, error } = await api.api.notes.collections.get();
+        if (error) return [];
+        const result = data as any;
+        return result.data || [];
+      },
+      enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
+    }
+  );
 
   // Update settings mutation
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<UserSettings>) => {
-      const { data, error } = await api.api.settings.patch(newSettings);
+      const { data, error } = await api.api.settings.patch(newSettings as any);
       if (error) throw new Error('Failed to update settings');
       return data;
     },
@@ -171,7 +181,7 @@ export default function SettingsPage() {
     queryFn: async () => {
       const { data, error } = await api.api.calendar['feed-url'].get();
       if (error) throw new Error('Failed to fetch calendar feed URL');
-      return data;
+      return data as { url: string; instructions: string };
     }
   });
 
@@ -181,7 +191,7 @@ export default function SettingsPage() {
     queryFn: async () => {
       const { data, error } = await api.api['api-tokens'].get();
       if (error) throw new Error('Failed to fetch API tokens');
-      return data;
+      return data as any as ApiToken[];
     }
   });
 
@@ -190,7 +200,7 @@ export default function SettingsPage() {
     mutationFn: async (name: string) => {
       const { data, error } = await api.api['api-tokens'].post({ name });
       if (error) throw new Error('Failed to create API token');
-      return data;
+      return data as { token: string };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
@@ -241,11 +251,12 @@ export default function SettingsPage() {
       const { data, error } = await api.api.settings['test-summary'].post({
         type,
         spaces: settings.notifications.summarySpaces
-      });
+      } as any);
       if (error) {
-        throw new Error(error.value || 'Failed to send via HamBot');
+        const errorVal = error.value as any;
+        throw new Error(errorVal?.error || 'Failed to send via HamBot');
       }
-      return data;
+      return data as { message: string };
     },
     onSuccess: (data) => {
       toast?.(data.message, {
@@ -266,9 +277,9 @@ export default function SettingsPage() {
   const { data: externalCalendars } = useQuery<ExternalCalendar[]>({
     queryKey: ['external-calendars'],
     queryFn: async () => {
-      const { data, error } = await api.api['external-calendars'].get();
+      const { data, error } = await (api.api['external-calendars'] as any).get();
       if (error) throw new Error('Failed to fetch external calendars');
-      return data;
+      return data as any as ExternalCalendar[];
     }
   });
 
@@ -280,9 +291,10 @@ export default function SettingsPage() {
       space: 'work' | 'personal';
       color: string;
     }) => {
-      const { data, error } = await api.api['external-calendars'].post(calendar);
+      const { data, error } = await (api.api['external-calendars'] as any).post(calendar);
       if (error) {
-        throw new Error(error.value?.error || 'Failed to add calendar');
+        const errorVal = error.value as any;
+        throw new Error(errorVal?.error || 'Failed to add calendar');
       }
       return data;
     },
@@ -310,7 +322,9 @@ export default function SettingsPage() {
   // Toggle external calendar enabled
   const toggleExternalCalendar = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const { data, error } = await api.api['external-calendars']({ id }).patch({ enabled });
+      const { data, error } = await (api.api['external-calendars'] as any)({ id }).patch({
+        enabled
+      });
       if (error) throw new Error('Failed to update calendar');
       return data;
     },
@@ -334,9 +348,12 @@ export default function SettingsPage() {
         color?: string;
       };
     }) => {
-      const { data, error } = await api.api['external-calendars']({ id }).patch(updateData);
+      const { data, error } = await (api.api['external-calendars'] as any)({ id }).patch(
+        updateData
+      );
       if (error) {
-        throw new Error(error.value?.error || 'Failed to update calendar');
+        const errorVal = error.value as any;
+        throw new Error(errorVal?.error || 'Failed to update calendar');
       }
       return data;
     },
@@ -361,7 +378,7 @@ export default function SettingsPage() {
   // Delete external calendar
   const deleteExternalCalendar = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api['external-calendars']({ id }).delete();
+      const { data, error } = await (api.api['external-calendars'] as any)({ id }).delete();
       if (error) throw new Error('Failed to delete calendar');
       return data;
     },
@@ -1295,7 +1312,7 @@ export default function SettingsPage() {
                       <Select.Root
                         positioning={{ sameWidth: true }}
                         collection={createListCollection({
-                          items: outlineCollections.map((c: { id: string; name: string }) => ({
+                          items: outlineCollections.map((c: OutlineCollection) => ({
                             label: c.name,
                             value: c.id
                           }))
@@ -1311,13 +1328,11 @@ export default function SettingsPage() {
                         <Portal>
                           <Select.Positioner>
                             <Select.Content>
-                              {outlineCollections.map(
-                                (collection: { id: string; name: string }) => (
-                                  <Select.Item key={collection.id} item={collection.id}>
-                                    <Select.ItemText>{collection.name}</Select.ItemText>
-                                  </Select.Item>
-                                )
-                              )}
+                              {outlineCollections.map((collection: OutlineCollection) => (
+                                <Select.Item key={collection.id} item={collection}>
+                                  <Select.ItemText>{collection.name}</Select.ItemText>
+                                </Select.Item>
+                              ))}
                             </Select.Content>
                           </Select.Positioner>
                         </Portal>

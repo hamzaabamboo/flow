@@ -59,10 +59,10 @@ global.WebSocket = class extends MockWebSocket {
 };
 // Ensure constants are on the class
 Object.assign(global.WebSocket, {
-    CONNECTING: WS_CONNECTING,
-    OPEN: WS_OPEN,
-    CLOSING: WS_CLOSING,
-    CLOSED: WS_CLOSED
+  CONNECTING: WS_CONNECTING,
+  OPEN: WS_OPEN,
+  CLOSING: WS_CLOSING,
+  CLOSED: WS_CLOSED
 });
 
 describe('useWebSocket', () => {
@@ -75,14 +75,14 @@ describe('useWebSocket', () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
     });
-    
+
     // Mock location
     // @ts-expect-error Mocking location
     delete global.window.location;
     global.window.location = {
-        ...originalLocation,
-        protocol: 'http:',
-        host: 'localhost:3000'
+      ...originalLocation,
+      protocol: 'http:',
+      host: 'localhost:3000'
     };
   });
 
@@ -155,13 +155,17 @@ describe('useWebSocket', () => {
   it('should handle column-update messages', async () => {
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
     renderHook(() => useWebSocket(), { wrapper });
-    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     const ws = wsInstances[0];
 
     act(() => {
-      ws.onmessage?.(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'column-update', data: { boardId: 'b1' } })
-      }));
+      ws.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'column-update', data: { boardId: 'b1' } })
+        })
+      );
     });
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['board', 'b1'] }));
   });
@@ -169,13 +173,17 @@ describe('useWebSocket', () => {
   it('should handle subtask-update messages', async () => {
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
     renderHook(() => useWebSocket(), { wrapper });
-    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     const ws = wsInstances[0];
 
     act(() => {
-      ws.onmessage?.(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'subtask-update', data: { taskId: 't1' } })
-      }));
+      ws.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'subtask-update', data: { taskId: 't1' } })
+        })
+      );
     });
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['subtasks', 't1'] }));
   });
@@ -183,13 +191,17 @@ describe('useWebSocket', () => {
   it('should handle inbox-update messages', async () => {
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
     renderHook(() => useWebSocket(), { wrapper });
-    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     const ws = wsInstances[0];
 
     act(() => {
-      ws.onmessage?.(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'inbox-update', data: { space: 'work' } })
-      }));
+      ws.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'inbox-update', data: { space: 'work' } })
+        })
+      );
     });
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['inbox', 'work'] }));
   });
@@ -228,13 +240,17 @@ describe('useWebSocket', () => {
   it('should handle pomodoro events', async () => {
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
     renderHook(() => useWebSocket(), { wrapper });
-    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     const ws = wsInstances[0];
 
     act(() => {
-      ws.onmessage?.(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'pomodoro-event' })
-      }));
+      ws.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'pomodoro-event' })
+        })
+      );
     });
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['pomodoro'] }));
   });
@@ -283,13 +299,17 @@ describe('useWebSocket', () => {
   it('should handle server-shutdown', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     renderHook(() => useWebSocket(), { wrapper });
-    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     const ws = wsInstances[0];
 
     act(() => {
-      ws.onmessage?.(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'server-shutdown' })
-      }));
+      ws.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'server-shutdown' })
+        })
+      );
     });
     expect(logSpy).toHaveBeenCalledWith('Server is shutting down, stopping reconnection attempts');
     logSpy.mockRestore();

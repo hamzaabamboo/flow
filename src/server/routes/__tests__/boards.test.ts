@@ -110,9 +110,7 @@ describe('Board Routes', () => {
         .mockReturnValueOnce(createMockQueryBuilder(mockBoards)) // Boards
         .mockReturnValueOnce(createMockQueryBuilder(mockColumns)); // Columns
 
-      const response = await app.handle(
-        new Request('http://localhost/boards?space=work')
-      );
+      const response = await app.handle(new Request('http://localhost/boards?space=work'));
 
       const data = await response.json();
 
@@ -127,9 +125,7 @@ describe('Board Routes', () => {
     it('should filter by space', async () => {
       vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 
-      await app.handle(
-        new Request('http://localhost/boards?space=personal')
-      );
+      await app.handle(new Request('http://localhost/boards?space=personal'));
 
       expect(db.select).toHaveBeenCalled();
     });

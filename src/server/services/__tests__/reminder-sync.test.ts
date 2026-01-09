@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReminderSyncService } from '../reminder-sync';
-import { eq } from 'drizzle-orm';
 
 // Mock DB module
 const mockDelete = vi.fn().mockReturnThis();
@@ -15,7 +14,7 @@ const mockDb = {
   values: mockValues,
   query: {
     columns: {
-      findFirst: vi.fn(),
+      findFirst: vi.fn()
     }
   }
 } as unknown as typeof db;
@@ -33,7 +32,7 @@ describe('ReminderSyncService', () => {
     taskId: 't1',
     taskTitle: 'Test Task',
     columnId: 'c1',
-    dueDate: new Date(Date.now() + 3600000), // 1 hour from now
+    dueDate: new Date(Date.now() + 3600000) // 1 hour from now
   };
 
   it('should delete existing reminders and create new ones', async () => {
@@ -54,12 +53,12 @@ describe('ReminderSyncService', () => {
 
     expect(mockDelete).toHaveBeenCalled();
     expect(mockInsert).toHaveBeenCalled();
-    // Should create 2 reminders (15 min before + at due time which is also 15 min if not specified? 
+    // Should create 2 reminders (15 min before + at due time which is also 15 min if not specified?
     // Wait, the code says:
     // Second reminder: At due time (or use custom minutesBefore if specified)
     // if (minutesBefore !== 15) { secondReminderTime.setMinutes(...) }
     // Since minutesBefore is 15, secondReminderTime remains same as dueDate.
-    
+
     const createdValues = mockValues.mock.calls[0][0];
     expect(createdValues.length).toBe(2);
   });
@@ -85,8 +84,8 @@ describe('ReminderSyncService', () => {
     });
 
     await service.syncReminders({
-        ...mockOptions,
-        dueDate: new Date(Date.now() - 3600000) // 1 hour ago
+      ...mockOptions,
+      dueDate: new Date(Date.now() - 3600000) // 1 hour ago
     });
 
     expect(mockInsert).not.toHaveBeenCalled();
@@ -102,20 +101,22 @@ describe('ReminderSyncService', () => {
     // Due in 5 minutes
     const dueDate = new Date(Date.now() + 300000);
     await service.syncReminders({
-        ...mockOptions,
-        dueDate
+      ...mockOptions,
+      dueDate
     });
 
     expect(mockInsert).toHaveBeenCalled();
     const createdValues = mockValues.mock.calls[0][0];
     // It should contain a reminder for the due time (message "due now")
-    expect(createdValues.some((r: { message: string }) => r.message.includes('due now'))).toBe(true);
+    expect(createdValues.some((r: { message: string }) => r.message.includes('due now'))).toBe(
+      true
+    );
   });
 
   it('getReminderSettings should return defaults if no board settings', async () => {
     mockDb.query.columns.findFirst.mockResolvedValue({
-        id: 'c1',
-        board: { settings: null }
+      id: 'c1',
+      board: { settings: null }
     });
 
     const settings = await service.getReminderSettings('c1');

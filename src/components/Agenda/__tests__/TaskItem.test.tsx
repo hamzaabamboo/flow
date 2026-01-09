@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { TaskItem } from '../TaskItem';
 import type { CalendarEvent } from '../../../shared/types/calendar';
@@ -20,11 +20,7 @@ describe('TaskItem', () => {
 
   it('should render task details correctly', () => {
     render(
-      <TaskItem 
-        event={mockEvent} 
-        onToggleComplete={onToggleComplete} 
-        onTaskClick={onTaskClick} 
-      />
+      <TaskItem event={mockEvent} onToggleComplete={onToggleComplete} onTaskClick={onTaskClick} />
     );
 
     expect(screen.getByText('Test Task')).toBeInTheDocument();
@@ -38,11 +34,7 @@ describe('TaskItem', () => {
   it('should call onToggleComplete when checkbox is clicked', async () => {
     const user = userEvent.setup();
     render(
-      <TaskItem 
-        event={mockEvent} 
-        onToggleComplete={onToggleComplete} 
-        onTaskClick={onTaskClick} 
-      />
+      <TaskItem event={mockEvent} onToggleComplete={onToggleComplete} onTaskClick={onTaskClick} />
     );
 
     await user.click(screen.getByRole('checkbox'));
@@ -52,11 +44,7 @@ describe('TaskItem', () => {
   it('should call onTaskClick when task card is clicked', async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <TaskItem 
-        event={mockEvent} 
-        onToggleComplete={onToggleComplete} 
-        onTaskClick={onTaskClick} 
-      />
+      <TaskItem event={mockEvent} onToggleComplete={onToggleComplete} onTaskClick={onTaskClick} />
     );
 
     // The card is the first child of the fragment
@@ -73,10 +61,10 @@ describe('TaskItem', () => {
     };
 
     render(
-      <TaskItem 
-        event={externalEvent} 
-        onToggleComplete={onToggleComplete} 
-        onTaskClick={onTaskClick} 
+      <TaskItem
+        event={externalEvent}
+        onToggleComplete={onToggleComplete}
+        onTaskClick={onTaskClick}
       />
     );
 
@@ -88,15 +76,15 @@ describe('TaskItem', () => {
     const user = userEvent.setup();
     const overdueEvent: CalendarEvent = {
       ...mockEvent,
-      dueDate: '2020-01-01T00:00:00Z', // Past date
+      dueDate: '2020-01-01T00:00:00Z' // Past date
     };
     const onCarryOver = vi.fn();
 
     render(
-      <TaskItem 
-        event={overdueEvent} 
-        onToggleComplete={onToggleComplete} 
-        onTaskClick={onTaskClick} 
+      <TaskItem
+        event={overdueEvent}
+        onToggleComplete={onToggleComplete}
+        onTaskClick={onTaskClick}
         onCarryOver={onCarryOver}
         hideCheckboxOnOverdue={true}
       />

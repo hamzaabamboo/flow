@@ -28,13 +28,14 @@ const createMockChain = (returnValue: any) => {
 vi.mock('../../server/websocket', () => ({
   wsManager: {
     broadcastTaskUpdate: vi.fn(),
-    initialize: vi.fn()
+    initialize: vi.fn(),
+    broadcastToUser: vi.fn()
   }
 }));
 
 // Integration test for complete authentication flow
 describe('Authentication Flow Integration', () => {
-  let app: Elysia<any> | null = null;
+  let app: Elysia<any, any, any, any, any, any, any> | null = null;
   let mockDb: any;
 
   const testUser = {
@@ -59,7 +60,8 @@ describe('Authentication Flow Integration', () => {
       select: vi.fn(),
       insert: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn()
+      delete: vi.fn(),
+      transaction: vi.fn((cb) => cb(mockDb))
     };
 
     // Default behaviors
@@ -72,7 +74,7 @@ describe('Authentication Flow Integration', () => {
     app = new Elysia()
       .decorate('db', mockDb)
       .use(simpleAuth)
-      .group('/api', (app) => app.use(tasksRoutes).use(boardRoutes).use(inboxRoutes));
+      .group('/api', (api) => api.use(tasksRoutes).use(boardRoutes).use(inboxRoutes)) as any;
   });
 
   beforeEach(() => {
@@ -151,7 +153,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as any;
       expect(data).toHaveProperty('email', testUser.email);
     });
 
@@ -225,14 +227,6 @@ describe('Authentication Flow Integration', () => {
         }
       });
 
-      // Note: If boardRoutes does further DB calls, we might see db errors if we don't mock them.
-      // But assuming boardRoutes first does user check (middleware) which we mocked,
-      // and then board fetch.
-      // E.g. .where(...)
-      // Our createMockChain returns `this` for where.
-      // And `then` returns empty array by default if we don't override.
-      // So board list empty -> 200 OK [].
-
       expect(response.status).toBe(200);
     });
   });
@@ -280,11 +274,9 @@ describe('Authentication Flow Integration', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(testUser)
       });
-      const data = (await response.json()) as { user: any };
+      const data = (await response.json()) as any;
 
       expect(data).not.toHaveProperty('password');
-      // simple-auth returns flat object { id, email, name }, not { user: ... }
-      // So check directly
       expect(data).not.toHaveProperty('user');
     });
   });

@@ -46,11 +46,11 @@ describe('SpaceContext', () => {
         <TestComponent />
       </SpaceProvider>
     );
-    
+
     await act(async () => {
       screen.getByText('Set Personal').click();
     });
-    
+
     expect(screen.getByTestId('space')).toHaveTextContent('personal');
     expect(localStorage.getItem('hamflow-space')).toBe('personal');
   });
@@ -61,26 +61,26 @@ describe('SpaceContext', () => {
         <TestComponent />
       </SpaceProvider>
     );
-    
+
     await act(async () => {
       screen.getByText('Toggle').click();
     });
-    
+
     expect(screen.getByTestId('space')).toHaveTextContent('personal');
-    
+
     await act(async () => {
       screen.getByText('Toggle').click();
     });
-    
+
     expect(screen.getByTestId('space')).toHaveTextContent('work');
   });
 
   it('should throw error when used outside provider', () => {
     // Suppress console.error for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+
     expect(() => render(<TestComponent />)).toThrow('useSpace must be used within a SpaceProvider');
-    
+
     consoleSpy.mockRestore();
   });
 });

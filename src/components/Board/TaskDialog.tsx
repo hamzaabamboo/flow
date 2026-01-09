@@ -157,13 +157,12 @@ export function TaskDialog({
     const form = e.currentTarget;
 
     // Add due date as hidden input if set
-    if (dueDate) {
-      const dueDateInput = document.createElement('input');
-      dueDateInput.type = 'hidden';
-      dueDateInput.name = 'dueDate';
-      dueDateInput.value = dueDate.toISOString(); // Convert to UTC ISO string
-      form.appendChild(dueDateInput);
-    }
+    // Always add dueDate to form data for consistency in tests/handlers
+    const dueDateInput = document.createElement('input');
+    dueDateInput.type = 'hidden';
+    dueDateInput.name = 'dueDate';
+    dueDateInput.value = dueDate ? dueDate.toISOString() : '';
+    form.appendChild(dueDateInput);
 
     // Add labels as JSON
     const labelsInput = document.createElement('input');
@@ -204,8 +203,8 @@ export function TaskDialog({
     originalOnSubmit(e);
 
     // Clean up the added inputs
-    const dueDateInput = form.querySelector('input[name="dueDate"][type="hidden"]');
-    if (dueDateInput) form.removeChild(dueDateInput);
+    const existingDueDateInput = form.querySelector('input[name="dueDate"][type="hidden"]');
+    if (existingDueDateInput) form.removeChild(existingDueDateInput);
     form.removeChild(labelsInput);
     form.removeChild(subtasksInput);
     form.removeChild(recurringInput);

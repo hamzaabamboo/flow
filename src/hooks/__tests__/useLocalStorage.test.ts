@@ -46,7 +46,7 @@ describe('useLocalStorage', () => {
       window.dispatchEvent(
         new StorageEvent('storage', {
           key,
-          newValue: JSON.stringify(newValue),
+          newValue: JSON.stringify(newValue)
         })
       );
     });

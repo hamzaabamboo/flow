@@ -5,7 +5,7 @@ describe('timezone utils', () => {
   it('utcToJst should convert UTC to JST (+9)', () => {
     const utcDate = new Date('2024-01-01T00:00:00Z');
     const jstDate = utcToJst(utcDate);
-    
+
     // JST is UTC+9, so it should be 9:00 AM
     expect(jstDate.getHours()).toBe(9);
     expect(jstDate.getDate()).toBe(1);
@@ -13,9 +13,9 @@ describe('timezone utils', () => {
 
   it('jstToUtc should convert JST to UTC (-9)', () => {
     // A Date object representing 9 AM in local time, but we tell the function it's JST
-    const jstDate = new Date('2024-01-01T09:00:00'); 
+    const jstDate = new Date('2024-01-01T09:00:00');
     const utcDate = jstToUtc(jstDate);
-    
+
     expect(utcDate.getUTCHours()).toBe(0);
   });
 
@@ -32,7 +32,7 @@ describe('timezone utils', () => {
   it('getJstDateComponents should return correct components', () => {
     const date = new Date('2024-01-01T00:00:00Z');
     const comps = getJstDateComponents(date);
-    
+
     expect(comps.year).toBe(2024);
     expect(comps.month).toBe(1);
     expect(comps.day).toBe(1);

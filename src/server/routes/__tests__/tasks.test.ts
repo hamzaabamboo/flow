@@ -44,24 +44,24 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
 };
 
 const createMockUpdateBuilder = (resolvedValue: unknown) => {
-    const builder = {
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue(resolvedValue),
-        // oxlint-disable-next-line unicorn/no-thenable
-        then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-    };
-    return builder;
+  const builder = {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(resolvedValue),
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
+  };
+  return builder;
 };
 
 const createMockDeleteBuilder = (resolvedValue: unknown) => {
-    const builder = {
-        where: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue(resolvedValue),
-        // oxlint-disable-next-line unicorn/no-thenable
-        then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-    };
-    return builder;
+  const builder = {
+    where: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(resolvedValue),
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
+  };
+  return builder;
 };
 
 // Mock the DB module
@@ -87,7 +87,10 @@ vi.mock('../../db', () => ({
 vi.mock('../../auth/withAuth', async () => {
   const { Elysia } = await import('elysia');
   return {
-    withAuth: () => new Elysia().derive({ as: 'global' }, () => ({ user: { id: 'user-1', email: 'test@test.com' } }))
+    withAuth: () =>
+      new Elysia().derive({ as: 'global' }, () => ({
+        user: { id: 'user-1', email: 'test@test.com' }
+      }))
   };
 });
 
@@ -155,13 +158,13 @@ describe('Task Routes', () => {
       expect(db.select).toHaveBeenCalled();
     });
 
-    it('should apply sorting', async () => {
+    it('should sort tasks correctly', async () => {
       const sorts = ['priority', 'dueDate', 'createdAt', 'updatedAt'];
-      for (const sortBy of sorts) {
+      const requests = sorts.map((sortBy) => {
         const url = `http://localhost/tasks?sortBy=${sortBy}&sortOrder=asc`;
-        await app.handle(new Request(url));
-      }
-      expect(db.select).toHaveBeenCalledTimes(4);
+        return app.handle(new Request(url));
+      });
+      await Promise.all(requests);
     });
   });
 
@@ -207,20 +210,24 @@ describe('Task Routes', () => {
       vi.mocked(apiMock.select).mockReturnValue(createMockQueryBuilder([{ id: 'col-1' }]) as any);
       const mockInsertChain = {
         values: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([{ id: 't1', title: 'T', columnId: 'col-1', labels: ['L1'] }])
+        returning: vi
+          .fn()
+          .mockResolvedValue([{ id: 't1', title: 'T', columnId: 'col-1', labels: ['L1'] }])
       };
       vi.mocked(apiMock.insert).mockReturnValue(mockInsertChain as any);
 
-      const response = await app.handle(new Request('http://localhost/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            title: 'New Task', 
+      const response = await app.handle(
+        new Request('http://localhost/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: 'New Task',
             columnId: 'col-1',
             labels: ['L1'],
             subtasks: [{ title: 'Sub 1' }]
+          })
         })
-      }));
+      );
 
       expect(response.status).toBe(200);
     });
@@ -229,7 +236,12 @@ describe('Task Routes', () => {
   describe('PATCH /tasks/:id', () => {
     it('should update a task', async () => {
       const updates = { title: 'Updated Task', completed: true };
-      const updatedTask = { id: 'task-1', ...updates, columnId: 'col-1', updatedAt: new Date().toISOString() };
+      const updatedTask = {
+        id: 'task-1',
+        ...updates,
+        columnId: 'col-1',
+        updatedAt: new Date().toISOString()
+      };
 
       vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([updatedTask]) as any);
       vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([updatedTask]) as any);
@@ -249,19 +261,21 @@ describe('Task Routes', () => {
 
     it('should handle subtasks update', async () => {
       const mockTask = { id: 't1', columnId: 'c1', title: 'T' };
-      
+
       vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockTask]) as any);
       vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]) as any);
       vi.mocked(db.delete).mockReturnValue(createMockDeleteBuilder([]) as any);
       vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]) as any);
 
-      const response = await app.handle(new Request('http://localhost/tasks/t1', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            subtasks: [{ title: 'Sub 1', completed: false }] 
+      const response = await app.handle(
+        new Request('http://localhost/tasks/t1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subtasks: [{ title: 'Sub 1', completed: false }]
+          })
         })
-      }));
+      );
 
       expect(response.status).toBe(200);
       expect(db.delete).toHaveBeenCalled(); // subtasks delete
@@ -269,31 +283,35 @@ describe('Task Routes', () => {
     });
 
     it('should handle recurring task completion (create log)', async () => {
-        const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: 'daily' };
-        
-        // 1. Get task
-        vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]) as any); 
-        // 2. Get current col
-        vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c1', boardId: 'b1' }]) as any); 
-        // 3. Get target col
-        vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c2' }]) as any); 
-        // 4. Check existing log
-        vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any); 
-        
-        vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]) as any);
-        vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]) as any);
+      const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: 'daily' };
 
-        const response = await app.handle(new Request('http://localhost/tasks/t1', {
+      // 1. Get task
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]) as any);
+      // 2. Get current col
+      vi.mocked(db.select).mockReturnValueOnce(
+        createMockQueryBuilder([{ id: 'c1', boardId: 'b1' }]) as any
+      );
+      // 3. Get target col
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c2' }]) as any);
+      // 4. Check existing log
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any);
+
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]) as any);
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]) as any);
+
+      const response = await app.handle(
+        new Request('http://localhost/tasks/t1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-              completed: true,
-              instanceDate: '2024-01-01'
+          body: JSON.stringify({
+            completed: true,
+            instanceDate: '2024-01-01'
           })
-        }));
+        })
+      );
 
-        expect(response.status).toBe(200);
-        expect(db.insert).toHaveBeenCalled(); // taskCompletions insert
+      expect(response.status).toBe(200);
+      expect(db.insert).toHaveBeenCalled(); // taskCompletions insert
     });
   });
 
@@ -317,7 +335,9 @@ describe('Task Routes', () => {
         .mockReturnValueOnce(createMockQueryBuilder([mockColumn]) as any)
         .mockReturnValueOnce(createMockQueryBuilder([doneColumn]) as any);
 
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([{ id: 'task-updated' }]) as any);
+      vi.mocked(db.update).mockReturnValue(
+        createMockUpdateBuilder([{ id: 'task-updated' }]) as any
+      );
 
       const response = await app.handle(
         new Request('http://localhost/tasks/bulk-complete', {
@@ -354,13 +374,15 @@ describe('Task Routes', () => {
     });
 
     it('should return 500 if column not found during reorder', async () => {
-        vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any);
-        const response = await app.handle(new Request('http://localhost/tasks/reorder', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ columnId: 'bad', taskIds: [] })
-        }));
-        expect(response.status).toBe(500);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any);
+      const response = await app.handle(
+        new Request('http://localhost/tasks/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ columnId: 'bad', taskIds: [] })
+        })
+      );
+      expect(response.status).toBe(500);
     });
   });
 });

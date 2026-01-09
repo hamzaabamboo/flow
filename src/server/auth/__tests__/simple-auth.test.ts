@@ -12,8 +12,8 @@ const JWT_CONFIG = {
     secure: true,
     sameSite: 'strict',
     path: '/',
-    maxAge: 7 * 24 * 60 * 60,
-  },
+    maxAge: 7 * 24 * 60 * 60
+  }
 } as const;
 
 interface MockQueryBuilder {
@@ -57,7 +57,9 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/logout should clear cookie', async () => {
-    const res = await app.handle(new Request('http://localhost/api/auth/logout', { method: 'POST' }));
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/logout', { method: 'POST' })
+    );
     expect(res.status).toBe(200);
   });
 
@@ -67,19 +69,23 @@ describe('Simple Auth', () => {
   });
 
   it('GET /api/auth/me should return user if token valid', async () => {
-    const signerApp = new Elysia().use(jwt(JWT_CONFIG)).get('/sign', ({ jwt }) => jwt.sign({ 
+    const signerApp = new Elysia().use(jwt(JWT_CONFIG)).get('/sign', ({ jwt }) =>
+      jwt.sign({
         userId: 'u1',
         email: 't@t.com',
         name: 'T'
-    }));
+      })
+    );
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([{ id: 'u1', email: 't@t.com', name: 'T' }]));
+    vi.mocked(db.select).mockReturnValue(
+      createMockQueryBuilder([{ id: 'u1', email: 't@t.com', name: 'T' }])
+    );
     const req = new Request('http://localhost/api/auth/me');
     req.headers.append('Cookie', `auth=${token}`);
     const res = await app.handle(req);
-    
+
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.id).toBe('u1');
@@ -88,16 +94,18 @@ describe('Simple Auth', () => {
   it('POST /api/auth/setup should create user and return hash', async () => {
     vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // No users
     const mockInsertChain = {
-        values: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
     };
     vi.mocked(db.insert).mockReturnValue(mockInsertChain);
 
-    const res = await app.handle(new Request('http://localhost/api/auth/setup', {
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 't@t.com', password: 'p123' })
-    }));
+      })
+    );
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -107,11 +115,13 @@ describe('Simple Auth', () => {
 
   it('POST /api/auth/setup should fail if users already exist', async () => {
     vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'existing' }]));
-    const res = await app.handle(new Request('http://localhost/api/auth/setup', {
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 't@t.com', password: 'p123' })
-    }));
+      })
+    );
     expect(res.status).toBe(400);
   });
 
@@ -119,22 +129,28 @@ describe('Simple Auth', () => {
     process.env.USER_PASSWORD_HASH = undefined;
     vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
     const mockInsertChain = {
-        values: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
     };
     vi.mocked(db.insert).mockReturnValue(mockInsertChain);
-    await app.handle(new Request('http://localhost/api/auth/setup', {
+    await app.handle(
+      new Request('http://localhost/api/auth/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 't@t.com', password: 'p123' })
-    }));
+      })
+    );
 
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]) as any);
-    const res = await app.handle(new Request('http://localhost/api/auth/login', {
+    vi.mocked(db.select).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]) as any
+    );
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 't@t.com', password: 'p123' })
-    }));
+      })
+    );
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -142,17 +158,23 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/login should fail with invalid credentials', async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
-    const res = await app.handle(new Request('http://localhost/api/auth/login', {
+    vi.mocked(db.select).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }])
+    );
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 't@t.com', password: 'wrong' })
-    }));
+      })
+    );
     expect(res.status).toBe(401);
   });
 
   it('GET /api/auth/me should return 401 if user not found in DB', async () => {
-    const signerApp = new Elysia().use(jwt(JWT_CONFIG)).get('/sign', ({ jwt }) => jwt.sign({ userId: 'missing' }));
+    const signerApp = new Elysia()
+      .use(jwt(JWT_CONFIG))
+      .get('/sign', ({ jwt }) => jwt.sign({ userId: 'missing' }));
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
@@ -165,7 +187,9 @@ describe('Simple Auth', () => {
 
   it('POST /api/auth/auto-login should return 404 if no users', async () => {
     vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
-    const res = await app.handle(new Request('http://localhost/api/auth/auto-login', { method: 'POST' }));
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/auto-login', { method: 'POST' })
+    );
     expect(res.status).toBe(404);
   });
 });

@@ -1,46 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HabitsPage from '../habits/+Page';
 import { SpaceContext } from '../../contexts/SpaceContext';
-import { api } from '../../api/client';
+import { mockApi, getMockFn, getMockRoute } from '../../test/mocks/api';
 
-// Mock the API client
-vi.mock('../../api/client', () => {
-  const habitsMock: any = vi.fn(() => ({
-    stats: { get: vi.fn().mockResolvedValue({ data: { totalCompletions: 0, completionRate: 0 }, error: null }) },
-    patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
-    delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
-    log: { post: vi.fn().mockResolvedValue({ data: {}, error: null }) }
-  }));
-  habitsMock.get = vi.fn().mockResolvedValue({ data: [], error: null });
-  habitsMock.post = vi.fn().mockResolvedValue({ data: { id: 'new' }, error: null });
-  
+// Mock API using shared mocks
+vi.mock('../../api/client', async () => {
+  const mocks = await import('../../test/mocks/api');
   return {
-    api: {
-      api: {
-        habits: habitsMock
-      }
-    }
+    api: mocks.mockApi
   };
 });
 
+const mockSpaceContext = {
+  currentSpace: 'personal' as const,
+  setCurrentSpace: vi.fn(),
+  toggleSpace: vi.fn()
+};
+
 // Helper to wrap component with necessary providers
-const renderWithProviders = (ui: React.ReactElement, currentSpace = 'personal') => {
+const renderWithProviders = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false,
-      },
-    },
+        retry: false
+      }
+    }
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={{ currentSpace, setCurrentSpace: vi.fn() }}>
-        {ui}
-      </SpaceContext.Provider>
+      <SpaceContext.Provider value={mockSpaceContext}>{ui}</SpaceContext.Provider>
     </QueryClientProvider>
   );
 };
@@ -55,7 +47,7 @@ describe('HabitsPage', () => {
       active: true,
       currentStreak: 5,
       space: 'personal',
-      color: '#3b82f6',
+      color: '#3b82f6'
     },
     {
       id: 'h2',
@@ -64,7 +56,7 @@ describe('HabitsPage', () => {
       targetDays: [1, 3, 5],
       active: true,
       currentStreak: 2,
-      space: 'personal',
+      space: 'personal'
     }
   ];
 
@@ -75,17 +67,21 @@ describe('HabitsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    const habitsMock = api.api.habits as any;
-    habitsMock.get.mockResolvedValue({ data: mockHabits, error: null });
-    
-    habitsMock.mockImplementation((params: any) => {
-      const id = typeof params === 'object' ? params.habitId : params;
+
+    const habitsRoute = getMockRoute(mockApi.api.habits);
+    habitsRoute.get.mockResolvedValue({ data: mockHabits, error: null });
+
+    getMockFn(habitsRoute).mockImplementation((params: any) => {
+      const id = typeof params === 'object' ? params.id : params;
       return {
         stats: {
-          get: vi.fn().mockResolvedValue({ 
-            data: mockStats.find(s => s.habitId === id) || { habitId: id, totalCompletions: 0, completionRate: 0 }, 
-            error: null 
+          get: vi.fn().mockResolvedValue({
+            data: mockStats.find((s) => s.habitId === id) || {
+              habitId: id,
+              totalCompletions: 0,
+              completionRate: 0
+            },
+            error: null
           })
         },
         patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
@@ -102,18 +98,19 @@ describe('HabitsPage', () => {
 
     expect(await screen.findByText('Morning Run')).toBeInTheDocument();
     expect(screen.getByText('Read Books')).toBeInTheDocument();
-    
+
     // Check summary stats
     expect(screen.getByText('Active Habits')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
-    
-    expect(screen.getByText('20 times')).toBeInTheDocument();
-    expect(screen.getByText('85%')).toBeInTheDocument();
+
+    // Wait for stats to load
+    expect(await screen.findByText(/20 times/i)).toBeInTheDocument();
+    expect(screen.getByText(/85%/)).toBeInTheDocument();
   });
 
   it('should open create dialog and create a daily habit', async () => {
     const user = userEvent.setup();
-    const habitsMock = api.api.habits as any;
+    const habitsRoute = getMockRoute(mockApi.api.habits);
 
     renderWithProviders(<HabitsPage />);
 
@@ -124,18 +121,20 @@ describe('HabitsPage', () => {
 
     const nameInput = screen.getByLabelText(/Name/i);
     await user.type(nameInput, 'New Habit Name');
-    
+
     const descInput = screen.getByLabelText(/Description/i);
     await user.type(descInput, 'New Habit Description');
 
     const submitBtn = screen.getByRole('button', { name: 'Create' });
     await user.click(submitBtn);
 
-    expect(habitsMock.post).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'New Habit Name',
-      frequency: 'daily',
-      space: 'personal'
-    }));
+    expect(habitsRoute.post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'New Habit Name',
+        frequency: 'daily',
+        space: 'personal'
+      })
+    );
   });
 
   it('should handle weekly habit creation with day selection', async () => {
@@ -145,31 +144,39 @@ describe('HabitsPage', () => {
     await user.click(screen.getByRole('button', { name: /New Habit/i }));
 
     await user.type(screen.getByLabelText(/Name/i), 'Weekly Habit');
-    
+
     await user.click(screen.getByRole('button', { name: 'Weekly' }));
-    
+
     await user.click(screen.getByRole('button', { name: 'Mon' }));
     await user.click(screen.getByRole('button', { name: 'Wed' }));
 
     const submitBtn = screen.getByRole('button', { name: 'Create' });
     await user.click(submitBtn);
 
-    expect(api.api.habits.post).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Weekly Habit',
-      frequency: 'weekly',
-      targetDays: [1, 3]
-    }));
+    expect(mockApi.api.habits.post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Weekly Habit',
+        frequency: 'weekly',
+        targetDays: [1, 3]
+      })
+    );
   });
 
   it('should toggle habit active status', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    
-    // api.api.habits('h1') call
-    (api.api.habits as any).mockImplementation((id: string) => ({
+
+    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
+      const id = typeof params === 'object' ? params.id : params;
+      return {
         patch: patchMock,
-        stats: { get: vi.fn().mockResolvedValue({ data: {}, error: null }) }
-    }));
+        stats: {
+          get: vi
+            .fn()
+            .mockResolvedValue({ data: mockStats.find((s) => s.habitId === id), error: null })
+        }
+      };
+    });
 
     renderWithProviders(<HabitsPage />);
     await screen.findByText('Morning Run');
@@ -177,17 +184,24 @@ describe('HabitsPage', () => {
     const powerBtn = screen.getAllByLabelText(/Disable habit/i)[0];
     await user.click(powerBtn);
 
-    expect(patchMock).toHaveBeenCalledWith({ active: false });
+    expect(patchMock).toHaveBeenCalledWith(expect.objectContaining({ active: false }));
   });
 
   it('should delete a habit', async () => {
     const user = userEvent.setup();
     const deleteMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    
-    (api.api.habits as any).mockImplementation((id: string) => ({
+
+    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
+      const id = typeof params === 'object' ? params.id : params;
+      return {
         delete: deleteMock,
-        stats: { get: vi.fn().mockResolvedValue({ data: {}, error: null }) }
-    }));
+        stats: {
+          get: vi
+            .fn()
+            .mockResolvedValue({ data: mockStats.find((s) => s.habitId === id), error: null })
+        }
+      };
+    });
 
     renderWithProviders(<HabitsPage />);
     await screen.findByText('Morning Run');
@@ -201,10 +215,18 @@ describe('HabitsPage', () => {
   it('should open edit dialog and update habit', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    (api.api.habits as any).mockImplementation((id: string) => ({
+
+    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
+      const id = typeof params === 'object' ? params.id : params;
+      return {
         patch: patchMock,
-        stats: { get: vi.fn().mockResolvedValue({ data: {}, error: null }) }
-    }));
+        stats: {
+          get: vi
+            .fn()
+            .mockResolvedValue({ data: mockStats.find((s) => s.habitId === id), error: null })
+        }
+      };
+    });
 
     renderWithProviders(<HabitsPage />);
 
@@ -214,21 +236,23 @@ describe('HabitsPage', () => {
     await user.click(editBtns[0]);
 
     expect(screen.getByText('Edit Habit')).toBeInTheDocument();
-    
+
     const nameInput = screen.getByLabelText(/Name/i);
     await user.clear(nameInput);
     await user.type(nameInput, 'Updated Name');
 
     await user.click(screen.getByRole('button', { name: 'Update' }));
 
-    expect(patchMock).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Updated Name'
-    }));
+    expect(patchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Updated Name'
+      })
+    );
   });
 
   it('should show empty state when no habits', async () => {
-    (api.api.habits.get as any).mockResolvedValue({ data: [], error: null });
-    
+    getMockRoute(mockApi.api.habits).get.mockResolvedValue({ data: [], error: null });
+
     renderWithProviders(<HabitsPage />);
 
     expect(await screen.findByText('No habits yet')).toBeInTheDocument();

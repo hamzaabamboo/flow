@@ -12,7 +12,7 @@ import { createListCollection, Select } from '../ui/select';
 import { SimpleDatePicker } from '../ui/simple-date-picker';
 import { PriorityBadge } from '../PriorityBadge';
 import type { AutoOrganizeSuggestion } from '../../shared/types/autoOrganize';
-import type { Column } from '../../shared/types';
+import type { BoardWithColumns } from '../../shared/types';
 import { api } from '../../api/client';
 
 interface SuggestionRowProps {
@@ -31,12 +31,12 @@ export function SuggestionRow({
   const [editedSuggestion, setEditedSuggestion] = useState(suggestion);
 
   // Fetch boards for column move editing
-  const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
+  const { data: boards = [] } = useQuery<BoardWithColumns[]>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data;
+      return data as BoardWithColumns[];
     },
     enabled: isEditing && suggestion.details.type === 'column_move'
   });

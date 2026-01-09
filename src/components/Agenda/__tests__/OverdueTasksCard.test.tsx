@@ -1,5 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, within } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { OverdueTasksCard } from '../OverdueTasksCard';
 import { DialogProvider } from '../../../utils/useDialogs';
@@ -8,24 +8,24 @@ import React from 'react';
 
 describe('OverdueTasksCard', () => {
   const mockTasks: CalendarEvent[] = [
-    { 
-        id: '1', 
-        title: 'Overdue 1', 
-        dueDate: '2020-01-01T10:00:00Z',
-        type: 'task',
-        completed: false,
-        instanceDate: '2020-01-01',
-        space: 'work'
+    {
+      id: '1',
+      title: 'Overdue 1',
+      dueDate: '2020-01-01T10:00:00Z',
+      type: 'task',
+      completed: false,
+      instanceDate: '2020-01-01',
+      space: 'work'
     },
-    { 
-        id: '2', 
-        title: 'Overdue 2', 
-        dueDate: '2020-01-01T08:00:00Z',
-        type: 'task',
-        completed: false,
-        instanceDate: '2020-01-01',
-        space: 'personal'
-    },
+    {
+      id: '2',
+      title: 'Overdue 2',
+      dueDate: '2020-01-01T08:00:00Z',
+      type: 'task',
+      completed: false,
+      instanceDate: '2020-01-01',
+      space: 'personal'
+    }
   ];
 
   const mockHandlers = {
@@ -35,15 +35,11 @@ describe('OverdueTasksCard', () => {
     onDuplicate: vi.fn(),
     onDelete: vi.fn(),
     onMove: vi.fn(),
-    onCreateCopy: vi.fn(),
+    onCreateCopy: vi.fn()
   };
 
   const renderWithDialog = (ui: React.ReactElement) => {
-    return render(
-      <DialogProvider>
-        {ui}
-      </DialogProvider>
-    );
+    return render(<DialogProvider>{ui}</DialogProvider>);
   };
 
   it('should render list of overdue tasks', () => {
@@ -78,7 +74,7 @@ describe('OverdueTasksCard', () => {
     // Find the specific task item's Carry Over button
     // It's a button with text "Carry Over" (not "Carry Over All")
     const buttons = screen.getAllByRole('button', { name: /Carry Over/i });
-    const carryOverBtn = buttons.find(b => b.textContent?.trim() === 'Carry Over');
+    const carryOverBtn = buttons.find((b) => b.textContent?.trim() === 'Carry Over');
     await user.click(carryOverBtn!);
 
     const dialog = await screen.findByRole('dialog');
@@ -89,7 +85,9 @@ describe('OverdueTasksCard', () => {
   });
 
   it('should return null when no overdue tasks', () => {
-    const { container } = renderWithDialog(<OverdueTasksCard overdueTasks={[]} {...mockHandlers} />);
+    const { container } = renderWithDialog(
+      <OverdueTasksCard overdueTasks={[]} {...mockHandlers} />
+    );
     expect(container.firstChild).toBeNull();
   });
 
@@ -113,7 +111,7 @@ describe('OverdueTasksCard', () => {
     renderWithDialog(<OverdueTasksCard overdueTasks={[mockTasks[0]]} {...mockHandlers} />);
 
     await user.click(screen.getByLabelText(/Task actions/i));
-    
+
     await user.click(await screen.findByRole('menuitem', { name: /Duplicate/i }));
     expect(mockHandlers.onDuplicate).toHaveBeenCalled();
 
@@ -128,10 +126,10 @@ describe('OverdueTasksCard', () => {
 
   it('should call onCreateCopy for external events', async () => {
     const user = userEvent.setup();
-    const extTask: CalendarEvent = { 
-        ...mockTasks[0], 
-        type: 'external', 
-        id: 'ext-1' 
+    const extTask: CalendarEvent = {
+      ...mockTasks[0],
+      type: 'external',
+      id: 'ext-1'
     };
     renderWithDialog(<OverdueTasksCard overdueTasks={[extTask]} {...mockHandlers} />);
 
