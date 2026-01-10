@@ -112,8 +112,10 @@ describe('AuthContext', () => {
 
     // Mock window.location.href
     const originalLocation = window.location;
-    delete (window as any).location;
-    window.location = { ...originalLocation, href: '', pathname: '/' } as any;
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, href: '', pathname: '/' },
+      writable: true
+    });
 
     renderWithQueryClient(
       <AuthProvider>
@@ -125,7 +127,10 @@ describe('AuthContext', () => {
       expect(window.location.href).toContain('/login');
     });
 
-    window.location = originalLocation as any;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true
+    });
   });
 
   it('logout should call API and clear user', async () => {

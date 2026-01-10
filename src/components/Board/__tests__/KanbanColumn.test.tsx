@@ -1,6 +1,8 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { KanbanColumn } from '../KanbanColumn';
+import type { Column, Task } from '../../../shared/types/board';
 
 // Mock dnd-kit
 vi.mock('@dnd-kit/core', () => ({
@@ -16,7 +18,7 @@ vi.mock('@dnd-kit/sortable', () => ({
     transition: null,
     isDragging: false
   }),
-  SortableContext: ({ children }: any) => <div>{children}</div>,
+  SortableContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   verticalListSortingStrategy: {}
 }));
 
@@ -51,8 +53,8 @@ describe('KanbanColumn', () => {
   it('should render column header and tasks', () => {
     render(
       <KanbanColumn
-        column={mockColumn as any}
-        tasks={mockTasks as any}
+        column={mockColumn as unknown as Column}
+        tasks={mockTasks as unknown as Task[]}
         boardId="b1"
         {...mockHandlers}
       />
@@ -67,8 +69,8 @@ describe('KanbanColumn', () => {
     const overloadedTasks = Array(6).fill({ id: 't', title: 'Task' });
     render(
       <KanbanColumn
-        column={mockColumn as any}
-        tasks={overloadedTasks as any}
+        column={mockColumn as unknown as Column}
+        tasks={overloadedTasks as unknown as Task[]}
         boardId="b1"
         {...mockHandlers}
       />
@@ -80,8 +82,8 @@ describe('KanbanColumn', () => {
   it('should call onAddTask when plus button is clicked', () => {
     render(
       <KanbanColumn
-        column={mockColumn as any}
-        tasks={mockTasks as any}
+        column={mockColumn as unknown as Column}
+        tasks={mockTasks as unknown as Task[]}
         boardId="b1"
         {...mockHandlers}
       />
@@ -94,8 +96,8 @@ describe('KanbanColumn', () => {
   it('should open edit dialog and handle column update', async () => {
     render(
       <KanbanColumn
-        column={mockColumn as any}
-        tasks={mockTasks as any}
+        column={mockColumn as unknown as Column}
+        tasks={mockTasks as unknown as Task[]}
         boardId="b1"
         {...mockHandlers}
       />
@@ -127,8 +129,8 @@ describe('KanbanColumn', () => {
   it('should prevent deletion if tasks are present', async () => {
     render(
       <KanbanColumn
-        column={mockColumn as any}
-        tasks={mockTasks as any}
+        column={mockColumn as unknown as Column}
+        tasks={mockTasks as unknown as Task[]}
         boardId="b1"
         {...mockHandlers}
       />
@@ -147,7 +149,14 @@ describe('KanbanColumn', () => {
 
   it('should call onDeleteColumn when empty and confirmed', async () => {
     mockConfirm.mockResolvedValue(true);
-    render(<KanbanColumn column={mockColumn as any} tasks={[]} boardId="b1" {...mockHandlers} />);
+    render(
+      <KanbanColumn
+        column={mockColumn as unknown as Column}
+        tasks={[]}
+        boardId="b1"
+        {...mockHandlers}
+      />
+    );
 
     fireEvent.click(screen.getByLabelText('Column options'));
     fireEvent.click(await screen.findByText('Delete Column'));

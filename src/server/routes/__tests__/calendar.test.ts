@@ -124,7 +124,7 @@ describe('Calendar Routes', () => {
       };
 
       // Sequence: Main -> Recurring -> Subtasks -> Completions -> External
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockTask])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Subtasks
@@ -166,7 +166,7 @@ describe('Calendar Routes', () => {
       (expandRecurringTasks as Mock).mockReturnValueOnce([expandedInstance]); // Upcoming
 
       // Sequence calls...
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring (Main Window)
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
@@ -201,7 +201,7 @@ describe('Calendar Routes', () => {
 
       // Sequence: Main -> Recurring -> [SKIP Subtasks] -> Completions -> Overdue -> External
       // Subtasks skipped because Main & Recurring are empty
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       // Subtasks SKIPPED
@@ -224,7 +224,7 @@ describe('Calendar Routes', () => {
       const nodateTask = { id: 'nd-1', title: 'No Date', dueDate: null, userId: 'user-1' };
 
       // Sequence: Main -> Recurring -> NoDueDate -> Subtasks -> Completions -> External
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([nodateTask])); // No Due Date
@@ -253,7 +253,7 @@ describe('Calendar Routes', () => {
       const mockEvent = { id: 'ext-evt-1', title: 'External Event', dueDate: new Date() };
 
       // Sequence: Main -> Recurring -> [SKIP Subtasks] -> Completions -> External (Found!)
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       // Subtasks SKIPPED because tasks array is empty
@@ -281,7 +281,7 @@ describe('Calendar Routes', () => {
         enabled: true
       };
 
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
@@ -316,7 +316,7 @@ describe('Calendar Routes', () => {
       };
 
       // Sequence calls...
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
@@ -342,7 +342,7 @@ describe('Calendar Routes', () => {
       const task1 = { id: 't1', dueDate: new Date('2024-01-02') };
       const task2 = { id: 't2', dueDate: new Date('2024-01-01') };
 
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([task1, task2])); // Main returns unordered
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Subtasks
@@ -388,7 +388,7 @@ describe('Calendar Routes', () => {
         }
       ];
 
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -423,7 +423,7 @@ describe('Calendar Routes', () => {
         }
       ];
 
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -452,7 +452,7 @@ describe('Calendar Routes', () => {
 
       // 1. Tasks
       // 2. Habits
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockTask]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -479,7 +479,7 @@ describe('Calendar Routes', () => {
 
       // 1. Tasks (empty)
       // 2. Habits (found)
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
 

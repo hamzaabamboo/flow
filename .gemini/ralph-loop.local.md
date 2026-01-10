@@ -3,7 +3,7 @@ active: true
 iteration: 1
 max_iterations: 20
 completion_promise: null
-started_at: "2026-01-10T02:18:04Z"
+started_at: "2026-01-10T03:34:53Z"
 ---
 
-can you eliminate all lint errors, make sure type check pass, don't use shortcut ffs, remove all "as any" ": any" and find a proper type for it and cast to it instead
+can you eliminate all lint errors, make sure type check pass, don't use shortcut ffs, remove all "as any" ": any" and find a proper type for it and cast to it instead don't stop till you hit 0

@@ -63,7 +63,7 @@ describe('useAutoOrganize hooks', () => {
     const suggestions: AutoOrganizeSuggestion[] = [
       { taskId: 't1', details: { type: 'column_move', suggestedColumnId: 'c2' } },
       { taskId: 't2', details: { type: 'priority_change', suggestedPriority: 'high' } }
-    ] as any;
+    ] as unknown as AutoOrganizeSuggestion[];
 
     const summary = await result.current.mutateAsync(suggestions);
 
@@ -90,7 +90,7 @@ describe('useAutoOrganize hooks', () => {
     const suggestions: AutoOrganizeSuggestion[] = [
       { taskId: 't1', details: { type: 'column_move', suggestedColumnId: 'c2' } },
       { taskId: 't2', details: { type: 'priority_change', suggestedPriority: 'high' } }
-    ] as any;
+    ] as unknown as AutoOrganizeSuggestion[];
 
     const summary = await result.current.mutateAsync(suggestions);
 

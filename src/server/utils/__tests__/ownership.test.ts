@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { PgSelectBuilder } from 'drizzle-orm/pg-core';
+import * as schema from '../../../../drizzle/schema';
 import {
   verifyBoardOwnership,
   verifyTaskOwnership,
@@ -17,55 +20,56 @@ const createMockQueryBuilder = (resolvedValue: any) => {
     innerJoin: vi.fn().mockReturnThis(),
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
-  };
+  } as unknown as PgSelectBuilder<any, any>;
 };
 
 describe('ownership utils', () => {
   const mockDb = {
-    select: vi.fn()
-  } as any;
+    select: vi.fn(),
+    $client: {}
+  } as unknown as PostgresJsDatabase<typeof schema> & { $client: any };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('verifyBoardOwnership should return true if board exists for user', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([{ id: 'b1' }]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([{ id: 'b1' }]));
 
     const result = await verifyBoardOwnership(mockDb, 'b1', 'u1');
     expect(result).toBe(true);
   });
 
   it('verifyBoardOwnership should return false if board does not exist', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([]));
 
     const result = await verifyBoardOwnership(mockDb, 'b1', 'u1');
     expect(result).toBe(false);
   });
 
   it('verifyTaskOwnership should return true if task exists for user', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([{ id: 't1' }]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([{ id: 't1' }]));
 
     const result = await verifyTaskOwnership(mockDb, 't1', 'u1');
     expect(result).toBe(true);
   });
 
   it('verifyColumnOwnership should return true if column belongs to user board', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([{ boardId: 'b1' }]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([{ boardId: 'b1' }]));
 
     const result = await verifyColumnOwnership(mockDb, 'c1', 'u1');
     expect(result).toBe(true);
   });
 
   it('verifyHabitOwnership should return true if habit exists for user', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([{ id: 'h1' }]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([{ id: 'h1' }]));
 
     const result = await verifyHabitOwnership(mockDb, 'h1', 'u1');
     expect(result).toBe(true);
   });
 
   it('verifySubtaskOwnership should return true if subtask belongs to user task', async () => {
-    mockDb.select.mockReturnValue(createMockQueryBuilder([{ taskId: 't1' }]));
+    (mockDb.select as Mock).mockReturnValue(createMockQueryBuilder([{ taskId: 't1' }]));
 
     const result = await verifySubtaskOwnership(mockDb, 's1', 'u1');
     expect(result).toBe(true);

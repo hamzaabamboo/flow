@@ -38,22 +38,38 @@ describe('Notes', () => {
     vi.clearAllMocks();
 
     // Default mocks for all hooks
-    mockedHooks.useNotesEnabled.mockReturnValue({ data: { enabled: true } } as any);
-    mockedHooks.useTaskNote.mockReturnValue({ data: null, refetch: vi.fn() } as any);
-    mockedHooks.useCreateNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any);
-    mockedHooks.useUnlinkNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any);
+    mockedHooks.useNotesEnabled.mockReturnValue({
+      data: { enabled: true }
+    } as unknown as ReturnType<typeof useNotesHooks.useNotesEnabled>);
+    mockedHooks.useTaskNote.mockReturnValue({
+      data: null,
+      refetch: vi.fn()
+    } as unknown as ReturnType<typeof useNotesHooks.useTaskNote>);
+    mockedHooks.useCreateNote.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false
+    } as unknown as ReturnType<typeof useNotesHooks.useCreateNote>);
+    mockedHooks.useUnlinkNote.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false
+    } as unknown as ReturnType<typeof useNotesHooks.useUnlinkNote>);
     mockedHooks.useSearchNotes.mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
       isSuccess: false,
       data: []
-    } as any);
-    mockedHooks.useLinkNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any);
+    } as unknown as ReturnType<typeof useNotesHooks.useSearchNotes>);
+    mockedHooks.useLinkNote.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false
+    } as unknown as ReturnType<typeof useNotesHooks.useLinkNote>);
   });
 
   describe('NotesSection', () => {
     it('should show info message when notes are disabled', () => {
-      mockedHooks.useNotesEnabled.mockReturnValue({ data: { enabled: false } } as any);
+      mockedHooks.useNotesEnabled.mockReturnValue({
+        data: { enabled: false }
+      } as unknown as ReturnType<typeof useNotesHooks.useNotesEnabled>);
       renderWithProviders(<NotesSection taskTitle="Test Task" />);
       expect(screen.getByText(/Configure Outline in Settings/i)).toBeInTheDocument();
     });
@@ -77,7 +93,10 @@ describe('Notes', () => {
     it('should call createNote mutation on submit', async () => {
       const user = userEvent.setup();
       const mutateAsync = vi.fn().mockResolvedValue({ url: 'http://note.url' });
-      mockedHooks.useCreateNote.mockReturnValue({ mutateAsync, isPending: false } as any);
+      mockedHooks.useCreateNote.mockReturnValue({
+        mutateAsync,
+        isPending: false
+      } as unknown as ReturnType<typeof useNotesHooks.useCreateNote>);
 
       renderWithProviders(<NotesSection taskId="t1" taskTitle="Test Task" />);
 
@@ -101,7 +120,7 @@ describe('Notes', () => {
       mockedHooks.useTaskNote.mockReturnValue({
         data: { title: 'Existing Note', url: 'http://note.url' },
         refetch: vi.fn()
-      } as any);
+      } as unknown as ReturnType<typeof useNotesHooks.useTaskNote>);
 
       renderWithProviders(<NotesSection taskTitle="Test Task" />);
 
@@ -112,11 +131,14 @@ describe('Notes', () => {
     it('should call unlink mutation when clicking X', async () => {
       const user = userEvent.setup();
       const mutateAsync = vi.fn().mockResolvedValue({});
-      mockedHooks.useUnlinkNote.mockReturnValue({ mutateAsync, isPending: false } as any);
+      mockedHooks.useUnlinkNote.mockReturnValue({
+        mutateAsync,
+        isPending: false
+      } as unknown as ReturnType<typeof useNotesHooks.useUnlinkNote>);
       mockedHooks.useTaskNote.mockReturnValue({
         data: { title: 'Existing Note' },
         refetch: vi.fn()
-      } as any);
+      } as unknown as ReturnType<typeof useNotesHooks.useTaskNote>);
 
       renderWithProviders(<NotesSection taskId="t1" taskTitle="Test Task" />);
 
@@ -137,7 +159,7 @@ describe('Notes', () => {
         mutate,
         isPending: false,
         isSuccess: false
-      } as any);
+      } as unknown as ReturnType<typeof useNotesHooks.useSearchNotes>);
 
       renderWithProviders(<NoteSearchDialog open={true} onOpenChange={vi.fn()} taskId="t1" />);
 
@@ -162,7 +184,7 @@ describe('Notes', () => {
             url: 'http://url1'
           }
         ]
-      } as any);
+      } as unknown as ReturnType<typeof useNotesHooks.useSearchNotes>);
 
       renderWithProviders(<NoteSearchDialog open={true} onOpenChange={vi.fn()} taskId="t1" />);
 
@@ -173,11 +195,14 @@ describe('Notes', () => {
     it('should call linkNote mutation when clicking Link', async () => {
       const user = userEvent.setup();
       const mutateAsync = vi.fn().mockResolvedValue({});
-      mockedHooks.useLinkNote.mockReturnValue({ mutateAsync, isPending: false } as any);
+      mockedHooks.useLinkNote.mockReturnValue({
+        mutateAsync,
+        isPending: false
+      } as unknown as ReturnType<typeof useNotesHooks.useLinkNote>);
       mockedHooks.useSearchNotes.mockReturnValue({
         isSuccess: true,
         data: [{ id: 'n1', title: 'Note 1', updatedAt: new Date().toISOString() }]
-      } as any);
+      } as unknown as ReturnType<typeof useNotesHooks.useSearchNotes>);
 
       renderWithProviders(<NoteSearchDialog open={true} onOpenChange={vi.fn()} taskId="t1" />);
 

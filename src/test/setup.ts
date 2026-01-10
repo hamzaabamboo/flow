@@ -39,8 +39,8 @@ afterEach(() => {
 });
 
 // Mock Bun global for Vitest environment
-if (typeof (global as any).Bun === 'undefined') {
-  (global as any).Bun = {
+if (typeof (globalThis as { Bun?: any }).Bun === 'undefined') {
+  (globalThis as { Bun?: any }).Bun = {
     version: '1.0.0',
     revision: 'mock',
     env: process.env,

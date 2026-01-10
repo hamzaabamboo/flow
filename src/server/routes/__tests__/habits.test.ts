@@ -200,7 +200,7 @@ describe('Habit Routes', () => {
         createMockQueryBuilder([{ id: 'h1', name: 'Read Book' }])
       );
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits/h1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Elysia } from 'elysia';
 import { PgSelectBuilder } from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { sql } from 'drizzle-orm';
 
 // Mock DB module
 vi.mock('../../db', () => ({
@@ -27,21 +29,23 @@ const createMockQueryBuilder = (resolvedValue: unknown) => {
 };
 
 import { db } from '../../db';
+import * as schema from '../../../../drizzle/schema';
+import { inboxItems, tasks } from '../../../../drizzle/schema';
 
 // Manually define the routes logic here to avoid import issues and 500s in tests
 const testStatsRoutes = new Elysia({ prefix: '/stats' })
   .decorate('db', db)
   .derive(() => ({ user: { id: 'u1' } }))
   .get('/test', () => ({ test: 'working' }))
-  .get('/badges', async ({ db }: { db: any }) => {
-    const inbox = (await db
+  .get('/badges', async ({ db }: { db: PostgresJsDatabase<typeof schema> }) => {
+    const inbox = await db
       .select()
-      .from({} as any)
-      .where({} as any)) as unknown[];
-    const userTasks = (await db
+      .from(inboxItems)
+      .where(sql`1=1`);
+    const userTasks = await db
       .select()
-      .from({} as any)
-      .where({} as any)) as unknown[];
+      .from(tasks)
+      .where(sql`1=1`);
 
     return {
       inbox: inbox.length,
@@ -50,10 +54,10 @@ const testStatsRoutes = new Elysia({ prefix: '/stats' })
     };
   })
   .get('/analytics/completions', async ({ query, db }) => {
-    const allTasks = (await db
+    const allTasks = await db
       .select()
-      .from({} as any)
-      .where({} as any)) as unknown[];
+      .from(tasks)
+      .where(sql`1=1`);
     return {
       startDate: query.startDate,
       endDate: query.endDate,
