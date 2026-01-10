@@ -20,8 +20,19 @@ export interface PomodoroSession {
   duration: number;
   startTime?: string;
   endTime?: string;
-  taskId?: string;
-  taskTitle?: string;
+  taskId?: string | null;
+  taskTitle?: string | null;
+}
+
+export interface ActivePomodoroState {
+  type: 'work' | 'short-break' | 'long-break';
+  duration: number;
+  timeLeft: number;
+  isRunning: boolean;
+  startTime?: string | null;
+  completedSessions: number;
+  taskId?: string | null;
+  taskTitle?: string | null;
 }
 
 export interface Reminder {

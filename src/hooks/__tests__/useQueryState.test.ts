@@ -10,20 +10,27 @@ describe('useQueryState hooks', () => {
     vi.clearAllMocks();
 
     // Mock window.location
-    delete (global as any).window.location;
-    (window as any).location = {
-      ...originalLocation,
-      search: '',
-      href: 'http://localhost/',
-      pathname: '/'
-    };
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...originalLocation,
+        search: '',
+        href: 'http://localhost/',
+        pathname: '/'
+      },
+      writable: true,
+      configurable: true
+    });
 
     // Mock window.history.replaceState
     window.history.replaceState = vi.fn();
   });
 
   afterEach(() => {
-    (window as any).location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true
+    });
     window.history.replaceState = originalHistory.replaceState;
   });
 

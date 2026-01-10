@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,7 +21,7 @@ vi.mock('../../contexts/ToasterContext', () => ({
 
 // Enhanced Mock TaskDialog to allow triggering submit
 vi.mock('../Board/TaskDialog', () => ({
-  TaskDialog: ({ open, onSubmit, task }: any) =>
+  TaskDialog: ({ open, onSubmit, task }: { open: boolean; onSubmit: any; task: any }) =>
     open ? (
       <div data-testid="task-dialog" data-title={task.title}>
         <form onSubmit={onSubmit}>
@@ -44,10 +44,10 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       command: {
-        post: (...args: any[]) => mockPost(...args)
+        post: (...args: unknown[]) => mockPost(...args)
       },
       tasks: {
-        post: (...args: any[]) => mockTaskPost(...args)
+        post: (...args: unknown[]) => mockTaskPost(...args)
       }
     }
   }
@@ -65,7 +65,7 @@ describe('QuickAddDialog', () => {
     queryClient = new QueryClient();
 
     // Inject mock toast
-    (useToaster as any).mockReturnValue({
+    (useToaster as Mock).mockReturnValue({
       toast: mockToast
     });
   });

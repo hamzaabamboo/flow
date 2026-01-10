@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { TaskActionsMenu } from '../TaskActionsMenu';
+import type { Task, CalendarEvent } from '../../shared/types';
 
 describe('TaskActionsMenu', () => {
   const mockTask = { id: 'task-1', title: 'Test Task' };
@@ -10,14 +11,14 @@ describe('TaskActionsMenu', () => {
   const onMove = vi.fn();
 
   it('should render trigger button', () => {
-    render(<TaskActionsMenu task={mockTask as any} onEdit={onEdit} />);
+    render(<TaskActionsMenu task={mockTask as unknown as Task} onEdit={onEdit} />);
     expect(screen.getByLabelText('Task actions')).toBeInTheDocument();
   });
 
   it('should open menu and show actions when clicked', async () => {
     render(
       <TaskActionsMenu
-        task={mockTask as any}
+        task={mockTask as unknown as Task}
         onEdit={onEdit}
         onDelete={onDelete}
         onDuplicate={onDuplicate}
@@ -34,7 +35,7 @@ describe('TaskActionsMenu', () => {
   });
 
   it('should call callbacks when actions are clicked', async () => {
-    render(<TaskActionsMenu task={mockTask as any} onEdit={onEdit} onDelete={onDelete} />);
+    render(<TaskActionsMenu task={mockTask as unknown as Task} onEdit={onEdit} onDelete={onDelete} />);
 
     fireEvent.click(screen.getByLabelText('Task actions'));
 
@@ -51,7 +52,7 @@ describe('TaskActionsMenu', () => {
       { value: 'extra', label: 'Extra Action', icon: <span />, onClick: onExtra }
     ];
 
-    render(<TaskActionsMenu task={mockTask as any} onEdit={onEdit} extraActions={extraActions} />);
+    render(<TaskActionsMenu task={mockTask as unknown as Task} onEdit={onEdit} extraActions={extraActions} />);
 
     fireEvent.click(screen.getByLabelText('Task actions'));
 

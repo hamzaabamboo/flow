@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder, PgDelete } from 'drizzle-orm/pg-core';
 
 // Helper to create chainable mock
-const createMockChain = (returnValue: any) => {
+const createMockChain = (returnValue: unknown) => {
   const chain = {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -17,11 +19,14 @@ const createMockChain = (returnValue: any) => {
     orderBy: vi.fn().mockReturnThis(),
 
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => {
+    then: (resolve: (val: unknown) => void) => {
       resolve(returnValue);
     }
   };
-  return chain;
+  return chain as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any> &
+    PgDelete<any, any, any>;
 };
 
 // Mock websocket to prevent open handles
@@ -35,7 +40,7 @@ vi.mock('../../server/websocket', () => ({
 
 // Integration test for complete authentication flow
 describe('Authentication Flow Integration', () => {
-  let app: Elysia<any, any, any, any, any, any, any> | null = null;
+  let app: any;
   let mockDb: any;
 
   const testUser = {
@@ -74,7 +79,7 @@ describe('Authentication Flow Integration', () => {
     app = new Elysia()
       .decorate('db', mockDb)
       .use(simpleAuth)
-      .group('/api', (api) => api.use(tasksRoutes).use(boardRoutes).use(inboxRoutes)) as any;
+      .group('/api', (api) => api.use(tasksRoutes).use(boardRoutes).use(inboxRoutes));
   });
 
   beforeEach(() => {
@@ -153,7 +158,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as Record<string, unknown>;
       expect(data).toHaveProperty('email', testUser.email);
     });
 
@@ -274,7 +279,7 @@ describe('Authentication Flow Integration', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(testUser)
       });
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as Record<string, unknown>;
 
       expect(data).not.toHaveProperty('password');
       expect(data).not.toHaveProperty('user');

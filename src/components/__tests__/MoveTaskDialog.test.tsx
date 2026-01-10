@@ -1,9 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MoveTaskDialog } from '../MoveTaskDialog';
-import { SpaceContext } from '../../contexts/SpaceContext';
+import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
+import type { Task } from '../../shared/types';
 
 // Mock the API client
 vi.mock('../../api/client', () => ({
@@ -16,12 +17,9 @@ vi.mock('../../api/client', () => ({
   }
 }));
 
-const mockSpaceContext = {
+const mockSpaceContext: SpaceContextType = {
   currentSpace: 'work',
-  spaces: [],
-  setSpaces: vi.fn(),
   setCurrentSpace: vi.fn(),
-  getSpaceById: vi.fn(),
   toggleSpace: vi.fn()
 };
 
@@ -50,7 +48,7 @@ const mockBoards = [
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={mockSpaceContext as any}>{ui}</SpaceContext.Provider>
+      <SpaceContext.Provider value={mockSpaceContext}>{ui}</SpaceContext.Provider>
     </QueryClientProvider>
   );
 };
@@ -65,7 +63,7 @@ describe('MoveTaskDialog', () => {
     queryClient.clear();
 
     // Mock API response
-    (api.api.boards.get as any).mockResolvedValue({
+    (api.api.boards.get as Mock).mockResolvedValue({
       data: mockBoards,
       error: null
     });
@@ -76,7 +74,7 @@ describe('MoveTaskDialog', () => {
       <MoveTaskDialog
         open={true}
         onOpenChange={onOpenChange}
-        task={mockTask as any}
+        task={mockTask as unknown as Task}
         onMove={onMove}
       />
     );
@@ -97,7 +95,7 @@ describe('MoveTaskDialog', () => {
       <MoveTaskDialog
         open={true}
         onOpenChange={onOpenChange}
-        task={mockTask as any}
+        task={mockTask as unknown as Task}
         onMove={onMove}
       />
     );
@@ -115,7 +113,7 @@ describe('MoveTaskDialog', () => {
       <MoveTaskDialog
         open={true}
         onOpenChange={onOpenChange}
-        task={mockTask as any}
+        task={mockTask as unknown as Task}
         onMove={onMove}
       />
     );

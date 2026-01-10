@@ -4,14 +4,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgendaWeekView } from '../AgendaWeekView';
 import type { CalendarEvent, Habit } from '../../../shared/types/calendar';
 import React from 'react';
+import type { DndContextProps, DragEndEvent } from '@dnd-kit/core';
+
+declare global {
+  var lastWeekDndProps: DndContextProps | undefined;
+}
 
 // Mock DndContext to capture props
 vi.mock('@dnd-kit/core', async () => {
-  const actual = await vi.importActual('@dnd-kit/core');
+  const actual = (await vi.importActual('@dnd-kit/core')) as any;
   return {
-    ...(actual as any),
-    DndContext: (props: any) => {
-      (global as any).lastWeekDndProps = props;
+    ...actual,
+    DndContext: (props: DndContextProps) => {
+      globalThis.lastWeekDndProps = props;
       return <div data-testid="dnd-context">{props.children}</div>;
     },
     useDraggable: vi.fn(() => ({
@@ -25,7 +30,7 @@ vi.mock('@dnd-kit/core', async () => {
       setNodeRef: vi.fn(),
       isOver: false
     })),
-    DragOverlay: ({ children }: any) => <div>{children}</div>
+    DragOverlay: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
   };
 });
 
@@ -243,16 +248,16 @@ describe('AgendaWeekView', () => {
       />
     );
 
-    const dndProps = (global as any).lastWeekDndProps;
+    const dndProps = globalThis.lastWeekDndProps;
 
     await act(async () => {
-      dndProps.onDragEnd({
+      dndProps?.onDragEnd?.({
         active: {
           id: 't1',
           data: { current: { event: groupedEvents['2024-12-25'][0], originalDate: '2024-12-25' } }
         },
         over: { id: '2024-12-26' } // Move to next day
-      });
+      } as unknown as DragEndEvent);
     });
 
     expect(mockHandlers.onTaskDrop).toHaveBeenCalledWith('t1', expect.any(Date));
