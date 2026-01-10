@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BoardDialog } from '../BoardDialog';
+import type { Board } from '../../../shared/types';
 import { ToasterContext } from '../../../contexts/ToasterContext';
 import { SpaceContext } from '../../../contexts/SpaceContext';
 import { navigate } from 'vike/client/router';

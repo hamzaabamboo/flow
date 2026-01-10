@@ -1,6 +1,7 @@
 // Test setup file for Vitest
 import { afterEach, vi } from 'vitest';
 
+// oxlint-disable-next-line import/no-unassigned-import
 import '@testing-library/jest-dom';
 
 // Mock fetch globally

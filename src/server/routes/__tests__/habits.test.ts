@@ -1,22 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import * as schema from '../../../../drizzle/schema';
+import { habits } from '../../../../drizzle/schema';
+
+type Habit = typeof habits.$inferSelect;
+interface CalendarHabit extends Habit {
+  link?: string | null;
+  completedToday: boolean;
+  currentStreak: number;
+  checkDate?: string;
+}
 
 // --- MOCKS ---
 
-interface MockQueryBuilder {
-  from: () => MockQueryBuilder;
-  where: () => MockQueryBuilder;
-  orderBy: () => MockQueryBuilder;
-  limit: () => MockQueryBuilder;
-  leftJoin: () => MockQueryBuilder;
-  groupBy: () => MockQueryBuilder;
-  returning: () => MockQueryBuilder;
-  values: () => MockQueryBuilder;
-  set: () => MockQueryBuilder;
-  then: (resolve: (value: unknown) => void) => Promise<void>;
-}
-
-const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
@@ -27,9 +26,12 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     returning: vi.fn().mockResolvedValue(resolvedValue), // For insert/update returning
     values: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
+    // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
-  return builder;
+  };
+  return builder as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 vi.mock('../../db', () => ({
@@ -57,7 +59,7 @@ import { habitsRoutes } from '../habits';
 import { db } from '../../db';
 
 describe('Habit Routes', () => {
-  let app: Elysia;
+  let app: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -67,7 +69,9 @@ describe('Habit Routes', () => {
     vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
     vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
 
-    app = new Elysia().decorate('db', db).use(habitsRoutes);
+    app = new Elysia()
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
+      .use(habitsRoutes);
     console.log('BeforeEach: App initialized');
   });
 
@@ -314,9 +318,10 @@ describe('Habit Routes', () => {
       createdAt: createdDate
     };
 
-          vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));          vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ count: 2 }])); // 2 completions
+    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
+    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ count: 2 }])); // 2 completions
 
-          const response = await app.handle(new Request('http://localhost/habits/h2/stats'));
+    const response = await app.handle(new Request('http://localhost/habits/h2/stats'));
     const data = await response.json();
     expect(response.status).toBe(200);
     // Just verify it runs the logic without error and returns a number

@@ -107,7 +107,7 @@ describe('BoardPage', () => {
       return Promise.resolve({ data: filteredTasks, error: null });
     });
 
-    getMockFn(mockApi.api.tasks['auto-organize'].post).mockResolvedValue({
+    getMockFn(tasksRoute['auto-organize'].post).mockResolvedValue({
       data: {
         suggestions: [
           {
@@ -187,7 +187,8 @@ describe('BoardPage', () => {
 
   it('should handle "Auto Organize" failure', async () => {
     const user = userEvent.setup();
-    getMockFn(mockApi.api.tasks['auto-organize'].post).mockResolvedValue({
+    const tasksRoute = getMockRoute(mockApi.api.tasks);
+    getMockFn(tasksRoute['auto-organize'].post).mockResolvedValue({
       data: null,
       error: { message: 'AI failed' }
     });

@@ -36,7 +36,7 @@ export function SuggestionRow({
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data as BoardWithColumns[];
+      return data as unknown as BoardWithColumns[];
     },
     enabled: isEditing && suggestion.details.type === 'column_move'
   });

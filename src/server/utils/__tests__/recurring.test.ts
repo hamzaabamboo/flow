@@ -8,14 +8,11 @@ describe('expandRecurringTasks', () => {
     title: 'Recurring Task',
     description: '',
     columnId: 'c1',
-    boardId: 'b1',
-    userId: 'u1',
     space: 'work',
     priority: 'medium',
     createdAt: new Date('2025-01-01T10:00:00Z').toISOString(),
     updatedAt: new Date('2025-01-01T10:00:00Z').toISOString(),
     columnName: 'To Do',
-    boardName: 'Board',
     labels: [],
     subtasks: []
   };
@@ -121,7 +118,7 @@ describe('expandRecurringTasks', () => {
   it('should handle tasks without dueDate using createdAt', () => {
     const task: Task = {
       ...baseTask,
-      dueDate: null,
+      dueDate: undefined,
       createdAt: new Date('2025-01-05T10:00:00Z').toISOString(),
       recurringPattern: 'daily'
     };
@@ -154,7 +151,7 @@ describe('expandRecurringTasks', () => {
     const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-10T10:00:00Z').toISOString(),
-      recurringPattern: null
+      recurringPattern: undefined
     };
 
     const start = new Date('2025-01-01T00:00:00Z');

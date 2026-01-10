@@ -97,8 +97,7 @@ describe('KanbanBoard', () => {
       priority: 'high',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      completed: false,
-      order: 0
+      completed: false
     }
   ];
 

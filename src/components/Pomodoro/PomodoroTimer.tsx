@@ -130,7 +130,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     queryFn: async () => {
       const { data, error } = await api.api.pomodoro.active.get();
       if (error) return null;
-      return data;
+      return data as unknown as ActivePomodoroState;
     },
     // Disable polling - rely on local timer and WebSocket for updates
     refetchInterval: false,
@@ -159,7 +159,17 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   // Update server state
   const updateStateMutation = useMutation({
     mutationFn: async (state: ActivePomodoroState) => {
-      const { data, error } = await api.api.pomodoro.active.post(state);
+      const { data, error } = await api.api.pomodoro.active.post(
+        state as unknown as {
+          type: 'work' | 'short-break' | 'long-break';
+          duration: number;
+          timeLeft: number;
+          isRunning: boolean;
+          completedSessions: number;
+          taskId?: string;
+          taskTitle?: string;
+        }
+      );
       if (error) throw new Error('Failed to update state');
       return data;
     },

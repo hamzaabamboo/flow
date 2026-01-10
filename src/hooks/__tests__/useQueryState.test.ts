@@ -10,9 +10,8 @@ describe('useQueryState hooks', () => {
     vi.clearAllMocks();
 
     // Mock window.location
-    // @ts-expect-error TS is complaining about deleting read-only property, but this is how we mock it.
-    delete global.window.location;
-    window.location = {
+    delete (global as any).window.location;
+    (window as any).location = {
       ...originalLocation,
       search: '',
       href: 'http://localhost/',
@@ -24,24 +23,24 @@ describe('useQueryState hooks', () => {
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+    (window as any).location = originalLocation;
     window.history.replaceState = originalHistory.replaceState;
   });
 
   describe('useQueryState', () => {
     it('should initialize with default value when no param present', () => {
-      const { result } = renderHook(() => useQueryState('test', 'default'));
+      const { result } = renderHook(() => useQueryState<string>('test', 'default'));
       expect(result.current[0]).toBe('default');
     });
 
     it('should initialize with value from URL', () => {
-      window.location.search = '?test=url-value';
-      const { result } = renderHook(() => useQueryState('test', 'default'));
+      (window.location as any).search = '?test=url-value';
+      const { result } = renderHook(() => useQueryState<string>('test', 'default'));
       expect(result.current[0]).toBe('url-value');
     });
 
     it('should update URL when setValue is called', () => {
-      const { result } = renderHook(() => useQueryState('test', 'default'));
+      const { result } = renderHook(() => useQueryState<string>('test', 'default'));
 
       act(() => {
         result.current[1]('new-value');
@@ -57,7 +56,7 @@ describe('useQueryState hooks', () => {
 
     it('should remove param from URL when set to default value', () => {
       window.location.search = '?test=other';
-      const { result } = renderHook(() => useQueryState('test', 'default'));
+      const { result } = renderHook(() => useQueryState<string>('test', 'default'));
 
       act(() => {
         result.current[1]('default');
@@ -68,7 +67,7 @@ describe('useQueryState hooks', () => {
     });
 
     it('should update state on popstate event', () => {
-      const { result } = renderHook(() => useQueryState('test', 'default'));
+      const { result } = renderHook(() => useQueryState<string>('test', 'default'));
 
       window.location.search = '?test=pop-value';
       act(() => {

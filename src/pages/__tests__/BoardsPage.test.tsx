@@ -43,7 +43,7 @@ describe('BoardsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({
+    (global as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockBoards)
     } as any);
@@ -64,7 +64,7 @@ describe('BoardsPage', () => {
   });
 
   it('should show empty state when no boards', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    (global as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([])
     } as any);

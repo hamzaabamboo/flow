@@ -29,6 +29,8 @@ export interface CalendarEvent {
   externalCalendarColor?: string; // Park UI color token
   isExternal?: boolean; // Helper flag
   isUpcoming?: boolean; // Helper flag for agenda view
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ExtendedTask {
@@ -69,6 +71,8 @@ export interface Habit {
   space?: 'work' | 'personal';
   link?: string;
   checkDate?: string; // For week view - the specific date this habit's completion is for
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CalendarFeedResponse {

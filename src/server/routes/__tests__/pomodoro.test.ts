@@ -1,26 +1,23 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
 
-// Define Mock DB Chain Helper
-interface MockQueryBuilder {
-  from: () => MockQueryBuilder;
-  where: () => MockQueryBuilder;
-  orderBy: () => MockQueryBuilder;
-  limit: () => MockQueryBuilder;
-  onConflictDoUpdate: () => MockQueryBuilder;
-  then: (resolve: (value: unknown) => void) => Promise<void>;
-}
-
-const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     onConflictDoUpdate: vi.fn().mockReturnThis(),
+    values: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(resolvedValue),
+    set: vi.fn().mockReturnThis(),
+    // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
-  return builder;
+  };
+  return builder as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 // Mock the DB module
@@ -66,15 +63,9 @@ describe('Pomodoro Routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    vi.mocked(db.from).mockReturnThis();
-    (db as any).where.mockReturnThis();
-    (db as any).insert.mockReturnThis();
-    (db as any).values.mockReturnThis();
-    (db as any).update.mockReturnThis();
-    (db as any).set.mockReturnThis();
-    (db as any).delete.mockReturnThis();
-    (db as any).returning.mockReturnThis();
-    (db as any).onConflictDoUpdate.mockReturnThis();
+    vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia()
       .decorate('db', db)
@@ -85,7 +76,7 @@ describe('Pomodoro Routes', () => {
   describe('GET /pomodoro', () => {
     it('should fetch today sessions', async () => {
       const mockSessions = [{ id: 's1', duration: 25, userId: mockUser.id }];
-      (db as any).select.mockReturnValue(createMockQueryBuilder(mockSessions));
+      (db.select as Mock).mockReturnValue(createMockQueryBuilder(mockSessions));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro')
@@ -102,7 +93,7 @@ describe('Pomodoro Routes', () => {
       const newSession = { duration: 25, startTime: new Date().toISOString(), taskId: 't1' };
       const savedSession = { id: 's2', ...newSession, userId: mockUser.id };
 
-      (db as any).returning.mockResolvedValueOnce([savedSession]);
+      vi.mocked(db.insert).mockReturnValueOnce(createMockQueryBuilder([savedSession]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro', {
@@ -120,7 +111,7 @@ describe('Pomodoro Routes', () => {
 
   describe('GET /pomodoro/active', () => {
     it('should return null if no active state', async () => {
-      (db as any).select.mockReturnValue(createMockQueryBuilder([]));
+      (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro/active')
@@ -137,11 +128,11 @@ describe('Pomodoro Routes', () => {
         userId: mockUser.id,
         isRunning: true,
         timeLeft: 1500, // 25 mins
-        startTime: startTime,
+        startTime: startTime
       };
 
-      (db as any).select.mockReturnValue(createMockQueryBuilder([mockState]));
-      (db as any).update.mockReturnThis();
+      (db.select as Mock).mockReturnValue(createMockQueryBuilder([mockState]));
+      vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro/active')
@@ -162,9 +153,9 @@ describe('Pomodoro Routes', () => {
         isRunning: true,
         completedSessions: 0
       };
-      
+
       const savedState = { ...body, userId: mockUser.id };
-      (db as any).returning.mockResolvedValueOnce([savedState]);
+      vi.mocked(db.insert).mockReturnValueOnce(createMockQueryBuilder([savedState]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro/active', {
@@ -175,9 +166,12 @@ describe('Pomodoro Routes', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(wsManager.broadcastToUser).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+      expect(wsManager.broadcastToUser).toHaveBeenCalledWith(
+        mockUser.id,
+        expect.objectContaining({
           type: 'pomodoro-state'
-      }));
+        })
+      );
     });
   });
 
@@ -191,9 +185,12 @@ describe('Pomodoro Routes', () => {
 
       expect(response.status).toBe(200);
       expect(db.delete).toHaveBeenCalled();
-      expect(wsManager.broadcastToUser).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+      expect(wsManager.broadcastToUser).toHaveBeenCalledWith(
+        mockUser.id,
+        expect.objectContaining({
           data: expect.objectContaining({ event: 'cleared' })
-      }));
+        })
+      );
     });
   });
 });

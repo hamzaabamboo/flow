@@ -69,7 +69,7 @@ export function useCreateNote() {
       if (error) {
         throw new Error(error.value?.message || 'Failed to create note');
       }
-      return data;
+      return (data as any).data; // Eden Treaty response wrapper
     },
     onSuccess: (data, variables) => {
       // Invalidate task note query if note was linked to a task

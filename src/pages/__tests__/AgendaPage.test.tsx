@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -50,7 +50,10 @@ vi.mock('../../api/client', () => {
   };
 });
 
-const renderWithProviders = (ui: React.ReactElement, currentSpace = 'personal') => {
+const renderWithProviders = (
+  ui: React.ReactElement,
+  currentSpace: 'work' | 'personal' = 'personal'
+) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false }
@@ -59,7 +62,9 @@ const renderWithProviders = (ui: React.ReactElement, currentSpace = 'personal') 
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={{ currentSpace, setCurrentSpace: vi.fn() }}>
+      <SpaceContext.Provider
+        value={{ currentSpace, setCurrentSpace: vi.fn(), toggleSpace: vi.fn() }}
+      >
         <ToasterProvider>
           <DialogProvider>{ui}</DialogProvider>
         </ToasterProvider>
@@ -213,7 +218,7 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    (api.api.calendar.events.get as vi.Mock).mockResolvedValue({ data: [extEvent], error: null });
+    (api.api.calendar.events.get as Mock).mockResolvedValue({ data: [extEvent], error: null });
 
     renderWithProviders(<AgendaPage />);
 
@@ -234,7 +239,7 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    (api.api.calendar.events.get as vi.Mock).mockResolvedValue({
+    (api.api.calendar.events.get as Mock).mockResolvedValue({
       data: [upcomingTask],
       error: null
     });
@@ -248,11 +253,11 @@ describe('AgendaPage', () => {
   it('should handle applying auto-organize suggestions', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    api.api.tasks.mockImplementation(() => ({
+    (api.api.tasks as unknown as Mock).mockImplementation(() => ({
       patch: patchMock
     }));
 
-    (api.api.tasks['auto-organize'].post as vi.Mock).mockResolvedValue({
+    (api.api.tasks['auto-organize'].post as Mock).mockResolvedValue({
       data: {
         suggestions: [
           {

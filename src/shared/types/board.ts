@@ -20,6 +20,7 @@ export interface Task {
   columnId: string;
   columnName?: string | null;
   space?: 'work' | 'personal';
+  completed?: boolean;
   createdAt?: string;
   updatedAt?: string;
   labels?: string[];
@@ -45,6 +46,7 @@ export interface Column {
   position?: number;
   wipLimit?: number | null;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Board {

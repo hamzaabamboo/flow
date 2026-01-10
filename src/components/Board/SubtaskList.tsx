@@ -20,12 +20,12 @@ export function SubtaskList({ taskId, compact = false }: SubtaskListProps) {
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   // Fetch subtasks
-  const { data: subtasks = [] } = useQuery<Subtask[]>({
+  const { data: subtasks = [] as Subtask[] } = useQuery<Subtask[]>({
     queryKey: ['subtasks', taskId],
     queryFn: async () => {
       const { data, error } = await api.api.subtasks.task({ taskId }).get();
-      if (error) throw new Error('Failed to fetch subtasks');
-      return data;
+      if (error) return [];
+      return data as unknown as Subtask[];
     }
   });
 

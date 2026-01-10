@@ -4,7 +4,7 @@ import { useLocalStorage } from '../useLocalStorage';
 
 describe('useLocalStorage', () => {
   const key = 'test-key';
-  const initialValue = { a: 1 };
+  const initialValue: Record<string, number> = { a: 1 };
 
   beforeEach(() => {
     vi.clearAllMocks();

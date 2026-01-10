@@ -71,9 +71,8 @@ export function TaskDialog({
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data;
-    },
-    enabled: open // Fetch when dialog is open to allow task movement
+      return data as unknown as Array<{ id: string; name: string; columns: Column[] }>;
+    }
   });
 
   const availableColumns =

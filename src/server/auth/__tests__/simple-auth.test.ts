@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
 import { simpleAuth } from '../simple-auth';
@@ -22,6 +22,9 @@ interface MockQueryBuilder {
   orderBy: () => MockQueryBuilder;
   limit: () => MockQueryBuilder;
   then: (resolve: (value: unknown) => void) => Promise<void>;
+  // Drizzle properties
+  _brand: string;
+  [Symbol.toStringTag]: string;
 }
 
 const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
@@ -31,8 +34,10 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     orderBy: () => builder,
     limit: () => builder,
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve),
+    _brand: 'PgSelect',
+    [Symbol.toStringTag]: 'PgSelect'
+  } as unknown as MockQueryBuilder;
   return builder;
 };
 
@@ -47,12 +52,14 @@ vi.mock('../../db', () => ({
   }
 }));
 
+type SimpleAuthApp = Elysia<any, any, any, any, any, any, any>;
+
 describe('Simple Auth', () => {
-  let app: Elysia;
+  let app: SimpleAuthApp;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
     app = new Elysia().decorate('db', db).use(simpleAuth);
   });
 
@@ -79,7 +86,7 @@ describe('Simple Auth', () => {
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
-    vi.mocked(db.select).mockReturnValue(
+    (db.select as Mock).mockReturnValue(
       createMockQueryBuilder([{ id: 'u1', email: 't@t.com', name: 'T' }])
     );
     const req = new Request('http://localhost/api/auth/me');
@@ -92,12 +99,14 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/setup should create user and return hash', async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // No users
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No users
     const mockInsertChain = {
       values: vi.fn().mockReturnThis(),
-      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
+      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }]),
+      _brand: 'PgInsert',
+      [Symbol.toStringTag]: 'PgInsert'
     };
-    vi.mocked(db.insert).mockReturnValue(mockInsertChain);
+    (db.insert as Mock).mockReturnValue(mockInsertChain);
 
     const res = await app.handle(
       new Request('http://localhost/api/auth/setup', {
@@ -114,7 +123,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/setup should fail if users already exist', async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'existing' }]));
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([{ id: 'existing' }]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/setup', {
         method: 'POST',
@@ -127,12 +136,14 @@ describe('Simple Auth', () => {
 
   it('POST /api/auth/login should work with correct credentials', async () => {
     process.env.USER_PASSWORD_HASH = undefined;
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
     const mockInsertChain = {
       values: vi.fn().mockReturnThis(),
-      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }])
+      returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }]),
+      _brand: 'PgInsert',
+      [Symbol.toStringTag]: 'PgInsert'
     };
-    vi.mocked(db.insert).mockReturnValue(mockInsertChain);
+    (db.insert as Mock).mockReturnValue(mockInsertChain);
     await app.handle(
       new Request('http://localhost/api/auth/setup', {
         method: 'POST',
@@ -141,8 +152,8 @@ describe('Simple Auth', () => {
       })
     );
 
-    vi.mocked(db.select).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]) as any
+    (db.select as Mock).mockReturnValueOnce(
+      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }])
     );
     const res = await app.handle(
       new Request('http://localhost/api/auth/login', {
@@ -158,7 +169,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/login should fail with invalid credentials', async () => {
-    vi.mocked(db.select).mockReturnValueOnce(
+    (db.select as Mock).mockReturnValueOnce(
       createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }])
     );
     const res = await app.handle(
@@ -178,7 +189,7 @@ describe('Simple Auth', () => {
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
     const req = new Request('http://localhost/api/auth/me');
     req.headers.append('Cookie', `auth=${token}`);
     const res = await app.handle(req);
@@ -186,10 +197,20 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/auto-login should return 404 if no users', async () => {
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/auto-login', { method: 'POST' })
     );
     expect(res.status).toBe(404);
+  });
+
+  it('POST /api/auth/auto-login should login first user', async () => {
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
+    const res = await app.handle(
+      new Request('http://localhost/api/auth/auto-login', { method: 'POST' })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe('u1');
   });
 });

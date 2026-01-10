@@ -2,8 +2,8 @@
 active: true
 iteration: 1
 max_iterations: 20
-completion_promise: "CLEANUP_DONE"
-started_at: "2026-01-08T07:07:16Z"
+completion_promise: null
+started_at: "2026-01-10T02:18:04Z"
 ---
 
-fix tests, fix lint everything must pass,get you shit together, use your brain if test failed read the fucking code come up with a solution do not just use fucking lazy shortcuts REMOVE ALL AS ANY
+can you eliminate all lint errors, make sure type check pass, don't use shortcut ffs, remove all "as any" ": any" and find a proper type for it and cast to it instead

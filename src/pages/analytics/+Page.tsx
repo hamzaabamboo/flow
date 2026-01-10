@@ -215,32 +215,32 @@ export default function AnalyticsPage() {
               <VStack gap="3" alignItems="stretch">
                 <Heading size="md">Completions by Priority</Heading>
                 <Grid gap="3" columns={{ base: 2, sm: 4 }}>
-                  {Object.entries(stats.byPriority).map(([priority, count]) => (
-                    <Box
-                      key={priority}
-                      borderRadius="md"
-                      p="3"
-                      /* @pandacss-ignore */
-                      bg={
-                        priority === 'urgent'
-                          ? 'red.subtle'
-                          : priority === 'high'
-                            ? 'orange.subtle'
-                            : priority === 'medium'
-                              ? 'yellow.subtle'
-                              : 'gray.subtle'
-                      }
-                    >
-                      <VStack gap="1">
-                        <Text fontSize="2xl" fontWeight="bold">
-                          {count}
-                        </Text>
-                        <Text fontSize="sm" textTransform="capitalize">
-                          {priority}
-                        </Text>
-                      </VStack>
-                    </Box>
-                  ))}
+                  {Object.entries(stats.byPriority).map(([priority, count]) => {
+                    const bgMap: Record<string, string> = {
+                      urgent: 'red.subtle',
+                      high: 'orange.subtle',
+                      medium: 'yellow.subtle',
+                      low: 'gray.subtle'
+                    };
+                    const bgColor = bgMap[priority] || 'gray.subtle';
+                    return (
+                      <Box
+                        key={priority}
+                        borderRadius="md"
+                        p="3"
+                        style={{ backgroundColor: `var(--colors-${bgColor.replace('.', '-')})` }}
+                      >
+                        <VStack gap="1">
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {count}
+                          </Text>
+                          <Text fontSize="sm" textTransform="capitalize">
+                            {priority}
+                          </Text>
+                        </VStack>
+                      </Box>
+                    );
+                  })}
                 </Grid>
               </VStack>
             </Box>

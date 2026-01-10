@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AnalyticsPage from '../analytics/+Page';
 import { SpaceContext } from '../../contexts/SpaceContext';
-import { mockApi, getMockFn } from '../../test/mocks/api';
+import { mockApi, getMockFn, getMockRoute } from '../../test/mocks/api';
 
 // Mock API using shared mocks
 vi.mock('../../api/client', async () => {
@@ -70,7 +70,8 @@ describe('AnalyticsPage', () => {
     vi.clearAllMocks();
     queryClient.clear();
     // Mock get to return a successful response with mock data
-    getMockFn(mockApi.api.stats.analytics.completions.get).mockResolvedValue({
+    const statsRoute = getMockRoute(mockApi.api.stats);
+    getMockFn(statsRoute.analytics.completions.get).mockResolvedValue({
       data: mockAnalyticsResponse,
       error: null
     });
@@ -88,7 +89,8 @@ describe('AnalyticsPage', () => {
 
   it('should display loading spinner while fetching data', async () => {
     // Make the query take time to resolve
-    getMockFn(mockApi.api.stats.analytics.completions.get).mockImplementation(
+    const statsRoute = getMockRoute(mockApi.api.stats);
+    getMockFn(statsRoute.analytics.completions.get).mockImplementation(
       () =>
         new Promise((resolve) =>
           setTimeout(() => resolve({ data: mockAnalyticsResponse, error: null }), 100)
@@ -135,20 +137,22 @@ describe('AnalyticsPage', () => {
     await screen.findByText('Total Completed');
 
     // Initial fetch for 'Last 7 Days'
-    expect(mockApi.api.stats.analytics.completions.get).toHaveBeenCalledTimes(1);
+    const statsRoute = getMockRoute(mockApi.api.stats);
+    expect(statsRoute.analytics.completions.get).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Last 30 Days/i }));
     });
 
     // Should have been called again for the new date range
-    expect(mockApi.api.stats.analytics.completions.get).toHaveBeenCalledTimes(2);
+    expect(statsRoute.analytics.completions.get).toHaveBeenCalledTimes(2);
 
     expect(screen.getByText(/Last 30 Days:/i)).toBeInTheDocument();
   });
 
   it('should display a message when there are no completed tasks', async () => {
-    getMockFn(mockApi.api.stats.analytics.completions.get).mockResolvedValue({
+    const statsRoute = getMockRoute(mockApi.api.stats);
+    getMockFn(statsRoute.analytics.completions.get).mockResolvedValue({
       data: { completions: [] },
       error: null
     });
@@ -166,9 +170,8 @@ describe('AnalyticsPage', () => {
 
   it('should handle API errors gracefully', async () => {
     // Mock the query to return an error state
-    getMockFn(mockApi.api.stats.analytics.completions.get).mockRejectedValue(
-      new Error('Network Error')
-    );
+    const statsRoute = getMockRoute(mockApi.api.stats);
+    getMockFn(statsRoute.analytics.completions.get).mockRejectedValue(new Error('Network Error'));
 
     renderWithProviders(<AnalyticsPage />);
 

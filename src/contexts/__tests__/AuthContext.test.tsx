@@ -32,11 +32,7 @@ const renderWithQueryClient = (ui: React.ReactElement) => {
       queries: { retry: false, staleTime: Infinity }
     }
   });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 };
 
 describe('AuthContext', () => {
@@ -74,9 +70,12 @@ describe('AuthContext', () => {
       </AuthProvider>
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('status').textContent).toBe('authenticated');
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('status').textContent).toBe('authenticated');
+      },
+      { timeout: 2000 }
+    );
     expect(screen.getByTestId('user').textContent).toBe('test@example.com');
   });
 
@@ -95,9 +94,12 @@ describe('AuthContext', () => {
       </AuthProvider>
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('status').textContent).toBe('unauthenticated');
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('status').textContent).toBe('unauthenticated');
+      },
+      { timeout: 2000 }
+    );
     expect(screen.getByTestId('user').textContent).toBe('no-user');
   });
 
@@ -111,7 +113,7 @@ describe('AuthContext', () => {
     // Mock window.location.href
     const originalLocation = window.location;
     delete (window as any).location;
-    window.location = { ...originalLocation, href: '', pathname: '/' };
+    window.location = { ...originalLocation, href: '', pathname: '/' } as any;
 
     renderWithQueryClient(
       <AuthProvider>
@@ -123,7 +125,7 @@ describe('AuthContext', () => {
       expect(window.location.href).toContain('/login');
     });
 
-    window.location = originalLocation;
+    window.location = originalLocation as any;
   });
 
   it('logout should call API and clear user', async () => {
@@ -139,7 +141,7 @@ describe('AuthContext', () => {
     const LogoutButton = () => {
       const { logout } = useAuth();
       useEffect(() => {
-          if (logout) capturedLogout = logout;
+        if (logout) capturedLogout = logout;
       }, [logout]);
       return <button onClick={() => logout()}>Logout</button>;
     };

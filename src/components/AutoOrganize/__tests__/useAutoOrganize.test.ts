@@ -37,7 +37,8 @@ describe('useAutoOrganize hooks', () => {
   });
 
   it('useAutoOrganize should call API and return data', async () => {
-    const autoOrganizePost = getMockFn(mockApi.api.tasks['auto-organize'].post);
+    const tasksRoute = getMockRoute(mockApi.api.tasks);
+    const autoOrganizePost = getMockFn(tasksRoute['auto-organize'].post);
     autoOrganizePost.mockResolvedValue({ data: { suggestions: [] }, error: null });
 
     const { result } = renderHook(() => useAutoOrganize(), { wrapper });

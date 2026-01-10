@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PgSelectBuilder } from 'drizzle-orm/pg-core';
 
 // --- MOCKS ---
 
@@ -16,7 +17,7 @@ const createMockQueryBuilder = (resolvedValue: any) => {
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
   };
-  return builder;
+  return builder as unknown as PgSelectBuilder<any, any>;
 };
 
 vi.mock('../../db', () => ({
@@ -59,21 +60,21 @@ import { expandRecurringTasks } from '../../utils/recurring';
 import { fetchAndParseIcal, convertIcalToEvents } from '../../utils/ical-parser';
 
 describe('Calendar Routes', () => {
-  let app: unknown;
+  let app: any;
   // removed unused mockUser
 
   beforeEach(() => {
     vi.resetAllMocks();
 
     // Default mocks
-    (db as any).select.mockReturnValue(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia().use(publicCalendarRoutes).use(calendarRoutes);
   });
 
   describe('GET /api/calendar/ical/:userId/:token', () => {
     it('should return 401 for invalid token', async () => {
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/api/calendar/ical/user-1/bad-token')
       );
       expect(response.status).toBe(401);
@@ -86,13 +87,11 @@ describe('Calendar Routes', () => {
       const mockTasks = [
         { id: 't1', title: 'Task 1', dueDate: new Date().toISOString(), userId: 'user-1' }
       ];
-      // 1. Tasks Query
-      // 2. Habits Query
-      const mockSelect = db.select as any;
+      const mockSelect = db.select as Mock;
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(mockTasks));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // No habits
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/api/calendar/ical/user-1/${validToken}`)
       );
 
@@ -106,7 +105,7 @@ describe('Calendar Routes', () => {
 
   describe('GET /calendar/feed-url', () => {
     it('should return subscription URL', async () => {
-      const response = await (app as any).handle(new Request('http://localhost/calendar/feed-url'));
+      const response = await app.handle(new Request('http://localhost/calendar/feed-url'));
       const data = await response.json();
       expect(data.url).toContain('/api/calendar/ical/user-1/');
     });
@@ -132,7 +131,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
       );
 
@@ -162,9 +161,9 @@ describe('Calendar Routes', () => {
 
       // 1. Main window call (empty)
       // 2. Upcoming window call (should find the instance)
-      (expandRecurringTasks as any).mockReturnValueOnce([]); // Main
+      (expandRecurringTasks as Mock).mockReturnValueOnce([]); // Main
       // The Upcoming logic calls expandRecurringTasks.
-      (expandRecurringTasks as any).mockReturnValueOnce([expandedInstance]); // Upcoming
+      (expandRecurringTasks as Mock).mockReturnValueOnce([expandedInstance]); // Upcoming
 
       // Sequence calls...
       const mockSelect = db.select as any;
@@ -179,7 +178,7 @@ describe('Calendar Routes', () => {
       // External
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(
           `http://localhost/calendar/events?start=${start}&end=${end}&includeUpcoming=true`
         )
@@ -210,7 +209,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([overdueTask])); // Overdue
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(
           `http://localhost/calendar/events?start=${start}&end=${end}&includeOverdue=true`
         )
@@ -233,7 +232,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(
           `http://localhost/calendar/events?start=${start}&end=${end}&includeNoDueDate=true`
         )
@@ -262,10 +261,10 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockExtCal])); // External query returns calendar config
 
       // Mock parser result using top-level mocks
-      (fetchAndParseIcal as any).mockResolvedValue({});
-      (convertIcalToEvents as any).mockReturnValue([mockEvent]);
+      (fetchAndParseIcal as Mock).mockResolvedValue({});
+      (convertIcalToEvents as Mock).mockReturnValue([mockEvent]);
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
       );
 
@@ -289,9 +288,9 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockExtCal])); // External
 
       // Mock failure
-      (fetchAndParseIcal as any).mockRejectedValue(new Error('Network Fail'));
+      (fetchAndParseIcal as Mock).mockRejectedValue(new Error('Network Fail'));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
       );
 
@@ -326,10 +325,10 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
       // Mock expansion
-      (expandRecurringTasks as any).mockReturnValueOnce([]); // Main
-      (expandRecurringTasks as any).mockReturnValueOnce([expandedInstance]); // Overdue
+      (expandRecurringTasks as Mock).mockReturnValueOnce([]); // Main
+      (expandRecurringTasks as Mock).mockReturnValueOnce([expandedInstance]); // Overdue
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(
           `http://localhost/calendar/events?start=${start}&end=${end}&includeOverdue=true`
         )
@@ -350,7 +349,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
       );
 
@@ -393,7 +392,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/api/calendar/ical/user-1/${token}`)
       );
       const text = await response.text();
@@ -428,7 +427,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/api/calendar/ical/user-1/${token}`)
       );
       const text = await response.text();
@@ -457,7 +456,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockTask]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/api/calendar/ical/user-1/${validToken}`)
       );
 
@@ -484,7 +483,7 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/api/calendar/ical/user-1/${validToken}`)
       );
 

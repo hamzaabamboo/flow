@@ -5,8 +5,22 @@ import type { Habit } from '../../../shared/types/calendar';
 
 describe('HabitsCard', () => {
   const mockHabits: Habit[] = [
-    { id: 'h1', name: 'Exercise', completedToday: false, frequency: 'daily', currentStreak: 5 },
-    { id: 'h2', name: 'Read', completedToday: true, frequency: 'daily', currentStreak: 3 }
+    {
+      id: 'h1',
+      name: 'Exercise',
+      completedToday: false,
+      frequency: 'daily',
+      currentStreak: 5,
+      active: true
+    },
+    {
+      id: 'h2',
+      name: 'Read',
+      completedToday: true,
+      frequency: 'daily',
+      currentStreak: 3,
+      active: true
+    }
   ];
 
   const mockHandlers = {

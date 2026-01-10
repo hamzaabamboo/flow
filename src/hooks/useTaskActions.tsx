@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { navigate } from 'vike/client/router';
 import { LayoutGrid } from 'lucide-react';
+import { navigate } from 'vike/client/router';
 import { useDialogs } from '../utils/useDialogs';
 import { useSpace } from '../contexts/SpaceContext';
-import type { CalendarEvent, ExtendedTask, Task } from '@hamflow/shared';
+import type { CalendarEvent, ExtendedTask, Task } from '../shared/types';
 import { api } from '../api/client';
 
 interface UseTaskActionsOptions {
   onTaskEdit?: (task: CalendarEvent | ExtendedTask | Task) => void;
   onSuccess?: () => void;
+}
+
+interface CreateTaskPayload {
+  title: string;
+  completed?: boolean;
+  columnId?: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string;
+  labels?: string[];
+  subtasks?: { title: string; completed: boolean }[];
+  link?: string;
 }
 
 export function useTaskActions(options: UseTaskActionsOptions = {}) {
@@ -39,10 +51,12 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
     mutationFn: async (task: CalendarEvent | ExtendedTask | Task) => {
       // Fetch full task data
       const { data: fullTask, error: fetchError } = await api.api.tasks({ id: task.id }).get();
-      if (fetchError) throw new Error('Failed to fetch task');
+      if (fetchError || !fullTask || 'error' in fullTask) {
+        throw new Error('Failed to fetch task');
+      }
 
       // Create duplicate
-      const payload: Record<string, unknown> = {
+      const payload: CreateTaskPayload = {
         title: `${fullTask.title} (Copy)`,
         completed: false
       };
@@ -50,15 +64,15 @@ export function useTaskActions(options: UseTaskActionsOptions = {}) {
       if (fullTask.columnId) payload.columnId = fullTask.columnId;
       if (fullTask.description) payload.description = fullTask.description;
       if (fullTask.priority) payload.priority = fullTask.priority;
-      if (fullTask.dueDate) payload.dueDate = fullTask.dueDate;
+      if (fullTask.dueDate) payload.dueDate = fullTask.dueDate.toISOString();
       if (fullTask.labels?.length) payload.labels = fullTask.labels;
       if (fullTask.subtasks?.length) {
-        payload.subtasks = fullTask.subtasks.map((st: { title: string }) => ({
+        payload.subtasks = fullTask.subtasks.map((st) => ({
           title: st.title,
           completed: false
         }));
       }
-      if (fullTask.link) payload.link = fullTask.link;
+      if ('link' in fullTask && fullTask.link) payload.link = fullTask.link as string;
 
       const { data, error } = await api.api.tasks.post(payload);
       if (error) throw new Error('Failed to duplicate task');

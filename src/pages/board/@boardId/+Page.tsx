@@ -45,9 +45,9 @@ export default function BoardPage() {
   const { data: board, isLoading: boardLoading } = useQuery<BoardWithColumns>({
     queryKey: ['board', boardId],
     queryFn: async () => {
-      const { data, error } = await api.api.boards({ id: boardId }).get();
+      const { data, error } = await api.api.boards({ boardId }).get();
       if (error) throw new Error('Failed to fetch board');
-      return data as BoardWithColumns;
+      return data as unknown as BoardWithColumns;
     }
   });
 
@@ -58,9 +58,9 @@ export default function BoardPage() {
       if (!board) return [];
 
       const tasksPromises = board.columns.map(async (column) => {
-        const { data, error } = await api.api.tasks.get({ query: { columnId: column.id } });
+        const { data, error } = await api.api.tasks.column({ id: column.id }).get();
         if (error) return [];
-        return data as Task[];
+        return data as unknown as Task[];
       });
 
       const tasksByColumn = await Promise.all(tasksPromises);
@@ -91,7 +91,7 @@ export default function BoardPage() {
 
   const handleCopySummary = async (columnId?: string) => {
     try {
-      const boardApi = api.api.boards({ id: boardId });
+      const boardApi = api.api.boards({ boardId });
       if (!boardApi) throw new Error('Board API not found');
 
       const { data, error } = columnId

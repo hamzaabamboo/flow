@@ -25,7 +25,7 @@ export default function BoardsListPage() {
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data as BoardInfo[];
+      return data as unknown as BoardInfo[];
     }
   });
 

@@ -77,17 +77,17 @@ describe('useWebSocket', () => {
     });
 
     // Mock location
-    // @ts-expect-error Mocking location
-    delete global.window.location;
-    global.window.location = {
+
+    delete (global as any).window.location;
+    (global as any).window.location = {
       ...originalLocation,
       protocol: 'http:',
       host: 'localhost:3000'
-    };
+    } as any;
   });
 
   afterEach(() => {
-    global.window.location = originalLocation;
+    (global as any).window.location = originalLocation;
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) =>
@@ -207,10 +207,9 @@ describe('useWebSocket', () => {
   });
 
   it('should handle reminder messages', async () => {
-    // @ts-expect-error Mocking global Notification
     const mockNotification = vi.fn() as unknown as typeof Notification & { permission: string };
     mockNotification.permission = 'granted';
-    // @ts-expect-error Mocking global Notification
+
     global.Notification = mockNotification;
 
     renderHook(() => useWebSocket(), { wrapper });

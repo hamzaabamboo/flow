@@ -63,7 +63,7 @@ export default function HabitsPage() {
     queryFn: async () => {
       const { data, error } = await api.api.habits.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch habits');
-      return data as Habit[];
+      return data as unknown as Habit[];
     }
   });
 
@@ -105,7 +105,7 @@ export default function HabitsPage() {
   // Update habit
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      const { data: result, error } = await api.api.habits({ id }).patch(data as any);
+      const { data: result, error } = await api.api.habits({ id }).patch(data);
       if (error) throw new Error('Failed to update habit');
       return result;
     },
@@ -131,7 +131,10 @@ export default function HabitsPage() {
   // Toggle habit completion (used in Agenda view, not here)
   const _toggleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api.habits({ id }).log.post({} as any);
+      const { data, error } = await api.api.habits({ id }).log.post({
+        date: new Date().toISOString().split('T')[0],
+        completed: true
+      });
       if (error) throw new Error('Failed to log habit');
       return data;
     },
@@ -143,7 +146,7 @@ export default function HabitsPage() {
   // Toggle habit active status
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { data, error } = await api.api.habits({ id }).patch({ active } as any);
+      const { data, error } = await api.api.habits({ id }).patch({ active });
       if (error) throw new Error('Failed to toggle habit');
       return data;
     },

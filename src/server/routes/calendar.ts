@@ -15,7 +15,8 @@ import {
 import { withAuth } from '../auth/withAuth';
 import { expandRecurringTasks } from '../utils/recurring';
 import { fetchAndParseIcal, convertIcalToEvents } from '../utils/ical-parser';
-import type { Task } from '../../shared/types/board';
+import type { CalendarEvent } from '../../shared/types/calendar';
+import type { Task, TaskMetadata } from '../../shared/types/board';
 import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 import { logger } from '../logger';
 
@@ -427,25 +428,29 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
         : [];
 
+      type TaskWithJoinedData = (typeof allTasks)[number];
+
       // Helper to format tasks
-      const formatTask = (task: any) => ({
-        ...task,
-        description: task.description ?? undefined,
-        dueDate: task.dueDate ? task.dueDate.toISOString() : undefined,
-        priority: task.priority ?? undefined,
-        labels: task.labels ?? undefined,
-        recurringPattern: task.recurringPattern ?? undefined,
-        recurringEndDate: task.recurringEndDate ? task.recurringEndDate.toISOString() : undefined,
-        parentTaskId: task.parentTaskId ?? undefined,
-        space: task.space ?? undefined,
-        boardId: task.boardId ?? undefined,
-        boardName: task.boardName ?? undefined,
-        columnName: task.columnName ?? undefined,
-        link: task.metadata?.link ?? undefined,
-        createdAt: task.createdAt?.toISOString(),
-        updatedAt: task.updatedAt?.toISOString(),
+      const formatTask = (task: TaskWithJoinedData): CalendarEvent => ({
+        ...(task as unknown as CalendarEvent),
+        description: (task.description as string | null | undefined) ?? undefined,
+        dueDate: (task.dueDate as Date | null) ? (task.dueDate as Date).toISOString() : undefined,
+        priority: (task.priority as string | null | undefined) ?? undefined,
+        labels: (task.labels as string[] | null | undefined) ?? undefined,
+        recurringPattern: (task.recurringPattern as string | null | undefined) ?? undefined,
+        recurringEndDate: (task.recurringEndDate as Date | null)
+          ? (task.recurringEndDate as Date).toISOString()
+          : undefined,
+        parentTaskId: (task.parentTaskId as string | null | undefined) ?? undefined,
+        space: (task.space as string | null | undefined) ?? undefined,
+        boardId: (task.boardId as string | null | undefined) ?? undefined,
+        boardName: (task.boardName as string | null | undefined) ?? undefined,
+        columnName: (task.columnName as string | null | undefined) ?? undefined,
+        link: (task.metadata as TaskMetadata | null)?.link ?? undefined,
+        createdAt: (task.createdAt as Date | undefined)?.toISOString(),
+        updatedAt: (task.updatedAt as Date | undefined)?.toISOString(),
         subtasks: subtasksData
-          .filter((st) => st.taskId === task.id)
+          .filter((st) => st.taskId === (task.id as string))
           .map((st) => ({
             ...st,
             completed: st.completed ?? false,
@@ -486,14 +491,9 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       }
 
       // Expand recurring tasks into individual instances
-      const taskEvents = expandRecurringTasks(
-        tasksWithSubtasks as Task[],
-        startDate,
-        endDate,
-        completionMap
-      );
+      const taskEvents = expandRecurringTasks(tasksWithSubtasks, startDate, endDate, completionMap);
 
-      let finalEvents = [...taskEvents];
+      let finalEvents: CalendarEvent[] = [...taskEvents];
 
       // --- HANDLE OVERDUE TASKS ---
       if (includeOverdue === 'true') {
@@ -548,7 +548,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
               completed: false,
               instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
               dueDate: t.dueDate ? new Date(t.dueDate) : undefined
-            });
+            } as unknown as CalendarEvent);
           }
         }
 
@@ -586,7 +586,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           // Expand instances from lookbackStart to startDate (exclusive)
           // We'll treat startDate as the "end" for expansion, so we get strictly past tasks
           const overdueInstances = expandRecurringTasks(
-            overdueFormatted as Task[],
+            overdueFormatted as unknown as Task[],
             lookbackStart,
             startDate, // End is exclusive effectively in our logic check below
             overdueCompletionMap
@@ -595,8 +595,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           // Filter to keep only those strictly BEFORE startDate and NOT completed
           const actualOverdueInstances = overdueInstances.filter((inst) => {
             if (!inst.dueDate) return false;
+            const instDueDate =
+              inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate);
             // Must be strictly past
-            if (inst.dueDate >= startDate) return false;
+            if (instDueDate >= startDate) return false;
             // Must not be completed
             if (inst.completed) return false;
             return true;
@@ -704,13 +706,15 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         // But if needed we could. Let's pass empty map for efficiency.
 
         const upcomingInstances = expandRecurringTasks(
-          formattedRecurring as Task[],
+          formattedRecurring as unknown as Task[],
           endDate, // Start expansion from end of main period
           upcomingEndDate,
           new Map() // No completions check for future
         ).filter((inst) => {
+          if (!inst.dueDate) return false;
+          const instDueDate = inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate);
           // Must be strictly after endDate
-          return inst.dueDate && inst.dueDate > endDate;
+          return instDueDate > endDate;
         });
 
         // Deduplicate: Only take the FIRST instance for each task ID
@@ -723,12 +727,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         }
       }
 
-      // Fetch external calendar events (unchanged logic, skipping for brevity of diff but implied kept if not touched)
-      // NOTE: The previous code block handling external calendars is preserved if we don't overwrite it.
-      // But verify_file returned lines 1-629. I need to make sure I don't lose the external calendar part.
-      // I will include it to be safe.
+      const HamFlowEvents = [...finalEvents];
 
-      const externalCalendarEvents: any[] = [];
+      // Fetch external calendar events
+      const externalCalendarEvents: CalendarEvent[] = [];
       try {
         const userCalendars = await db
           .select()
@@ -768,9 +770,17 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       }
 
       // Combine HamFlow events and external calendar events, then sort by date
-      const allEvents = [...finalEvents, ...externalCalendarEvents].toSorted((a, b) => {
-        const aDate = a.dueDate ? new Date(a.dueDate) : null;
-        const bDate = b.dueDate ? new Date(b.dueDate) : null;
+      const allEvents = [...HamFlowEvents, ...externalCalendarEvents].toSorted((a, b) => {
+        const aDate = a.dueDate
+          ? a.dueDate instanceof Date
+            ? a.dueDate
+            : new Date(a.dueDate)
+          : null;
+        const bDate = b.dueDate
+          ? b.dueDate instanceof Date
+            ? b.dueDate
+            : new Date(b.dueDate)
+          : null;
 
         if (!aDate || !bDate) return 0;
         return aDate.getTime() - bDate.getTime();

@@ -131,7 +131,7 @@ export default function AgendaPage() {
         query: { date: dateStr, space: currentSpace, view: viewMode }
       });
       if (error) throw new Error('Failed to fetch habits');
-      return data as Habit[];
+      return data as unknown as Habit[];
     }
   });
 
@@ -179,11 +179,12 @@ export default function AgendaPage() {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
+      // Remove fields that the API doesn't expect
+      const { id: _, columnName: __, subtasks: ___, column: ____, ...payload } = taskData;
       const { data, error } = await api.api.tasks.post({
         title: taskData.title || 'Untitled',
-        ...taskData,
-        space: currentSpace
-      } as any);
+        ...payload
+      } as unknown as { title: string }); // Eden Treaty expects at least title
       if (error) throw new Error('Failed to create task');
       return data;
     },
@@ -197,7 +198,9 @@ export default function AgendaPage() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      const { data, error } = await api.api.tasks({ id: taskData.id! }).patch(taskData as any);
+      const { data, error } = await api.api
+        .tasks({ id: taskData.id! })
+        .patch(taskData as unknown as Partial<Task>);
       if (error) throw new Error('Failed to update task');
       return data;
     },
@@ -223,7 +226,9 @@ export default function AgendaPage() {
 
         const newUtcDate = jstToUtc(targetDate);
 
-        return api.api.tasks({ id: taskId }).patch({ dueDate: newUtcDate.toISOString() } as any);
+        return api.api
+          .tasks({ id: taskId })
+          .patch({ dueDate: newUtcDate.toISOString() } as unknown as { dueDate: string });
       });
 
       await Promise.all(promises);
@@ -404,7 +409,7 @@ export default function AgendaPage() {
 
       const eventDate = new Date(event.dueDate);
 
-      if (eventDate < startOfToday && !(event as any).isUpcoming) {
+      if (eventDate < startOfToday && !event.isUpcoming) {
         overdue.push(event);
       }
     });

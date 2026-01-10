@@ -12,7 +12,8 @@ describe('TaskItem', () => {
     dueDate: '2024-12-25T10:00:00Z',
     labels: ['work', 'urgent'],
     noteId: 'note-1',
-    completed: false
+    completed: false,
+    type: 'task'
   };
 
   const onToggleComplete = vi.fn();

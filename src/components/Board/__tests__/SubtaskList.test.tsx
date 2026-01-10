@@ -52,7 +52,7 @@ describe('SubtaskList', () => {
     queryClient.clear();
 
     // Access the shared mock directly
-    const subtasks = mockApi.api.subtasks;
+    const subtasks = getMockRoute(mockApi.api.subtasks);
 
     // We mock the .task({}).get() chain
     getMockFn(subtasks.task).mockReturnValue({

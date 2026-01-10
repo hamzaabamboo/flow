@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Space = 'work' | 'personal';
+export type Space = 'work' | 'personal';
 
-interface SpaceContextType {
+export interface SpaceContextType {
   currentSpace: Space;
   setCurrentSpace: (space: Space) => void;
   toggleSpace: () => void;

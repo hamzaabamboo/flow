@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "noEmit": true,
-    "types": ["bun-types", "vite/client"],
+    "types": ["bun-types", "vite/client", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"]

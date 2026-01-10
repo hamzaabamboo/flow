@@ -1,14 +1,20 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
 import { autoOrganizeRoutes } from '../autoOrganize';
 import { db } from '../../db';
 import { autoOrganizer } from '../../../mastra/agents/autoOrganizer';
+import { GenerateTextResult } from 'ai';
 
 interface MockQueryBuilder {
   from: () => MockQueryBuilder;
   where: () => MockQueryBuilder;
   leftJoin: () => MockQueryBuilder;
+  limit: () => MockQueryBuilder;
+  orderBy: () => MockQueryBuilder;
   then: (resolve: (value: unknown) => void) => Promise<void>;
+  // Drizzle internal properties to satisfy type checking
+  _brand: 'PgSelect';
+  [Symbol.toStringTag]: string;
 }
 
 const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
@@ -16,9 +22,13 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     from: () => builder,
     where: () => builder,
     leftJoin: () => builder,
+    limit: () => builder,
+    orderBy: () => builder,
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve),
+    _brand: 'PgSelect' as const,
+    [Symbol.toStringTag]: 'PgSelect'
+  } as unknown as MockQueryBuilder;
   return builder;
 };
 
@@ -34,7 +44,13 @@ vi.mock('../../db', () => ({
     select: vi.fn(),
     from: vi.fn(),
     where: vi.fn(),
-    leftJoin: vi.fn()
+    leftJoin: vi.fn(),
+    transaction: vi.fn((cb) =>
+      cb({
+        update: vi.fn(() => createMockQueryBuilder([])),
+        delete: vi.fn(() => createMockQueryBuilder([]))
+      })
+    )
   }
 }));
 
@@ -47,12 +63,13 @@ vi.mock('../../../mastra/agents/autoOrganizer', () => ({
 }));
 
 describe('Auto Organize Routes', () => {
-  let app: Elysia;
+  let app: any; // Elysia apps are complex to type in tests
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
-    vi.mocked(autoOrganizer.generate).mockResolvedValue({
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+
+    const mockAiResult: Partial<GenerateTextResult<any, any>> = {
       text: JSON.stringify({
         summary: 'AI Summary',
         suggestions: [
@@ -63,13 +80,16 @@ describe('Auto Organize Routes', () => {
             details: { type: 'column_move', currentColumnId: 'c1', suggestedColumnId: 'c2' }
           }
         ]
-      })
-    });
+      }),
+      steps: []
+    };
+
+    (autoOrganizer.generate as Mock).mockResolvedValue(mockAiResult);
 
     app = new Elysia()
       .onError(({ error }) => {
         console.error('AUTO_ORG_ERROR', error);
-        return { error: error.message };
+        return { error: error instanceof Error ? error.message : String(error) };
       })
       .decorate('db', db)
       .derive(() => ({ user: { id: 'user-1' } }))
@@ -78,15 +98,12 @@ describe('Auto Organize Routes', () => {
 
   it('POST / should return suggestions', async () => {
     const apiMock = db;
-    vi.mocked(apiMock.select).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }])
-    );
-    vi.mocked(apiMock.select).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }])
-    );
-    vi.mocked(apiMock.select).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 't1', title: 'T', columnId: 'c1', columnName: 'C1' }])
-    );
+    (apiMock.select as Mock)
+      .mockReturnValueOnce(createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }]))
+      .mockReturnValueOnce(createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }]))
+      .mockReturnValueOnce(
+        createMockQueryBuilder([{ id: 't1', title: 'T', columnId: 'c1', columnName: 'C1' }])
+      );
 
     const res = await app.handle(
       new Request('http://localhost/tasks/auto-organize', {

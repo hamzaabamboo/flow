@@ -64,8 +64,9 @@ export function NotesSection({ taskId, taskTitle }: NotesSectionProps) {
       // Don't close form - user can see the linked note display instead
       refetchNote();
 
-      if (result.url) {
-        window.open(result.url, '_blank');
+      const typedResult = result as unknown as { url: string };
+      if (typedResult?.url) {
+        window.open(typedResult.url, '_blank');
       }
     } catch (error) {
       toast?.(error instanceof Error ? error.message : 'Failed to create note', {

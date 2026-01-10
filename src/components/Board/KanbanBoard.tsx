@@ -82,14 +82,16 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: board.space } });
       if (error) throw new Error('Failed to fetch boards');
-      return data;
+      return data as unknown as BoardWithColumns[];
     }
   });
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (data: Partial<Task>) => {
-      const { data: result, error } = await api.api.tasks.post(data);
+    mutationFn: async (taskData: Partial<Task>) => {
+      const { data: result, error } = await api.api.tasks.post(
+        taskData as unknown as { title: string }
+      );
       if (error) throw new Error('Failed to create task');
       return result;
     },
@@ -133,14 +135,13 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
   const duplicateTaskMutation = useMutation({
     mutationFn: async (task: Task) => {
       const { data, error } = await api.api.tasks.post({
-        columnId: task.columnId,
         title: `${task.title} (Copy)`,
         description: task.description,
         priority: task.priority,
-        dueDate: task.dueDate,
+        columnId: task.columnId,
         labels: task.labels,
         subtasks: task.subtasks?.map((st) => ({ title: st.title, completed: false }))
-      });
+      } as unknown as { title: string });
       if (error) throw new Error('Failed to duplicate task');
       return data;
     },
@@ -199,7 +200,8 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     mutationFn: async (columnId: string) => {
       const { data, error } = await api.api.columns({ columnId }).delete();
       if (error) {
-        throw new Error(error.value || 'Failed to delete column');
+        const errorMsg = typeof error.value === 'string' ? error.value : 'Failed to delete column';
+        throw new Error(errorMsg);
       }
       return data;
     },

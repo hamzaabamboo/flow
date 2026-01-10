@@ -128,6 +128,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
     {
       body: t.Object({
         name: t.String(),
+        description: t.Optional(t.String()),
         space: t.String()
       })
     }
@@ -141,12 +142,18 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         return errorResponse('Board not found');
       }
 
+      const updateData: Record<string, unknown> = {
+        name: body.name,
+        updatedAt: new Date()
+      };
+
+      if (body.description !== undefined) {
+        updateData.description = body.description;
+      }
+
       const [updated] = await db
         .update(boards)
-        .set({
-          name: body.name,
-          updatedAt: new Date()
-        })
+        .set(updateData)
         .where(eq(boards.id, params.boardId))
         .returning();
 
@@ -161,7 +168,8 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
     {
       params: t.Object({ boardId: t.String() }),
       body: t.Object({
-        name: t.Optional(t.String())
+        name: t.Optional(t.String()),
+        description: t.Optional(t.String())
       })
     }
   )

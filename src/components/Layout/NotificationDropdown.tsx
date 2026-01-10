@@ -25,16 +25,9 @@ export function NotificationDropdown() {
   const { data: reminders = [], refetch } = useQuery<Reminder[]>({
     queryKey: ['reminders', 'upcoming'],
     queryFn: async () => {
-      const { data: allReminders, error } = await api.api.reminders.get();
-      if (error) throw new Error('Failed to fetch reminders');
-
-      // Sort by time and limit to 10 most recent
-      return allReminders
-        .toSorted(
-          (a: Reminder, b: Reminder) =>
-            new Date(a.reminderTime).getTime() - new Date(b.reminderTime).getTime()
-        )
-        .slice(0, 10);
+      const { data, error } = await api.api.reminders.get();
+      if (error) return [];
+      return data as unknown as Reminder[];
     },
     refetchInterval: 30000 // Refetch every 30 seconds
   });

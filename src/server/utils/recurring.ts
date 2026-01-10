@@ -1,12 +1,15 @@
 import type { Task } from '../../shared/types/board';
+import type { CalendarEvent } from '../../shared/types/calendar';
+
+type RecurringTaskSource = Task | CalendarEvent;
 
 export function expandRecurringTasks(
-  tasks: Task[],
+  tasks: RecurringTaskSource[],
   startDate: Date,
   endDate: Date,
   completionMap: Map<string, Set<string>>
-) {
-  const events = [];
+): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
 
   for (const task of tasks) {
     // For non-recurring tasks, skip if no dueDate
@@ -19,8 +22,8 @@ export function expandRecurringTasks(
         ? new Date(task.createdAt)
         : new Date(startDate);
 
-    const formattedTask = {
-      ...task,
+    const formattedTask: CalendarEvent = {
+      ...(task as unknown as CalendarEvent),
       space: task.space,
       type: 'task' as const
     };

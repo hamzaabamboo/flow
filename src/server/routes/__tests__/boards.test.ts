@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
+import * as schema from '../../../../drizzle/schema';
+import { boards } from '../../../../drizzle/schema';
+
+type Board = typeof boards.$inferSelect;
 
 // Define Mock DB Chain Helper
 const createMockQueryBuilder = (resolvedValue: unknown) => {
@@ -19,7 +25,9 @@ const createMockQueryBuilder = (resolvedValue: unknown) => {
 
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
+  } as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 // Mock dependencies
@@ -77,7 +85,7 @@ import { boardRoutes } from '../boards';
 import { db } from '../../db'; // Mocked
 
 describe('Board Routes', () => {
-  let app: Elysia;
+  let app: any;
   const mockUser = { id: 'user-1', email: 'test@example.com' };
 
   beforeEach(() => {
@@ -91,7 +99,7 @@ describe('Board Routes', () => {
     vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia()
-      .decorate('db', db)
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
       .derive(() => ({ user: mockUser }))
       .use(boardRoutes);
   });
@@ -151,7 +159,7 @@ describe('Board Routes', () => {
     });
 
     it('should return 404 if board not found', async () => {
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([])); // No board
+      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No board
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-bad')
@@ -171,7 +179,7 @@ describe('Board Routes', () => {
       ];
 
       // Mock transaction
-      (db.transaction as any).mockImplementation(async (cb: any) => {
+      (db.transaction as Mock).mockImplementation(async (cb: any) => {
         const txMock = {
           insert: vi.fn().mockReturnThis(),
           values: vi.fn().mockReturnThis(),
@@ -274,7 +282,7 @@ describe('Board Routes', () => {
       const mockColumns = [{ id: 'col-1', name: 'To Do', boardId: 'board-1' }];
 
       // Return valid board, valid columns list
-      (db.select as any)
+      (db.select as Mock)
         .mockReturnValueOnce(createMockQueryBuilder([mockBoard]))
         .mockReturnValueOnce(createMockQueryBuilder(mockColumns));
       // No task fetch expected if column validation fails first?
@@ -290,7 +298,7 @@ describe('Board Routes', () => {
       // So tasks are fetched for the INVALID column ID. Likely returns empty.
       // Then validation checks if column exists in boardColumns.
 
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([])); // Empty tasks
+      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // Empty tasks
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-1/summary?columnId=bad-col')
@@ -300,7 +308,7 @@ describe('Board Routes', () => {
     });
 
     it('should return 404 if board not found', async () => {
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([])); // No board
+      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No board
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-1/summary')

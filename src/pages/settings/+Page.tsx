@@ -127,7 +127,7 @@ export default function SettingsPage() {
       const { data, error } = await api.api.settings.get();
       if (error) throw new Error('Failed to fetch settings');
 
-      const typedData = data as any as UserSettings;
+      const typedData = data as unknown as UserSettings;
 
       // Initialize Outline settings
       if (typedData.outlineApiUrl) setOutlineApiUrl(typedData.outlineApiUrl);
@@ -145,7 +145,7 @@ export default function SettingsPage() {
       queryFn: async () => {
         const { data, error } = await api.api.notes.collections.get();
         if (error) return [];
-        const result = data as any;
+        const result = data as { data?: OutlineCollection[] };
         return result.data || [];
       },
       enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
@@ -155,7 +155,7 @@ export default function SettingsPage() {
   // Update settings mutation
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<UserSettings>) => {
-      const { data, error } = await api.api.settings.patch(newSettings as any);
+      const { data, error } = await api.api.settings.patch(newSettings);
       if (error) throw new Error('Failed to update settings');
       return data;
     },
@@ -191,7 +191,7 @@ export default function SettingsPage() {
     queryFn: async () => {
       const { data, error } = await api.api['api-tokens'].get();
       if (error) throw new Error('Failed to fetch API tokens');
-      return data as any as ApiToken[];
+      return data as unknown as ApiToken[];
     }
   });
 

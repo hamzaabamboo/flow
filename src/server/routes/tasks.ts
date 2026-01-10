@@ -116,16 +116,67 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     }
   )
   .get(
-    '/:columnId',
+    '/column/:id',
     async ({ params, db }) => {
-      const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, params.columnId));
+      const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, params.id));
       return columnTasks.map((task) => ({
         ...task,
         link: task.metadata?.link
       }));
     },
     {
-      params: t.Object({ columnId: t.String() })
+      params: t.Object({ id: t.String() })
+    }
+  )
+  .get(
+    '/:id',
+    async ({ params, db, user, set }) => {
+      const [task] = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          columnId: tasks.columnId,
+          labels: tasks.labels,
+          recurringPattern: tasks.recurringPattern,
+          recurringEndDate: tasks.recurringEndDate,
+          parentTaskId: tasks.parentTaskId,
+          metadata: tasks.metadata,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          columnName: columns.name,
+          boardName: boards.name,
+          boardId: boards.id,
+          boardSpace: boards.space,
+          noteId: tasks.noteId
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(eq(tasks.id, params.id), eq(tasks.userId, user.id)));
+
+      if (!task) {
+        set.status = 404;
+        return { error: 'Task not found' };
+      }
+
+      // Fetch subtasks
+      const taskSubtasks = await db
+        .select()
+        .from(subtasks)
+        .where(eq(subtasks.taskId, task.id))
+        .orderBy(asc(subtasks.order));
+
+      return {
+        ...task,
+        subtasks: taskSubtasks,
+        link: task.metadata?.link
+      };
+    },
+    {
+      params: t.Object({ id: t.String() })
     }
   )
   .post(

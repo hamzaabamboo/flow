@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { ReminderSyncService } from '../reminder-sync';
+import { db } from '../../db';
 
 // Mock DB module
 const mockDelete = vi.fn().mockReturnThis();
@@ -37,7 +38,7 @@ describe('ReminderSyncService', () => {
 
   it('should delete existing reminders and create new ones', async () => {
     // Mock column/board state
-    mockDb.query.columns.findFirst.mockResolvedValue({
+    (mockDb.query.columns.findFirst as Mock).mockResolvedValue({
       id: 'c1',
       name: 'To Do',
       board: {
@@ -64,7 +65,7 @@ describe('ReminderSyncService', () => {
   });
 
   it('should not create reminders if task is in "Done" column', async () => {
-    mockDb.query.columns.findFirst.mockResolvedValue({
+    (mockDb.query.columns.findFirst as Mock).mockResolvedValue({
       id: 'c1',
       name: 'Done',
       board: { id: 'b1', settings: {} }
@@ -77,7 +78,7 @@ describe('ReminderSyncService', () => {
   });
 
   it('should not create reminders if due date is in the past', async () => {
-    mockDb.query.columns.findFirst.mockResolvedValue({
+    (mockDb.query.columns.findFirst as Mock).mockResolvedValue({
       id: 'c1',
       name: 'To Do',
       board: { id: 'b1', settings: {} }
@@ -92,7 +93,7 @@ describe('ReminderSyncService', () => {
   });
 
   it('should create an immediate reminder if task is due very soon', async () => {
-    mockDb.query.columns.findFirst.mockResolvedValue({
+    (mockDb.query.columns.findFirst as Mock).mockResolvedValue({
       id: 'c1',
       name: 'To Do',
       board: { id: 'b1', settings: {} }
@@ -114,7 +115,7 @@ describe('ReminderSyncService', () => {
   });
 
   it('getReminderSettings should return defaults if no board settings', async () => {
-    mockDb.query.columns.findFirst.mockResolvedValue({
+    (mockDb.query.columns.findFirst as Mock).mockResolvedValue({
       id: 'c1',
       board: { settings: null }
     });

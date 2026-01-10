@@ -1,9 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SettingsPage from '../settings/+Page';
-import { SpaceContext } from '../../contexts/SpaceContext';
+import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { ToasterContext } from '../../contexts/ToasterContext';
 import { api } from '../../api/client';
 
@@ -34,13 +34,20 @@ vi.mock('../../api/client', () => ({
   }
 }));
 
+interface MockEndpoint extends Mock {
+  get?: Mock;
+  post?: Mock;
+  patch?: Mock;
+  delete?: Mock;
+}
+
 // Setup chained mocks
 const mockApiTokensDelete = vi.fn();
 const mockApiTokensPost = vi.fn();
 const mockApiTokensGet = vi.fn();
-(api.api['api-tokens'] as any).get = mockApiTokensGet;
-(api.api['api-tokens'] as any).post = mockApiTokensPost;
-(api.api['api-tokens'] as any).mockImplementation(() => ({
+(api.api['api-tokens'] as unknown as MockEndpoint).get = mockApiTokensGet;
+(api.api['api-tokens'] as unknown as MockEndpoint).post = mockApiTokensPost;
+(api.api['api-tokens'] as unknown as MockEndpoint).mockImplementation(() => ({
   delete: mockApiTokensDelete
 }));
 
@@ -48,19 +55,16 @@ const mockExternalCalendarsPatch = vi.fn();
 const mockExternalCalendarsDelete = vi.fn();
 const mockExternalCalendarsPost = vi.fn();
 const mockExternalCalendarsGet = vi.fn();
-(api.api['external-calendars'] as any).get = mockExternalCalendarsGet;
-(api.api['external-calendars'] as any).post = mockExternalCalendarsPost;
-(api.api['external-calendars'] as any).mockImplementation(() => ({
+(api.api['external-calendars'] as unknown as MockEndpoint).get = mockExternalCalendarsGet;
+(api.api['external-calendars'] as unknown as MockEndpoint).post = mockExternalCalendarsPost;
+(api.api['external-calendars'] as unknown as MockEndpoint).mockImplementation(() => ({
   patch: mockExternalCalendarsPatch,
   delete: mockExternalCalendarsDelete
 }));
 
-const mockSpaceContext = {
+const mockSpaceContext: SpaceContextType = {
   currentSpace: 'work',
-  spaces: [],
-  setSpaces: vi.fn(),
   setCurrentSpace: vi.fn(),
-  getSpaceById: vi.fn(),
   toggleSpace: vi.fn()
 };
 
@@ -77,7 +81,7 @@ const queryClient = new QueryClient({
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider value={mockSpaceContext as any}>
+      <SpaceContext.Provider value={mockSpaceContext}>
         <ToasterContext.Provider value={mockToasterContext}>{ui}</ToasterContext.Provider>
       </SpaceContext.Provider>
     </QueryClientProvider>
@@ -118,12 +122,12 @@ describe('SettingsPage', () => {
     queryClient.clear();
 
     // Default mock responses
-    (api.api.settings.get as vi.Mock).mockResolvedValue({ data: mockSettings, error: null });
-    (api.api.notes.collections.get as vi.Mock).mockResolvedValue({
+    (api.api.settings.get as Mock).mockResolvedValue({ data: mockSettings, error: null });
+    (api.api.notes.collections.get as Mock).mockResolvedValue({
       data: { data: [{ id: 'coll-1', name: 'Collection 1' }] },
       error: null
     });
-    (api.api.calendar['feed-url'].get as vi.Mock).mockResolvedValue({
+    (api.api.calendar['feed-url'].get as Mock).mockResolvedValue({
       data: { url: 'http://cal.feed' },
       error: null
     });
@@ -132,7 +136,7 @@ describe('SettingsPage', () => {
   });
 
   it('should render loading state initially', () => {
-    (api.api.settings.get as vi.Mock).mockImplementation(() => new Promise(() => {}));
+    (api.api.settings.get as Mock).mockImplementation(() => new Promise(() => {}));
     renderWithProviders(<SettingsPage />);
     expect(screen.getByText(/Loading settings.../i)).toBeInTheDocument();
   });
@@ -232,7 +236,7 @@ describe('SettingsPage', () => {
 
   it('should save Outline settings', async () => {
     const user = userEvent.setup();
-    (api.api.settings.patch as vi.Mock).mockResolvedValue({ data: {}, error: null });
+    (api.api.settings.patch as Mock).mockResolvedValue({ data: {}, error: null });
 
     renderWithProviders(<SettingsPage />);
     await screen.findByText('Outline Integration');
@@ -257,7 +261,7 @@ describe('SettingsPage', () => {
 
   it('should toggle evening summary and summary spaces', async () => {
     const user = userEvent.setup();
-    (api.api.settings.patch as vi.Mock).mockResolvedValue({ data: {}, error: null });
+    (api.api.settings.patch as Mock).mockResolvedValue({ data: {}, error: null });
 
     renderWithProviders(<SettingsPage />);
     await screen.findByText('Daily Summaries (HamBot)');
@@ -284,7 +288,7 @@ describe('SettingsPage', () => {
 
   it('should test HamBot summaries', async () => {
     const user = userEvent.setup();
-    const testSummaryPost = api.api.settings['test-summary'].post as vi.Mock;
+    const testSummaryPost = api.api.settings['test-summary'].post as Mock;
     testSummaryPost.mockResolvedValue({ data: { message: 'Sent!' }, error: null });
 
     renderWithProviders(<SettingsPage />);

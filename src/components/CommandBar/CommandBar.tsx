@@ -105,10 +105,9 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
-      if (error) return [];
-      return data;
-    },
-    enabled: open
+      if (error) throw new Error('Failed to fetch boards');
+      return data as unknown as Array<{ id: string; name: string; columns: Column[] }>;
+    }
   });
 
   // Load command history from localStorage

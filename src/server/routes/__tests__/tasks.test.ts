@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import * as schema from '../../../../drizzle/schema';
 import { tasksRoutes } from '../tasks';
 import { db } from '../../db';
 import { wsManager } from '../../websocket';
@@ -7,23 +9,7 @@ import { wsManager } from '../../websocket';
 // Helper to serialize dates to string (simulating JSON response)
 const toResponse = (obj: unknown) => JSON.parse(JSON.stringify(obj));
 
-interface MockQueryBuilder {
-  from: () => MockQueryBuilder;
-  where: () => MockQueryBuilder;
-  orderBy: () => MockQueryBuilder;
-  limit: () => MockQueryBuilder;
-  leftJoin: () => MockQueryBuilder;
-  groupBy: () => MockQueryBuilder;
-  insert: () => MockQueryBuilder;
-  values: () => MockQueryBuilder;
-  returning: () => MockQueryBuilder;
-  update: () => MockQueryBuilder;
-  set: () => MockQueryBuilder;
-  delete: () => MockQueryBuilder;
-  then: (resolve: (value: unknown) => void) => Promise<void>;
-}
-
-const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
     from: () => builder,
     where: () => builder,
@@ -39,8 +25,11 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     delete: () => builder,
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
-  return builder;
+  };
+  return builder as unknown as ReturnType<PostgresJsDatabase['select']> &
+    ReturnType<PostgresJsDatabase['insert']> &
+    ReturnType<PostgresJsDatabase['update']> &
+    ReturnType<PostgresJsDatabase['delete']>;
 };
 
 const createMockUpdateBuilder = (resolvedValue: unknown) => {
@@ -51,7 +40,7 @@ const createMockUpdateBuilder = (resolvedValue: unknown) => {
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
   };
-  return builder;
+  return builder as unknown as ReturnType<PostgresJsDatabase['update']>;
 };
 
 const createMockDeleteBuilder = (resolvedValue: unknown) => {
@@ -61,7 +50,7 @@ const createMockDeleteBuilder = (resolvedValue: unknown) => {
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
   };
-  return builder;
+  return builder as unknown as ReturnType<PostgresJsDatabase['delete']>;
 };
 
 // Mock the DB module
@@ -109,28 +98,22 @@ vi.mock('../../services/reminder-sync', () => ({
 }));
 
 describe('Task Routes', () => {
-  let app: Elysia;
+  let app: any;
   const mockUser = { id: 'user-1', email: 'test@test.com' };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Setup chainable mocks on the imported db object
-    vi.mocked(db.from).mockReturnThis();
-    vi.mocked(db.where).mockReturnThis();
-    vi.mocked(db.insert).mockReturnThis();
-    vi.mocked(db.update).mockImplementation(() => createMockUpdateBuilder([]) as any);
-    vi.mocked(db.delete).mockImplementation(() => createMockDeleteBuilder([]) as any);
-    vi.mocked(db.limit).mockReturnThis();
-    vi.mocked(db.leftJoin).mockReturnThis();
-    vi.mocked(db.groupBy).mockReturnThis();
-    vi.mocked(db.orderBy).mockReturnThis();
+    vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.update).mockImplementation(() => createMockUpdateBuilder([]));
+    vi.mocked(db.delete).mockImplementation(() => createMockDeleteBuilder([]));
 
     // Default select
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]) as any);
+    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia()
-      .decorate('db', db)
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
       .derive(() => ({ user: mockUser }))
       .use(tasksRoutes);
   });
@@ -142,7 +125,7 @@ describe('Task Routes', () => {
         { id: 'task-2', title: 'Task 2', columnId: 'col-1' }
       ];
 
-      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks) as any);
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks));
 
       const response = await app.handle(new Request('http://localhost/tasks/col-1'));
       const data = await response.json();
@@ -188,7 +171,9 @@ describe('Task Routes', () => {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([createdTask])
       };
-      vi.mocked(db.insert).mockReturnValue(mockChain as any);
+      vi.mocked(db.insert).mockReturnValue(
+        mockChain as unknown as ReturnType<PostgresJsDatabase['insert']>
+      );
 
       const response = await app.handle(
         new Request('http://localhost/tasks', {
@@ -207,14 +192,16 @@ describe('Task Routes', () => {
 
     it('should handle subtasks and labels in creation', async () => {
       const apiMock = db;
-      vi.mocked(apiMock.select).mockReturnValue(createMockQueryBuilder([{ id: 'col-1' }]) as any);
+      vi.mocked(apiMock.select).mockReturnValue(createMockQueryBuilder([{ id: 'col-1' }]));
       const mockInsertChain = {
         values: vi.fn().mockReturnThis(),
         returning: vi
           .fn()
           .mockResolvedValue([{ id: 't1', title: 'T', columnId: 'col-1', labels: ['L1'] }])
       };
-      vi.mocked(apiMock.insert).mockReturnValue(mockInsertChain as any);
+      vi.mocked(apiMock.insert).mockReturnValue(
+        mockInsertChain as unknown as ReturnType<PostgresJsDatabase['insert']>
+      );
 
       const response = await app.handle(
         new Request('http://localhost/tasks', {
@@ -243,8 +230,8 @@ describe('Task Routes', () => {
         updatedAt: new Date().toISOString()
       };
 
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([updatedTask]) as any);
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([updatedTask]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([updatedTask]));
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([updatedTask]));
 
       const response = await app.handle(
         new Request('http://localhost/tasks/task-1', {
@@ -262,10 +249,10 @@ describe('Task Routes', () => {
     it('should handle subtasks update', async () => {
       const mockTask = { id: 't1', columnId: 'c1', title: 'T' };
 
-      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockTask]) as any);
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]) as any);
-      vi.mocked(db.delete).mockReturnValue(createMockDeleteBuilder([]) as any);
-      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]) as any);
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockTask]));
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]));
+      vi.mocked(db.delete).mockReturnValue(createMockDeleteBuilder([]));
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
 
       const response = await app.handle(
         new Request('http://localhost/tasks/t1', {
@@ -286,18 +273,18 @@ describe('Task Routes', () => {
       const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: 'daily' };
 
       // 1. Get task
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]));
       // 2. Get current col
       vi.mocked(db.select).mockReturnValueOnce(
-        createMockQueryBuilder([{ id: 'c1', boardId: 'b1' }]) as any
+        createMockQueryBuilder([{ id: 'c1', boardId: 'b1' }])
       );
       // 3. Get target col
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c2' }]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c2' }]));
       // 4. Check existing log
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
-      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]) as any);
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]) as any);
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]));
 
       const response = await app.handle(
         new Request('http://localhost/tasks/t1', {
@@ -327,17 +314,15 @@ describe('Task Routes', () => {
 
       // Task 1:
       vi.mocked(db.select)
-        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[0]]) as any)
-        .mockReturnValueOnce(createMockQueryBuilder([mockColumn]) as any)
-        .mockReturnValueOnce(createMockQueryBuilder([doneColumn]) as any)
+        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[0]]))
+        .mockReturnValueOnce(createMockQueryBuilder([mockColumn]))
+        .mockReturnValueOnce(createMockQueryBuilder([doneColumn]))
         // Task 2:
-        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[1]]) as any)
-        .mockReturnValueOnce(createMockQueryBuilder([mockColumn]) as any)
-        .mockReturnValueOnce(createMockQueryBuilder([doneColumn]) as any);
+        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[1]]))
+        .mockReturnValueOnce(createMockQueryBuilder([mockColumn]))
+        .mockReturnValueOnce(createMockQueryBuilder([doneColumn]));
 
-      vi.mocked(db.update).mockReturnValue(
-        createMockUpdateBuilder([{ id: 'task-updated' }]) as any
-      );
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([{ id: 'task-updated' }]));
 
       const response = await app.handle(
         new Request('http://localhost/tasks/bulk-complete', {
@@ -358,8 +343,8 @@ describe('Task Routes', () => {
       const columnId = 'col-1';
       const taskIds = ['task-2', 'task-1'];
 
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: columnId }]) as any);
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: columnId }]));
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([]));
 
       const response = await app.handle(
         new Request('http://localhost/tasks/reorder', {
@@ -374,7 +359,7 @@ describe('Task Routes', () => {
     });
 
     it('should return 500 if column not found during reorder', async () => {
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
       const response = await app.handle(
         new Request('http://localhost/tasks/reorder', {
           method: 'POST',

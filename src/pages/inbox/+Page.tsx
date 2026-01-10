@@ -48,7 +48,7 @@ export default function InboxPage() {
     queryFn: async () => {
       const { data, error } = await api.api.inbox.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch inbox items');
-      return data as InboxItem[];
+      return data as unknown as InboxItem[];
     }
   });
 
@@ -58,7 +58,7 @@ export default function InboxPage() {
     queryFn: async () => {
       const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch boards');
-      return data as BoardWithColumns[];
+      return data as unknown as BoardWithColumns[];
     }
   });
 

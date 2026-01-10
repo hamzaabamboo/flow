@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Elysia } from 'elysia';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { withAuth } from '../withAuth';
 import { db } from '../../db';
 import { validateHamAuthTokenCached } from '../hamauth-utils';
@@ -19,22 +18,28 @@ vi.mock('../hamauth-utils', () => ({
 }));
 
 // Define Mock DB Chain Helper
-const createMockQueryBuilder = (resolvedValue: any) => {
-  return {
+// Using a more robust structure to satisfy Drizzle's complex return types
+const createMockQueryBuilder = (resolvedValue: unknown) => {
+  const builder = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     returning: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
-    execute: vi.fn().mockResolvedValue([]),
+    execute: vi.fn().mockResolvedValue(resolvedValue),
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
+    then: (resolve: (val: unknown) => void) => Promise.resolve(resolvedValue).then(resolve),
+    _brand: 'PgSelect',
+    [Symbol.toStringTag]: 'PgSelect'
   };
+  return builder;
 };
 
+type AuthApp = ReturnType<typeof withAuth>;
+
 describe('withAuth Elysia middleware', () => {
-  let app: Elysia;
+  let app: AuthApp;
   const mockUser = { id: 'u1', email: 'test@example.com', name: 'Test User' };
   const originalEnv = process.env.NODE_ENV;
 
@@ -42,11 +47,12 @@ describe('withAuth Elysia middleware', () => {
     vi.resetAllMocks();
     process.env.NODE_ENV = 'development';
 
-    (db as any).select.mockReturnValue(createMockQueryBuilder([mockUser]));
-    (db as any).update.mockReturnValue(createMockQueryBuilder([]));
-    (db as any).insert.mockReturnValue(createMockQueryBuilder([mockUser]));
+    (db.select as Mock).mockReturnValue(createMockQueryBuilder([mockUser]));
+    (db.update as Mock).mockReturnValue(createMockQueryBuilder([]));
+    (db.insert as Mock).mockReturnValue(createMockQueryBuilder([mockUser]));
 
-    app = new Elysia().use(withAuth()).get('/test', ({ user }) => ({ user }));
+    // We can use withAuth().get() to create a test app
+    app = withAuth().get('/test', ({ user }) => ({ user })) as unknown as AuthApp;
   });
 
   afterEach(() => {
@@ -84,8 +90,8 @@ describe('withAuth Elysia middleware', () => {
     };
 
     // Setup specific sequence for this test
-    const mockSelect = vi.fn();
-    (db as any).select = mockSelect;
+    const mockSelect = db.select as Mock;
+    mockSelect.mockReset();
 
     mockSelect
       .mockReturnValueOnce(createMockQueryBuilder([mockTokenRecord])) // Find token
@@ -115,7 +121,7 @@ describe('withAuth Elysia middleware', () => {
       expiresAt: expiredDate
     };
 
-    (db as any).select.mockReturnValueOnce(createMockQueryBuilder([mockTokenRecord]));
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([mockTokenRecord]));
 
     const response = await app.handle(
       new Request('http://localhost/test', {
@@ -128,16 +134,16 @@ describe('withAuth Elysia middleware', () => {
 
   it('should validate with HamAuth if not an API token', async () => {
     // 1. Select token returns nothing
-    (db as any).select.mockReturnValueOnce(createMockQueryBuilder([]));
+    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
 
     // 2. HamAuth validation success
-    (validateHamAuthTokenCached as any).mockResolvedValue({
+    (validateHamAuthTokenCached as Mock).mockResolvedValue({
       sub: 'ext-1',
       email: 'ham@example.com'
     });
 
     // 3. Find or create user
-    (db as any).select.mockReturnValueOnce(
+    (db.select as Mock).mockReturnValueOnce(
       createMockQueryBuilder([{ id: 'u2', email: 'ham@example.com' }])
     );
 

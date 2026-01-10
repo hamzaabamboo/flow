@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useNotesEnabled,
@@ -45,7 +45,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useNotesEnabled should fetch status', async () => {
-    (api.api.notes.enabled.get as vi.Mock).mockResolvedValue({
+    (api.api.notes.enabled.get as Mock).mockResolvedValue({
       data: { enabled: true },
       error: null
     });
@@ -71,7 +71,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useCreateNote should trigger mutation', async () => {
-    (api.api.notes.create.post as vi.Mock).mockResolvedValue({
+    (api.api.notes.create.post as Mock).mockResolvedValue({
       data: { id: 'new-note' },
       error: null
     });
@@ -86,7 +86,7 @@ describe('useNotes hooks', () => {
 
   it('useSearchNotes should return search results', async () => {
     const mockDocs = [{ id: '1', title: 'Doc 1', url: 'url1', updatedAt: '' }];
-    (api.api.notes.search.post as vi.Mock).mockResolvedValue({
+    (api.api.notes.search.post as Mock).mockResolvedValue({
       data: { documents: mockDocs },
       error: null
     });
@@ -101,7 +101,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useLinkNote should link a note to a task', async () => {
-    (api.api.notes.link.post as vi.Mock).mockResolvedValue({
+    (api.api.notes.link.post as Mock).mockResolvedValue({
       data: { success: true },
       error: null
     });

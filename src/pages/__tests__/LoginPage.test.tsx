@@ -8,15 +8,15 @@ describe('LoginPage', () => {
   beforeEach(() => {
     // Mock window.location
     delete (window as any).location;
-    window.location = {
+    (window as any).location = {
       ...originalLocation,
       href: '',
       search: ''
-    };
+    } as any;
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+    (window as any).location = originalLocation;
   });
 
   it('should render the login card correctly', () => {
@@ -37,7 +37,7 @@ describe('LoginPage', () => {
   });
 
   it('should preserve returnUrl when redirecting', () => {
-    window.location.search = '?returnUrl=%2Ftasks';
+    (window.location as any).search = '?returnUrl=%2Ftasks';
     render(<LoginPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));

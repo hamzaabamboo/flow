@@ -4,7 +4,7 @@ import { vi, Mock, MockedFunction } from 'vitest';
 // Eden Treaty routes can be called as functions (for path params)
 // and have methods like get, post, patch, delete
 const createMockRoute = () => {
-  const route = vi.fn(() => ({
+  const route = vi.fn((..._args: any[]) => ({
     get: vi.fn().mockResolvedValue({ data: null, error: null }),
     post: vi.fn().mockResolvedValue({ data: null, error: null }),
     patch: vi.fn().mockResolvedValue({ data: null, error: null }),

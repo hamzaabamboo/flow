@@ -1,26 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import * as schema from '../../../../drizzle/schema';
 import { inboxRoutes } from '../inbox';
 import { db } from '../../db';
 
-interface MockQueryBuilder {
-  from: () => MockQueryBuilder;
-  where: () => MockQueryBuilder;
-  orderBy: () => MockQueryBuilder;
-  limit: () => MockQueryBuilder;
-  leftJoin: () => MockQueryBuilder;
-  groupBy: () => MockQueryBuilder;
-  insert: () => MockQueryBuilder;
-  values: () => MockQueryBuilder;
-  returning: () => MockQueryBuilder;
-  update: () => MockQueryBuilder;
-  set: () => MockQueryBuilder;
-  delete: () => MockQueryBuilder;
-  then: (resolve: (value: unknown) => void) => Promise<void>;
-}
-
 // Define Mock DB Chain Helper
-const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
     from: () => builder,
     where: () => builder,
@@ -36,8 +23,10 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     delete: () => builder,
     // oxlint-disable-next-line unicorn/no-thenable
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
-  } as MockQueryBuilder;
-  return builder;
+  };
+  return builder as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 // Mock the DB module
@@ -79,29 +68,25 @@ vi.mock('../../websocket', () => ({
 }));
 
 describe('Inbox Routes', () => {
-  let app: Elysia;
+  let app: any;
   const mockUser = { id: 'user-123', email: 'test@example.com' };
 
   beforeEach(() => {
     vi.resetAllMocks();
 
     // Setup chainable mocks on the imported db object
-    vi.mocked(db.from).mockReturnThis();
-    vi.mocked(db.where).mockReturnThis();
     vi.mocked(db.insert).mockReturnThis();
     vi.mocked(db.update).mockReturnThis();
     vi.mocked(db.delete).mockReturnThis();
-    vi.mocked(db.limit).mockReturnThis();
-    vi.mocked(db.orderBy).mockReturnThis();
 
     // Transaction mock
-    vi.mocked(db.transaction).mockImplementation((cb: (tx: typeof db) => unknown) => cb(db));
+    vi.mocked(db.transaction).mockImplementation((cb: any) => cb(db));
 
     // Default select
-    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]) as any);
+    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia()
-      .decorate('db', db)
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
       .derive(() => ({ user: mockUser }))
       .use(inboxRoutes);
   });
@@ -110,7 +95,7 @@ describe('Inbox Routes', () => {
     it('should fetch inbox items', async () => {
       const mockItems = [{ id: 'i1', title: 'Inbox 1', userId: mockUser.id, space: 'work' }];
 
-      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockItems) as any);
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockItems));
 
       const response = await app.handle(new Request('http://localhost/inbox?space=work'));
 
@@ -126,7 +111,7 @@ describe('Inbox Routes', () => {
       const newItem = { content: 'New Item', space: 'work' };
       const createdItem = { id: 'i2', title: 'New Item', space: 'work' };
 
-      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([createdItem]) as any);
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([createdItem]));
 
       const response = await app.handle(
         new Request('http://localhost/inbox', {
@@ -203,8 +188,8 @@ describe('Inbox Routes', () => {
         { id: 'i1', space: 'work' },
         { id: 'i2', space: 'personal' }
       ];
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockItems) as any);
-      vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]) as any);
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockItems));
+      vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]));
 
       const res = await app.handle(
         new Request('http://localhost/inbox/delete', {
