@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { PgSelectBuilder } from 'drizzle-orm/pg-core';
+import type { Sql } from 'postgres';
 import * as schema from '../../../../drizzle/schema';
 import {
   verifyBoardOwnership,
@@ -11,7 +11,7 @@ import {
 } from '../ownership';
 
 // Mock DB chain helper
-const createMockQueryBuilder = (resolvedValue: any) => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   return {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -19,15 +19,15 @@ const createMockQueryBuilder = (resolvedValue: any) => {
     limit: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
-  } as unknown as PgSelectBuilder<any, any>;
+    then: (resolve: (val: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
+  };
 };
 
 describe('ownership utils', () => {
   const mockDb = {
     select: vi.fn(),
-    $client: {}
-  } as unknown as PostgresJsDatabase<typeof schema> & { $client: any };
+    $client: {} as unknown as Sql
+  } as unknown as PostgresJsDatabase<typeof schema> & { $client: Sql };
 
   beforeEach(() => {
     vi.clearAllMocks();

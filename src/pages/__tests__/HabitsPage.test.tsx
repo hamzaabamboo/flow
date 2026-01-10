@@ -71,8 +71,11 @@ describe('HabitsPage', () => {
     const habitsRoute = getMockRoute(mockApi.api.habits);
     habitsRoute.get.mockResolvedValue({ data: mockHabits, error: null });
 
-    getMockFn(habitsRoute).mockImplementation((params: any) => {
-      const id = typeof params === 'object' ? params.id : params;
+    getMockFn(habitsRoute).mockImplementation((params: unknown) => {
+      const id =
+        params && typeof params === 'object' && 'id' in params
+          ? (params as { id: string }).id
+          : params;
       return {
         stats: {
           get: vi.fn().mockResolvedValue({
@@ -166,8 +169,11 @@ describe('HabitsPage', () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
 
-    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
-      const id = typeof params === 'object' ? params.id : params;
+    getMockFn(mockApi.api.habits).mockImplementation((params: unknown) => {
+      const id =
+        params && typeof params === 'object' && 'id' in params
+          ? (params as { id: string }).id
+          : params;
       return {
         patch: patchMock,
         stats: {
@@ -191,8 +197,11 @@ describe('HabitsPage', () => {
     const user = userEvent.setup();
     const deleteMock = vi.fn().mockResolvedValue({ data: {}, error: null });
 
-    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
-      const id = typeof params === 'object' ? params.id : params;
+    getMockFn(mockApi.api.habits).mockImplementation((params: unknown) => {
+      const id =
+        params && typeof params === 'object' && 'id' in params
+          ? (params as { id: string }).id
+          : params;
       return {
         delete: deleteMock,
         stats: {
@@ -216,8 +225,11 @@ describe('HabitsPage', () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
 
-    getMockFn(mockApi.api.habits).mockImplementation((params: any) => {
-      const id = typeof params === 'object' ? params.id : params;
+    getMockFn(mockApi.api.habits).mockImplementation((params: unknown) => {
+      const id =
+        params && typeof params === 'object' && 'id' in params
+          ? (params as { id: string }).id
+          : params;
       return {
         patch: patchMock,
         stats: {

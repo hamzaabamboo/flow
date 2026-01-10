@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BoardsPage from '../boards/+Page';
-import { SpaceContext } from '../../contexts/SpaceContext';
-import { AuthContext } from '../../contexts/AuthContext';
+import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
+import { AuthContext, AuthContextType } from '../../contexts/AuthContext';
 import { DialogProvider } from '../../utils/useDialogs';
 
 // Mock vike/client/router
@@ -24,10 +24,21 @@ const renderWithProviders = (
     <QueryClientProvider client={queryClient}>
       <AuthContext.Provider
         value={
-          { isAuthenticated, login: vi.fn(), logout: vi.fn(), user: null, loading: false } as any
+          {
+            isAuthenticated,
+            login: vi.fn(),
+            logout: vi.fn(),
+            user: null,
+            loading: false,
+            refreshToken: vi.fn()
+          } as unknown as AuthContextType
         }
       >
-        <SpaceContext.Provider value={{ currentSpace, setCurrentSpace: vi.fn() } as any}>
+        <SpaceContext.Provider
+          value={
+            { currentSpace, setCurrentSpace: vi.fn(), toggleSpace: vi.fn() } as SpaceContextType
+          }
+        >
           <DialogProvider>{ui}</DialogProvider>
         </SpaceContext.Provider>
       </AuthContext.Provider>
@@ -43,10 +54,10 @@ describe('BoardsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (global as any).fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockBoards)
-    } as any);
+    } as unknown as Response) as unknown as typeof fetch;
   });
 
   it('should render boards when authenticated', async () => {
@@ -64,10 +75,10 @@ describe('BoardsPage', () => {
   });
 
   it('should show empty state when no boards', async () => {
-    (global as any).fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([])
-    } as any);
+    } as unknown as Response) as unknown as typeof fetch;
 
     renderWithProviders(<BoardsPage />);
 

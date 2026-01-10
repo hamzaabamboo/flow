@@ -21,7 +21,15 @@ vi.mock('../../contexts/ToasterContext', () => ({
 
 // Enhanced Mock TaskDialog to allow triggering submit
 vi.mock('../Board/TaskDialog', () => ({
-  TaskDialog: ({ open, onSubmit, task }: { open: boolean; onSubmit: any; task: any }) =>
+  TaskDialog: ({
+    open,
+    onSubmit,
+    task
+  }: {
+    open: boolean;
+    onSubmit: React.FormEventHandler;
+    task: { title: string };
+  }) =>
     open ? (
       <div data-testid="task-dialog" data-title={task.title}>
         <form onSubmit={onSubmit}>

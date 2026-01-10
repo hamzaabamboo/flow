@@ -77,17 +77,23 @@ describe('useWebSocket', () => {
     });
 
     // Mock location
-
-    delete (global as any).window.location;
-    (global as any).window.location = {
-      ...originalLocation,
-      protocol: 'http:',
-      host: 'localhost:3000'
-    } as any;
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...originalLocation,
+        protocol: 'http:',
+        host: 'localhost:3000'
+      },
+      writable: true,
+      configurable: true
+    });
   });
 
   afterEach(() => {
-    (global as any).window.location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true
+    });
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) =>

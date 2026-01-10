@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { calendarEventToExtendedTask } from '../type-converters';
+import type { CalendarEvent } from '../../shared/types';
 
 describe('type-converters', () => {
   it('calendarEventToExtendedTask should convert correctly', () => {
-    const event: any = {
+    const event: CalendarEvent = {
       id: 'e1',
       title: 'Title',
       description: 'Desc',
@@ -15,7 +16,8 @@ describe('type-converters', () => {
       boardId: 'b1',
       space: 'personal',
       labels: ['l1'],
-      subtasks: []
+      subtasks: [],
+      type: 'task'
     };
 
     const task = calendarEventToExtendedTask(event);
@@ -30,9 +32,10 @@ describe('type-converters', () => {
   });
 
   it('should handle missing optional fields', () => {
-    const event: any = {
+    const event: CalendarEvent = {
       id: 'e1',
-      title: 'Title'
+      title: 'Title',
+      type: 'task'
     };
 
     const task = calendarEventToExtendedTask(event);

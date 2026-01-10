@@ -5,7 +5,7 @@ import { PgSelectBuilder } from 'drizzle-orm/pg-core';
 // --- MOCKS ---
 
 // 1. Mock DB and Drizzle
-const createMockQueryBuilder = (resolvedValue: any) => {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
@@ -15,7 +15,7 @@ const createMockQueryBuilder = (resolvedValue: any) => {
     groupBy: vi.fn().mockReturnThis(),
 
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
+    then: (resolve: (val: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
   };
   return builder as unknown as PgSelectBuilder<any, any>;
 };
@@ -36,7 +36,7 @@ vi.mock('../../db', () => ({
 
 // 2. Mock Auth
 vi.mock('../../auth/withAuth', () => ({
-  withAuth: () => (app: any) =>
+  withAuth: () => (app: Elysia) =>
     app
       .decorate('user', { id: 'user-1', email: 'test@example.com' })
       .derive(() => ({ user: { id: 'user-1', email: 'test@example.com' } }))

@@ -22,7 +22,7 @@ describe('Auth Middleware', () => {
   const createTestApp = (authRequired: boolean = true) => {
     const app = new Elysia();
 
-    app.get('/test', async ({ set }: any) => {
+    app.get('/test', async ({ set }: { set: { status?: number | string } }) => {
       const token = mocks.authCookie.value;
       if (!token) {
         if (authRequired) {

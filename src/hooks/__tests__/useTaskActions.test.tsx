@@ -1,10 +1,15 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTaskActions } from '../useTaskActions';
-import { SpaceContext } from '../../contexts/SpaceContext';
+import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
 import { navigate } from 'vike/client/router';
+import type { Task } from '../../shared/types';
+
+interface MockTasks extends Mock {
+  post?: Mock;
+}
 
 // Mock dependencies
 vi.mock('../../api/client', () => ({
@@ -32,12 +37,9 @@ vi.mock('../../utils/useDialogs', () => ({
   })
 }));
 
-const mockSpaceContext = {
+const mockSpaceContext: SpaceContextType = {
   currentSpace: 'work',
-  spaces: [],
-  setSpaces: vi.fn(),
   setCurrentSpace: vi.fn(),
-  getSpaceById: vi.fn(),
   toggleSpace: vi.fn()
 };
 
@@ -50,7 +52,7 @@ const queryClient = new QueryClient({
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <SpaceContext.Provider value={mockSpaceContext as any}>{children}</SpaceContext.Provider>
+    <SpaceContext.Provider value={mockSpaceContext}>{children}</SpaceContext.Provider>
   </QueryClientProvider>
 );
 
@@ -62,13 +64,15 @@ describe('useTaskActions', () => {
     queryClient.clear();
 
     // Setup nested mocks for api.api.tasks
-    (api.api.tasks as any).mockReturnValue({
+    (api.api.tasks as unknown as MockTasks).mockReturnValue({
       delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
       get: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
       patch: vi.fn().mockResolvedValue({ data: {}, error: null })
     });
     // For tasks.post
-    (api.api.tasks as any).post = vi.fn().mockResolvedValue({ data: {}, error: null });
+    (api.api.tasks as unknown as MockTasks).post = vi
+      .fn()
+      .mockResolvedValue({ data: {}, error: null });
   });
 
   it('handleEdit should call onTaskEdit', () => {
@@ -76,7 +80,7 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions({ onTaskEdit }), { wrapper });
 
     act(() => {
-      result.current.handleEdit(mockTask as any);
+      result.current.handleEdit(mockTask as unknown as Task);
     });
 
     expect(onTaskEdit).toHaveBeenCalledWith(mockTask);
@@ -88,7 +92,7 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions({ onSuccess }), { wrapper });
 
     act(() => {
-      result.current.handleDelete(mockTask as any);
+      result.current.handleDelete(mockTask as unknown as Task);
     });
 
     expect(mockConfirm).toHaveBeenCalled();
@@ -104,7 +108,7 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions(), { wrapper });
 
     act(() => {
-      result.current.handleDelete(mockTask as any);
+      result.current.handleDelete(mockTask as unknown as Task);
     });
 
     expect(mockConfirm).toHaveBeenCalled();
@@ -119,12 +123,12 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions({ onSuccess }), { wrapper });
 
     act(() => {
-      result.current.handleDuplicate(mockTask as any);
+      result.current.handleDuplicate(mockTask as unknown as Task);
     });
 
     await waitFor(() => {
       expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
-      expect((api.api.tasks as any).post).toHaveBeenCalledWith(
+      expect((api.api.tasks as unknown as MockTasks).post).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Test Task (Copy)',
           completed: false
@@ -138,7 +142,7 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions(), { wrapper });
 
     act(() => {
-      result.current.handleMove(mockTask as any);
+      result.current.handleMove(mockTask as unknown as Task);
     });
 
     expect(result.current.isMoveDialogOpen).toBe(true);
@@ -149,7 +153,7 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions(), { wrapper });
 
     act(() => {
-      result.current.handleViewBoard(mockTask as any);
+      result.current.handleViewBoard(mockTask as unknown as Task);
     });
 
     expect(navigate).toHaveBeenCalledWith('/board/board-1');

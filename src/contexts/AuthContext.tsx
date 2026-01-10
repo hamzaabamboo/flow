@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, AuthContextType } from '@hamflow/shared';
+export type { AuthContextType };
 import { api } from '../api/client';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

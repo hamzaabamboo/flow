@@ -11,6 +11,12 @@ import {
 } from '../useNotes';
 import { api } from '../../api/client';
 
+interface MockRoute extends Mock {
+  get?: Mock;
+  post?: Mock;
+  delete?: Mock;
+}
+
 // Mock API client
 vi.mock('../../api/client', () => ({
   api: {
@@ -59,7 +65,7 @@ describe('useNotes hooks', () => {
 
   it('useTaskNote should fetch note for a task', async () => {
     const mockNote = { id: 'note-1', title: 'Note 1', url: 'http://note' };
-    (api.api.notes.task as any).mockReturnValue({
+    (api.api.notes.task as unknown as MockRoute).mockReturnValue({
       get: vi.fn().mockResolvedValue({ data: { note: mockNote }, error: null })
     });
 
@@ -115,7 +121,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useUnlinkNote should unlink note from task', async () => {
-    (api.api.notes.unlink as any).mockReturnValue({
+    (api.api.notes.unlink as unknown as MockRoute).mockReturnValue({
       delete: vi.fn().mockResolvedValue({ data: { success: true }, error: null })
     });
 

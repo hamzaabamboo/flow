@@ -12,7 +12,7 @@ declare global {
 
 // Mock DndContext to capture props
 vi.mock('@dnd-kit/core', async () => {
-  const actual = (await vi.importActual('@dnd-kit/core')) as any;
+  const actual = (await vi.importActual('@dnd-kit/core')) as unknown as object;
   return {
     ...actual,
     DndContext: (props: DndContextProps) => {

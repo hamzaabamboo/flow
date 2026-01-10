@@ -8,7 +8,7 @@ import React from 'react';
 
 // Mock SimpleDatePicker to avoid complex Ark UI interactions in this test
 vi.mock('../../ui/simple-date-picker', () => ({
-  SimpleDatePicker: ({ value, onChange }: any) => (
+  SimpleDatePicker: ({ value, onChange }: { value?: string; onChange: (v: string) => void }) => (
     <input role="textbox" value={value} onChange={(e) => onChange(e.target.value)} />
   )
 }));

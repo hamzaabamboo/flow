@@ -179,7 +179,7 @@ describe('Board Routes', () => {
       ];
 
       // Mock transaction
-      (db.transaction as Mock).mockImplementation(async (cb: any) => {
+      (db.transaction as Mock).mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           insert: vi.fn().mockReturnThis(),
           values: vi.fn().mockReturnThis(),

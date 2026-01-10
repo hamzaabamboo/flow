@@ -63,7 +63,7 @@ vi.mock('../../../mastra/agents/autoOrganizer', () => ({
 }));
 
 describe('Auto Organize Routes', () => {
-  let app: any; // Elysia apps are complex to type in tests
+  let app: any;
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -31,7 +31,8 @@ function getAudioContext(): AudioContext | null {
   try {
     if (!audioContext) {
       const AudioContextClass =
-        window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) {
         console.warn('AudioContext not supported');
         return null;
@@ -149,7 +150,11 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   // Update server state
   const updateStateMutation = useMutation({
     mutationFn: async (state: ActivePomodoroState) => {
-      const { data, error } = await api.api.pomodoro.active.post(state as any);
+      const { data, error } = await api.api.pomodoro.active.post({
+        ...state,
+        taskId: state.taskId ?? undefined,
+        taskTitle: state.taskTitle ?? undefined
+      });
       if (error) throw new Error('Failed to update state');
       return data;
     },

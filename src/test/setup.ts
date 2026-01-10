@@ -38,9 +38,22 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+interface BunMock {
+  version: string;
+  revision: string;
+  env: typeof process.env;
+  gc: () => void;
+  CryptoHasher: {
+    new (algo: string): {
+      update(data: string): { update(data: string): unknown; digest(encoding?: string): string };
+      digest(encoding?: string): string;
+    };
+  };
+}
+
 // Mock Bun global for Vitest environment
-if (typeof (globalThis as { Bun?: any }).Bun === 'undefined') {
-  (globalThis as { Bun?: any }).Bun = {
+if (typeof (globalThis as unknown as { Bun?: BunMock }).Bun === 'undefined') {
+  (globalThis as unknown as { Bun: BunMock }).Bun = {
     version: '1.0.0',
     revision: 'mock',
     env: process.env,

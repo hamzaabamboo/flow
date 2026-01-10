@@ -49,17 +49,17 @@ const renderWithProviders = (ui: React.ReactElement) => {
 // Interface for captured DndProps to avoid 'any'
 interface DndProps {
   children: React.ReactNode;
-  onDragOver?: (event: any) => void;
-  onDragEnd?: (event: any) => void;
+  onDragOver?: (event: unknown) => void;
+  onDragEnd?: (event: unknown) => void;
 }
 
 // Mock DndContext to capture props
 vi.mock('@dnd-kit/core', async () => {
-  const actual = await vi.importActual<{ DndContext: any }>('@dnd-kit/core');
+  const actual = (await vi.importActual('@dnd-kit/core')) as unknown as object;
   return {
     ...actual,
     DndContext: (props: DndProps) => {
-      (global as unknown as { lastDndProps: DndProps }).lastDndProps = props;
+      (globalThis as unknown as { lastDndProps: DndProps }).lastDndProps = props;
       return <div data-testid="dnd-context">{props.children}</div>;
     },
     // Mock sensors to avoid initialization issues
@@ -230,7 +230,7 @@ describe('KanbanBoard', () => {
 
     renderWithProviders(<KanbanBoard board={mockBoard} tasks={mockTasks} />);
 
-    const dndProps = (global as unknown as { lastDndProps: DndProps }).lastDndProps;
+    const dndProps = (globalThis as unknown as { lastDndProps: DndProps }).lastDndProps;
 
     await waitFor(() => expect(dndProps.onDragOver).toBeDefined());
 
@@ -239,7 +239,7 @@ describe('KanbanBoard', () => {
         dndProps.onDragOver!({
           active: { id: 'task-1', data: { current: { type: 'task' } } },
           over: { id: 'col-2', data: { current: { type: 'column' } } }
-        });
+        } as any);
       });
     }
 
@@ -255,14 +255,14 @@ describe('KanbanBoard', () => {
 
     renderWithProviders(<KanbanBoard board={mockBoard} tasks={manyTasks} />);
 
-    const dndProps = (global as unknown as { lastDndProps: DndProps }).lastDndProps;
+    const dndProps = (globalThis as unknown as { lastDndProps: DndProps }).lastDndProps;
 
     if (dndProps.onDragEnd) {
       await act(async () => {
         dndProps.onDragEnd!({
           active: { id: 'task-1', data: { current: { type: 'task' } } },
           over: { id: 'task-2', data: { current: { type: 'task' } } }
-        });
+        } as any);
       });
     }
 

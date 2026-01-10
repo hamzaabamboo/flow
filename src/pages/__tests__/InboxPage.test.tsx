@@ -11,7 +11,7 @@ import '@testing-library/jest-dom';
 // Mock vike navigation
 const mockNavigate = vi.fn();
 vi.mock('vike/client/router', () => ({
-  navigate: (...args: any[]) => mockNavigate(...args)
+  navigate: (...args: unknown[]) => mockNavigate(...args)
 }));
 
 // Mock SpaceContext
@@ -32,7 +32,7 @@ vi.mock('../../contexts/ToasterContext', () => ({
 const mockConfirm = vi.fn();
 vi.mock('../../utils/useDialogs', () => ({
   useDialogs: () => ({
-    confirm: (...args: any[]) => mockConfirm(...args)
+    confirm: (...args: unknown[]) => mockConfirm(...args)
   })
 }));
 
@@ -46,17 +46,17 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       inbox: Object.assign(
-        (_params: any) => ({
+        (_params: unknown) => ({
           // If nested routes needing ID
         }),
         {
-          get: (...args: any[]) => mockInboxGet(...args),
-          convert: { post: (...args: any[]) => mockConvertPost(...args) },
-          delete: { post: (...args: any[]) => mockDeletePost(...args) }
+          get: (...args: unknown[]) => mockInboxGet(...args),
+          convert: { post: (...args: unknown[]) => mockConvertPost(...args) },
+          delete: { post: (...args: unknown[]) => mockDeletePost(...args) }
         }
       ),
       boards: {
-        get: (...args: any[]) => mockBoardsGet(...args)
+        get: (...args: unknown[]) => mockBoardsGet(...args)
       }
     }
   }

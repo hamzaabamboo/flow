@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder, PgDelete } from 'drizzle-orm/pg-core';
 
 // Helper to create chainable mock

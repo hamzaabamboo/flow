@@ -142,7 +142,7 @@ describe('AuthContext', () => {
     const logoutMock = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
     getMockFn(mockApi.api.auth.logout.post).mockImplementation(logoutMock);
 
-    let capturedLogout: any;
+    let capturedLogout: () => Promise<void>;
     const LogoutButton = () => {
       const { logout } = useAuth();
       useEffect(() => {

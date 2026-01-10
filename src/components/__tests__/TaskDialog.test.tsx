@@ -26,7 +26,7 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       boards: {
-        get: (...args: any[]) => mockGetBoards(...args)
+        get: (...args: unknown[]) => mockGetBoards(...args)
       }
     }
   }

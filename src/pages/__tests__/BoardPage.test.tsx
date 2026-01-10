@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BoardPage from '../board/@boardId/+Page';
 import { SpaceContext } from '../../contexts/SpaceContext';
 import { usePageContext } from 'vike-react/usePageContext';
+import type { PageContext } from 'vike/types';
 import { DialogProvider } from '../../utils/useDialogs';
 import { ToasterProvider } from '../../contexts/ToasterProvider';
 import { mockApi, getMockFn, getMockRoute } from '../../test/mocks/api';
@@ -74,7 +75,7 @@ describe('BoardPage', () => {
     vi.clearAllMocks();
     vi.mocked(usePageContext).mockReturnValue({
       routeParams: { boardId: 'b1' }
-    } as any);
+    } as unknown as PageContext);
 
     const boardsRoute = getMockRoute(mockApi.api.boards);
 
@@ -88,7 +89,7 @@ describe('BoardPage', () => {
       delete: vi.fn().mockResolvedValue({ data: {}, error: null })
     };
 
-    getMockFn(boardsRoute).mockImplementation((params?: any) => {
+    getMockFn(boardsRoute).mockImplementation((params?: Record<string, unknown>) => {
       if (params && (params.id || params.boardId)) {
         return boardApiMock;
       }
@@ -101,7 +102,7 @@ describe('BoardPage', () => {
     boardsRoute.get.mockResolvedValue({ data: [mockBoard], error: null });
 
     const tasksRoute = getMockRoute(mockApi.api.tasks);
-    tasksRoute.get.mockImplementation(({ query }: any) => {
+    tasksRoute.get.mockImplementation(({ query }: { query?: Record<string, string> }) => {
       const columnId = query?.columnId;
       const filteredTasks = columnId ? mockTasks.filter((t) => t.columnId === columnId) : mockTasks;
       return Promise.resolve({ data: filteredTasks, error: null });
@@ -135,7 +136,7 @@ describe('BoardPage', () => {
 
   it('should show "Board not found" if board is null', async () => {
     const boardsRoute = getMockRoute(mockApi.api.boards);
-    getMockFn(boardsRoute).mockImplementation((params?: any) => {
+    getMockFn(boardsRoute).mockImplementation((params?: Record<string, unknown>) => {
       if (params && (params.id || params.boardId)) {
         return {
           get: vi.fn().mockResolvedValue({ data: null, error: { status: 404 } })

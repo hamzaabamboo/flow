@@ -10,7 +10,7 @@ import '@testing-library/jest-dom';
 // Mock navigation
 const mockNavigate = vi.fn();
 vi.mock('vike/client/router', () => ({
-  navigate: (...args: any[]) => mockNavigate(...args)
+  navigate: (...args: unknown[]) => mockNavigate(...args)
 }));
 
 // Mock SpeechRecognition
@@ -22,8 +22,8 @@ class MockSpeechRecognition {
   lang = '';
   interimResults = false;
   maxAlternatives = 1;
-  onresult: ((event: any) => void) | null = null;
-  onerror: ((event: any) => void) | null = null;
+  onresult: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
   onend: (() => void) | null = null;
   onstart: (() => void) | null = null;
 }
@@ -56,13 +56,13 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       command: {
-        post: (...args: any[]) => mockPost(...args),
+        post: (...args: unknown[]) => mockPost(...args),
         execute: {
-          post: (...args: any[]) => mockExecutePost(...args)
+          post: (...args: unknown[]) => mockExecutePost(...args)
         }
       },
       boards: {
-        get: (...args: any[]) => mockGetBoards(...args)
+        get: (...args: unknown[]) => mockGetBoards(...args)
       }
     }
   }

@@ -41,7 +41,7 @@ describe('useQueryState hooks', () => {
     });
 
     it('should initialize with value from URL', () => {
-      (window.location as any).search = '?test=url-value';
+      window.location.search = '?test=url-value';
       const { result } = renderHook(() => useQueryState<string>('test', 'default'));
       expect(result.current[0]).toBe('url-value');
     });

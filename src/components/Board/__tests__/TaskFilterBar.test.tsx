@@ -7,7 +7,15 @@ import React from 'react';
 
 // Mock SimpleDatePicker
 vi.mock('../../ui/simple-date-picker', () => ({
-  SimpleDatePicker: ({ value, onChange, placeholder }: any) => (
+  SimpleDatePicker: ({
+    value,
+    onChange,
+    placeholder
+  }: {
+    value?: string;
+    onChange: (val: string) => void;
+    placeholder?: string;
+  }) => (
     <input
       role="textbox"
       placeholder={placeholder}

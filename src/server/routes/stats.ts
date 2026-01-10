@@ -6,6 +6,12 @@ import { withAuth } from '../auth/withAuth';
 import { isTaskCompleted } from '../utils/taskCompletion';
 import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 
+interface Habit {
+  id: string;
+  name: string;
+  completedToday: boolean;
+}
+
 export const statsRoutes = new Elysia({ prefix: '/stats' })
   .decorate('db', db)
   .use(withAuth())
@@ -69,8 +75,8 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
           headers: { 'x-user-id': user.id }
         }
       );
-      const habits = habitsResponse.ok ? await habitsResponse.json() : [];
-      const incompleteHabits = habits.filter((h: any) => !h.completedToday);
+      const habits = (habitsResponse.ok ? await habitsResponse.json() : []) as Habit[];
+      const incompleteHabits = habits.filter((h) => !h.completedToday);
 
       // Count all incomplete tasks (for Tasks badge)
       const allIncompleteTasks = tasksWithColumns.filter(

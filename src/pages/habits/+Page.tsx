@@ -63,7 +63,18 @@ export default function HabitsPage() {
     queryFn: async () => {
       const { data, error } = await api.api.habits.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch habits');
-      return data as unknown as Habit[];
+      if (!data) return [];
+
+      return (data as unknown[]).map((item) => {
+        const h = item as Record<string, unknown>;
+        return {
+          ...h,
+          createdAt:
+            h.createdAt instanceof Date ? h.createdAt.toISOString() : (h.createdAt as string),
+          updatedAt:
+            h.updatedAt instanceof Date ? h.updatedAt.toISOString() : (h.updatedAt as string)
+        } as unknown as Habit;
+      });
     }
   });
 
@@ -75,8 +86,7 @@ export default function HabitsPage() {
 
       const statsPromises = habits.map(async (habit) => {
         const { data, error } = await api.api.habits({ id: habit.id }).stats.get();
-        if (error)
-          return { habitId: habit.id, totalCompletions: 0, completionRate: 0 } as HabitStats;
+        if (error) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
         return data as HabitStats;
       });
 
@@ -89,9 +99,15 @@ export default function HabitsPage() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { data: result, error } = await api.api.habits.post({
-        ...data,
+        name: data.name,
+        description: data.description,
+        frequency: data.frequency,
+        targetDays: data.targetDays,
+        reminderTime: data.reminderTime,
+        color: data.color,
+        link: data.link,
         space: currentSpace
-      } as any);
+      });
       if (error) throw new Error('Failed to create habit');
       return result;
     },

@@ -145,8 +145,8 @@ export default function SettingsPage() {
       queryFn: async () => {
         const { data, error } = await api.api.notes.collections.get();
         if (error) return [];
-        const result = data as { data?: OutlineCollection[] };
-        return result.data || [];
+        const result = data as { data?: OutlineCollection[] } | undefined;
+        return result?.data || [];
       },
       enabled: !!(settings?.outlineApiUrl && settings?.outlineApiKey)
     }
@@ -251,9 +251,9 @@ export default function SettingsPage() {
       const { data, error } = await api.api.settings['test-summary'].post({
         type,
         spaces: settings.notifications.summarySpaces
-      } as any);
+      });
       if (error) {
-        const errorVal = error.value as any;
+        const errorVal = error.value as { error?: string };
         throw new Error(errorVal?.error || 'Failed to send via HamBot');
       }
       return data as { message: string };
@@ -277,9 +277,13 @@ export default function SettingsPage() {
   const { data: externalCalendars } = useQuery<ExternalCalendar[]>({
     queryKey: ['external-calendars'],
     queryFn: async () => {
-      const { data, error } = await (api.api['external-calendars'] as any).get();
+      const { data, error } = await (
+        api.api['external-calendars'] as unknown as {
+          get: () => Promise<{ data: ExternalCalendar[]; error: unknown }>;
+        }
+      ).get();
       if (error) throw new Error('Failed to fetch external calendars');
-      return data as any as ExternalCalendar[];
+      return (data as ExternalCalendar[]) || [];
     }
   });
 
@@ -291,10 +295,14 @@ export default function SettingsPage() {
       space: 'work' | 'personal';
       color: string;
     }) => {
-      const { data, error } = await (api.api['external-calendars'] as any).post(calendar);
+      const { data, error } = await (
+        api.api['external-calendars'] as unknown as {
+          post: (body: unknown) => Promise<{ data: unknown; error: unknown }>;
+        }
+      ).post(calendar);
       if (error) {
-        const errorVal = error.value as any;
-        throw new Error(errorVal?.error || 'Failed to add calendar');
+        const errorVal = error as unknown as { value?: { error?: string } };
+        throw new Error(errorVal.value?.error || 'Failed to add calendar');
       }
       return data;
     },
@@ -322,7 +330,13 @@ export default function SettingsPage() {
   // Toggle external calendar enabled
   const toggleExternalCalendar = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const { data, error } = await (api.api['external-calendars'] as any)({ id }).patch({
+      const { data, error } = await (
+        api.api['external-calendars'] as unknown as {
+          (params: { id: string }): {
+            patch: (body: unknown) => Promise<{ data: unknown; error: unknown }>;
+          };
+        }
+      )({ id }).patch({
         enabled
       });
       if (error) throw new Error('Failed to update calendar');
@@ -348,12 +362,16 @@ export default function SettingsPage() {
         color?: string;
       };
     }) => {
-      const { data, error } = await (api.api['external-calendars'] as any)({ id }).patch(
-        updateData
-      );
+      const { data, error } = await (
+        api.api['external-calendars'] as unknown as {
+          (params: { id: string }): {
+            patch: (body: unknown) => Promise<{ data: unknown; error: unknown }>;
+          };
+        }
+      )({ id }).patch(updateData);
       if (error) {
-        const errorVal = error.value as any;
-        throw new Error(errorVal?.error || 'Failed to update calendar');
+        const errorVal = error as unknown as { value?: { error?: string } };
+        throw new Error(errorVal.value?.error || 'Failed to update calendar');
       }
       return data;
     },
@@ -378,7 +396,11 @@ export default function SettingsPage() {
   // Delete external calendar
   const deleteExternalCalendar = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await (api.api['external-calendars'] as any)({ id }).delete();
+      const { data, error } = await (
+        api.api['external-calendars'] as unknown as {
+          (params: { id: string }): { delete: () => Promise<{ data: unknown; error: unknown }> };
+        }
+      )({ id }).delete();
       if (error) throw new Error('Failed to delete calendar');
       return data;
     },
@@ -418,10 +440,10 @@ export default function SettingsPage() {
     if (!settings) return;
 
     const newSettings = { ...settings };
-    let current: any = newSettings;
+    let current: Record<string, unknown> = newSettings as unknown as Record<string, unknown>;
 
     for (let i = 0; i < path.length - 1; i++) {
-      current = current[path[i]];
+      current = current[path[i]] as Record<string, unknown>;
     }
     current[path[path.length - 1]] = value;
 

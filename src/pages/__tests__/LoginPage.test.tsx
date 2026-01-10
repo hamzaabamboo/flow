@@ -7,16 +7,23 @@ describe('LoginPage', () => {
 
   beforeEach(() => {
     // Mock window.location
-    delete (window as any).location;
-    (window as any).location = {
-      ...originalLocation,
-      href: '',
-      search: ''
-    } as any;
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...originalLocation,
+        href: '',
+        search: ''
+      },
+      writable: true,
+      configurable: true
+    });
   });
 
   afterEach(() => {
-    (window as any).location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true
+    });
   });
 
   it('should render the login card correctly', () => {
@@ -37,7 +44,7 @@ describe('LoginPage', () => {
   });
 
   it('should preserve returnUrl when redirecting', () => {
-    (window.location as any).search = '?returnUrl=%2Ftasks';
+    window.location.search = '?returnUrl=%2Ftasks';
     render(<LoginPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));

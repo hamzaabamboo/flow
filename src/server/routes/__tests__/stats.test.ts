@@ -96,7 +96,7 @@ describe('Stats Routes', () => {
     const response = await app.handle(new Request(url));
 
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { completions: any[] };
+    const data = (await response.json()) as { completions: unknown[] };
     expect(data.completions).toHaveLength(1);
   });
 
