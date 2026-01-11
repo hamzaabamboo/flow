@@ -449,6 +449,9 @@ export function AgendaWeekView({
                 habits?.filter((habit) => {
                   // In week view, habits from API already have checkDate for filtering
                   if (viewMode === 'week') {
+                    if (habit.checkDate instanceof Date) {
+                      return format(habit.checkDate, 'yyyy-MM-dd') === dateKey;
+                    }
                     return habit.checkDate === dateKey;
                   }
                   // In day view, use frequency logic

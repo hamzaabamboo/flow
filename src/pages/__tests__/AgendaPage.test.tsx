@@ -9,7 +9,7 @@ import { api } from '../../api/client';
 import { DialogProvider } from '../../utils/useDialogs';
 import { ToasterProvider } from '../../contexts/ToasterProvider';
 import { addHours, addDays } from 'date-fns';
-import { asMock, getMockRoute } from '../../test/mocks/api';
+import { asMock } from '../../test/mocks/api';
 
 // Mock vike-react/usePageContext
 vi.mock('vike-react/usePageContext', () => ({
@@ -80,7 +80,7 @@ describe('AgendaPage', () => {
     window.history.replaceState({}, '', '/');
     vi.clearAllMocks();
 
-    const apiMock = getMockRoute(api.api);
+    const apiMock = api.api;
     asMock(apiMock.calendar.events.get).mockResolvedValue({ data: mockEvents, error: null });
     asMock(apiMock.habits.get).mockResolvedValue({ data: mockHabits, error: null });
     asMock(apiMock.boards.get).mockResolvedValue({ data: [], error: null });
