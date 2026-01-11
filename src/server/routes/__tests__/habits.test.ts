@@ -59,7 +59,7 @@ import { habitsRoutes } from '../habits';
 import { db } from '../../db';
 
 describe('Habit Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
 
   beforeEach(() => {
     vi.resetAllMocks();

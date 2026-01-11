@@ -85,7 +85,7 @@ import { boardRoutes } from '../boards';
 import { db } from '../../db'; // Mocked
 
 describe('Board Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
   const mockUser = { id: 'user-1', email: 'test@example.com' };
 
   beforeEach(() => {

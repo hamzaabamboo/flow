@@ -98,7 +98,7 @@ vi.mock('../../services/reminder-sync', () => ({
 }));
 
 describe('Task Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
   const mockUser = { id: 'user-1', email: 'test@test.com' };
 
   beforeEach(() => {

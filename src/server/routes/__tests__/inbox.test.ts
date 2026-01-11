@@ -68,7 +68,7 @@ vi.mock('../../websocket', () => ({
 }));
 
 describe('Inbox Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
   const mockUser = { id: 'user-123', email: 'test@example.com' };
 
   beforeEach(() => {

@@ -60,7 +60,7 @@ import { expandRecurringTasks } from '../../utils/recurring';
 import { fetchAndParseIcal, convertIcalToEvents } from '../../utils/ical-parser';
 
 describe('Calendar Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
   // removed unused mockUser
 
   beforeEach(() => {

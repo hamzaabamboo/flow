@@ -7,6 +7,7 @@ import { SpaceContext } from '../../../contexts/SpaceContext';
 import { DialogProvider } from '../../../utils/useDialogs';
 import type { BoardWithColumns, Task } from '../../../shared/types';
 import { mockApi, getMockRoute, getMockFn } from '../../../test/mocks/api';
+import type { DragOverEvent, DragEndEvent } from '@dnd-kit/core';
 
 // Correctly mock using dynamic import to avoid hoisting issues
 vi.mock('../../../api/client', async () => {
@@ -239,7 +240,7 @@ describe('KanbanBoard', () => {
         dndProps.onDragOver!({
           active: { id: 'task-1', data: { current: { type: 'task' } } },
           over: { id: 'col-2', data: { current: { type: 'column' } } }
-        } as any);
+        } as unknown as DragOverEvent);
       });
     }
 
@@ -262,7 +263,7 @@ describe('KanbanBoard', () => {
         dndProps.onDragEnd!({
           active: { id: 'task-1', data: { current: { type: 'task' } } },
           over: { id: 'task-2', data: { current: { type: 'task' } } }
-        } as any);
+        } as unknown as DragEndEvent);
       });
     }
 

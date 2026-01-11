@@ -63,7 +63,7 @@ vi.mock('../../../mastra/agents/autoOrganizer', () => ({
 }));
 
 describe('Auto Organize Routes', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
 
   beforeEach(() => {
     vi.clearAllMocks();

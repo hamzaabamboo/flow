@@ -39,7 +39,7 @@ vi.mock('../../server/websocket', () => ({
 
 // Integration test for complete authentication flow
 describe('Authentication Flow Integration', () => {
-  let app: any;
+  let app: { handle: (request: Request) => Promise<Response> };
   let mockDb: any;
 
   const testUser = {
