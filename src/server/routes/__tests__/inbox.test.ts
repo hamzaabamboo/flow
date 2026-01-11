@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
-import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import {
+  PgSelectBuilder,
+  PgInsertBuilder,
+  PgUpdateBuilder,
+  PgTransaction
+} from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase, PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
+import { ExtractTablesWithRelations } from 'drizzle-orm';
 import * as schema from '../../../../drizzle/schema';
 import { inboxRoutes } from '../inbox';
 import { db } from '../../db';
@@ -67,6 +73,12 @@ vi.mock('../../websocket', () => ({
   }
 }));
 
+type DBTransaction = PgTransaction<
+  PostgresJsQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+
 describe('Inbox Routes', () => {
   let app: { handle: (request: Request) => Promise<Response> };
   const mockUser = { id: 'user-123', email: 'test@example.com' };
@@ -80,7 +92,8 @@ describe('Inbox Routes', () => {
     vi.mocked(db.delete).mockReturnThis();
 
     // Transaction mock
-    vi.mocked(db.transaction).mockImplementation((cb: any) => cb(db));
+    vi.mocked(db.transaction).mockImplementation(((cb: (tx: DBTransaction) => unknown) =>
+      cb(db as unknown as DBTransaction)) as unknown as typeof db.transaction);
 
     // Default select
     vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
@@ -133,19 +146,21 @@ describe('Inbox Routes', () => {
       const mockItem = { id: 'i1', title: 'Inbox 1', space: 'work' };
       const createdTask = { id: 't1', title: 'Inbox 1' };
 
-      vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
-        const tx = {
-          select: vi.fn().mockReturnValue(createMockQueryBuilder([mockItem])),
-          from: vi.fn().mockReturnThis(),
-          where: vi.fn().mockReturnThis(),
-          insert: vi.fn().mockReturnThis(),
-          values: vi.fn().mockReturnThis(),
-          returning: vi.fn().mockResolvedValue([createdTask]),
-          update: vi.fn().mockReturnThis(),
-          set: vi.fn().mockReturnThis()
-        };
-        return cb(tx);
-      });
+      vi.mocked(db.transaction).mockImplementation(
+        async (cb: (tx: DBTransaction) => Promise<unknown>) => {
+          const tx = {
+            select: vi.fn().mockReturnValue(createMockQueryBuilder([mockItem])),
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            insert: vi.fn().mockReturnThis(),
+            values: vi.fn().mockReturnThis(),
+            returning: vi.fn().mockResolvedValue([createdTask]),
+            update: vi.fn().mockReturnThis(),
+            set: vi.fn().mockReturnThis()
+          };
+          return cb(tx as unknown as DBTransaction);
+        }
+      );
 
       const response = await app.handle(
         new Request('http://localhost/inbox/convert', {
@@ -161,14 +176,16 @@ describe('Inbox Routes', () => {
     });
 
     it('should return error if item not found during conversion', async () => {
-      vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
-        const tx = {
-          select: vi.fn().mockReturnValue(createMockQueryBuilder([])),
-          from: vi.fn().mockReturnThis(),
-          where: vi.fn().mockReturnThis()
-        };
-        return cb(tx);
-      });
+      vi.mocked(db.transaction).mockImplementation(
+        async (cb: (tx: DBTransaction) => Promise<unknown>) => {
+          const tx = {
+            select: vi.fn().mockReturnValue(createMockQueryBuilder([])),
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis()
+          };
+          return cb(tx as unknown as DBTransaction);
+        }
+      );
 
       const res = await app.handle(
         new Request('http://localhost/inbox/convert', {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAutoOrganize, useApplyAutoOrganize } from '../useAutoOrganize';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -38,7 +38,7 @@ describe('useAutoOrganize hooks', () => {
 
   it('useAutoOrganize should call API and return data', async () => {
     const tasksRoute = getMockRoute(mockApi.api.tasks);
-    const autoOrganizePost = getMockFn(tasksRoute['auto-organize'].post);
+    const autoOrganizePost = getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post);
     autoOrganizePost.mockResolvedValue({ data: { suggestions: [] }, error: null });
 
     const { result } = renderHook(() => useAutoOrganize(), { wrapper });

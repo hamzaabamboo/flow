@@ -54,7 +54,7 @@ export function getMockRoute<T = unknown>(mock: T) {
     post: Mock;
     patch: Mock;
     delete: Mock;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

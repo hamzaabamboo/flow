@@ -1,5 +1,5 @@
 import { render, screen, waitFor, within, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { KanbanBoard } from '../KanbanBoard';
@@ -249,7 +249,9 @@ describe('KanbanBoard', () => {
 
   it('should handle dragging a task over another task in same column (reorder)', async () => {
     const tasksRoute = getMockRoute(mockApi.api.tasks);
-    const reorderPost = getMockFn(tasksRoute.reorder.post);
+    const reorderPost = getMockFn(
+      (tasksRoute as unknown as { reorder: { post: Mock } }).reorder.post
+    );
     reorderPost.mockResolvedValue({ data: {}, error: null });
 
     const manyTasks = [...mockTasks, { ...mockTasks[0], id: 'task-2', title: 'Task 2' }];

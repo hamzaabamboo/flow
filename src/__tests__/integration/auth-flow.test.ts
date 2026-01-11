@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder, PgDelete } from 'drizzle-orm/pg-core';
 
 // Helper to create chainable mock
@@ -40,7 +41,7 @@ vi.mock('../../server/websocket', () => ({
 // Integration test for complete authentication flow
 describe('Authentication Flow Integration', () => {
   let app: { handle: (request: Request) => Promise<Response> };
-  let mockDb: any;
+  let mockDb: Record<string, Mock>;
 
   const testUser = {
     email: 'integration@test.com',
@@ -65,7 +66,7 @@ describe('Authentication Flow Integration', () => {
       insert: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      transaction: vi.fn((cb) => cb(mockDb))
+      transaction: vi.fn((cb: (db: unknown) => unknown) => cb(mockDb))
     };
 
     // Default behaviors
@@ -76,7 +77,7 @@ describe('Authentication Flow Integration', () => {
     mockDb.update.mockReturnValue(createMockChain([{ id: 'user-1' }]));
 
     app = new Elysia()
-      .decorate('db', mockDb)
+      .decorate('db', mockDb as unknown as PostgresJsDatabase)
       .use(simpleAuth)
       .group('/api', (api) => api.use(tasksRoutes).use(boardRoutes).use(inboxRoutes));
   });

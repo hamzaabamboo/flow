@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -108,7 +108,7 @@ describe('BoardPage', () => {
       return Promise.resolve({ data: filteredTasks, error: null });
     });
 
-    getMockFn(tasksRoute['auto-organize'].post).mockResolvedValue({
+    getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post).mockResolvedValue({
       data: {
         suggestions: [
           {
@@ -189,7 +189,7 @@ describe('BoardPage', () => {
   it('should handle "Auto Organize" failure', async () => {
     const user = userEvent.setup();
     const tasksRoute = getMockRoute(mockApi.api.tasks);
-    getMockFn(tasksRoute['auto-organize'].post).mockResolvedValue({
+    getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post).mockResolvedValue({
       data: null,
       error: { message: 'AI failed' }
     });
