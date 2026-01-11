@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi, Mock } from 'vitest';
 import { Elysia } from 'elysia';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder, PgDelete } from 'drizzle-orm/pg-core';
 
 // Helper to create chainable mock
-const createMockChain = (returnValue: any) => {
+const createMockChain = (returnValue: unknown) => {
   const chain = {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -17,25 +19,29 @@ const createMockChain = (returnValue: any) => {
     orderBy: vi.fn().mockReturnThis(),
 
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => {
+    then: (resolve: (val: unknown) => void) => {
       resolve(returnValue);
     }
   };
-  return chain;
+  return chain as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any> &
+    PgDelete<any, any, any>;
 };
 
 // Mock websocket to prevent open handles
 vi.mock('../../server/websocket', () => ({
   wsManager: {
     broadcastTaskUpdate: vi.fn(),
-    initialize: vi.fn()
+    initialize: vi.fn(),
+    broadcastToUser: vi.fn()
   }
 }));
 
 // Integration test for complete authentication flow
 describe('Authentication Flow Integration', () => {
-  let app: Elysia<any> | null = null;
-  let mockDb: any;
+  let app: { handle: (request: Request) => Promise<Response> };
+  let mockDb: Record<string, Mock>;
 
   const testUser = {
     email: 'integration@test.com',
@@ -50,7 +56,6 @@ describe('Authentication Flow Integration', () => {
   beforeAll(async () => {
     // Setup test server with all routes
     const { simpleAuth } = await import('../../server/auth/simple-auth');
-    const { authMiddleware } = await import('../../server/auth/middleware');
     const { tasksRoutes } = await import('../../server/routes/tasks');
     const { boardRoutes } = await import('../../server/routes/boards');
     const { inboxRoutes } = await import('../../server/routes/inbox');
@@ -60,7 +65,8 @@ describe('Authentication Flow Integration', () => {
       select: vi.fn(),
       insert: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn()
+      delete: vi.fn(),
+      transaction: vi.fn((cb: (db: unknown) => unknown) => cb(mockDb))
     };
 
     // Default behaviors
@@ -71,11 +77,9 @@ describe('Authentication Flow Integration', () => {
     mockDb.update.mockReturnValue(createMockChain([{ id: 'user-1' }]));
 
     app = new Elysia()
-      .decorate('db', mockDb)
+      .decorate('db', mockDb as unknown as PostgresJsDatabase)
       .use(simpleAuth)
-      .group('/api', (app) =>
-        app.use(authMiddleware).use(tasksRoutes).use(boardRoutes).use(inboxRoutes)
-      );
+      .group('/api', (api) => api.use(tasksRoutes).use(boardRoutes).use(inboxRoutes));
   });
 
   beforeEach(() => {
@@ -154,7 +158,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as Record<string, unknown>;
       expect(data).toHaveProperty('email', testUser.email);
     });
 
@@ -228,14 +232,6 @@ describe('Authentication Flow Integration', () => {
         }
       });
 
-      // Note: If boardRoutes does further DB calls, we might see db errors if we don't mock them.
-      // But assuming boardRoutes first does user check (middleware) which we mocked,
-      // and then board fetch.
-      // E.g. .where(...)
-      // Our createMockChain returns `this` for where.
-      // And `then` returns empty array by default if we don't override.
-      // So board list empty -> 200 OK [].
-
       expect(response.status).toBe(200);
     });
   });
@@ -283,11 +279,9 @@ describe('Authentication Flow Integration', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(testUser)
       });
-      const data = (await response.json()) as { user: any };
+      const data = (await response.json()) as Record<string, unknown>;
 
       expect(data).not.toHaveProperty('password');
-      // simple-auth returns flat object { id, email, name }, not { user: ... }
-      // So check directly
       expect(data).not.toHaveProperty('user');
     });
   });

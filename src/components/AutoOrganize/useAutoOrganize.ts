@@ -4,6 +4,7 @@ import type {
   AutoOrganizeResponse,
   AutoOrganizeSuggestion
 } from '../../shared/types/autoOrganize';
+export type { AutoOrganizeSuggestion };
 import { api } from '../../api/client';
 
 export function useAutoOrganize() {

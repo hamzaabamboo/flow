@@ -1,19 +1,38 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import {
+  PgSelectBuilder,
+  PgInsertBuilder,
+  PgUpdateBuilder,
+  PgTransaction
+} from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase, PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
+import { ExtractTablesWithRelations } from 'drizzle-orm';
+import * as schema from '../../../../drizzle/schema';
+import { inboxRoutes } from '../inbox';
+import { db } from '../../db';
 
 // Define Mock DB Chain Helper
-const createMockQueryBuilder = (resolvedValue: any) => {
-  return {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    orderBy: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    leftJoin: vi.fn().mockReturnThis(),
-    groupBy: vi.fn().mockReturnThis(),
-
+const createMockQueryBuilder = (resolvedValue: unknown) => {
+  const builder = {
+    from: () => builder,
+    where: () => builder,
+    orderBy: () => builder,
+    limit: () => builder,
+    leftJoin: () => builder,
+    groupBy: () => builder,
+    insert: () => builder,
+    values: () => builder,
+    returning: () => builder,
+    update: () => builder,
+    set: () => builder,
+    delete: () => builder,
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
   };
+  return builder as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 // Mock the DB module
@@ -36,11 +55,16 @@ vi.mock('../../db', () => ({
   }
 }));
 
-// Mock withAuth (ensure it mocks correctly)
-vi.mock('../../auth/withAuth', () => ({
-  withAuth: () => (app: any) =>
-    app.derive(() => ({ user: { id: 'user-123', email: 'test@example.com' } }))
-}));
+// Mock withAuth
+vi.mock('../../auth/withAuth', async () => {
+  const { Elysia } = await import('elysia');
+  return {
+    withAuth: () =>
+      new Elysia().derive({ as: 'global' }, () => ({
+        user: { id: 'user-123', email: 'test@example.com' }
+      }))
+  };
+});
 
 // Mock WebSocket
 vi.mock('../../websocket', () => ({
@@ -49,36 +73,33 @@ vi.mock('../../websocket', () => ({
   }
 }));
 
-// Import after mocks
-import { inboxRoutes } from '../inbox';
-import { db } from '../../db';
+type DBTransaction = PgTransaction<
+  PostgresJsQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
 
 describe('Inbox Routes', () => {
-  let app: unknown;
+  let app: { handle: (request: Request) => Promise<Response> };
   const mockUser = { id: 'user-123', email: 'test@example.com' };
 
   beforeEach(() => {
     vi.resetAllMocks();
 
     // Setup chainable mocks on the imported db object
-    (db as any).from.mockReturnThis();
-    (db as any).where.mockReturnThis();
-    (db as any).insert.mockReturnThis();
-    (db as any).values.mockReturnThis();
-    (db as any).update.mockReturnThis();
-    (db as any).set.mockReturnThis();
-    (db as any).delete.mockReturnThis();
-    (db as any).limit.mockReturnThis();
-    (db as any).orderBy.mockReturnThis();
+    vi.mocked(db.insert).mockReturnThis();
+    vi.mocked(db.update).mockReturnThis();
+    vi.mocked(db.delete).mockReturnThis();
 
     // Transaction mock
-    (db as any).transaction.mockImplementation((cb: (tx: any) => any) => cb(db));
+    vi.mocked(db.transaction).mockImplementation(((cb: (tx: DBTransaction) => unknown) =>
+      cb(db as unknown as DBTransaction)) as unknown as typeof db.transaction);
 
     // Default select
-    (db as any).select.mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia()
-      .decorate('db', db)
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
       .derive(() => ({ user: mockUser }))
       .use(inboxRoutes);
   });
@@ -87,11 +108,9 @@ describe('Inbox Routes', () => {
     it('should fetch inbox items', async () => {
       const mockItems = [{ id: 'i1', title: 'Inbox 1', userId: mockUser.id, space: 'work' }];
 
-      (db as any).select.mockReturnValue(createMockQueryBuilder(mockItems));
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockItems));
 
-      const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
-        new Request('http://localhost/inbox?space=work')
-      );
+      const response = await app.handle(new Request('http://localhost/inbox?space=work'));
 
       const data = await response.json();
       expect(response.status).toBe(200);
@@ -105,9 +124,9 @@ describe('Inbox Routes', () => {
       const newItem = { content: 'New Item', space: 'work' };
       const createdItem = { id: 'i2', title: 'New Item', space: 'work' };
 
-      (db as any).returning.mockResolvedValueOnce([createdItem]);
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([createdItem]));
 
-      const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
+      const response = await app.handle(
         new Request('http://localhost/inbox', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -116,17 +135,8 @@ describe('Inbox Routes', () => {
       );
 
       const data = await response.json();
-      // Inbox route usually returns successResponse which has { success: true, data: item }
-      // But verify based on existing test expectations.
-      // Expected: data.data.title
-
       expect(response.status).toBe(200);
-      // If it's wrapped:
-      if (data.data) {
-        expect(data.data.title).toBe('New Item');
-      } else {
-        expect(data.title).toBe('New Item');
-      }
+      expect(data.data.title).toBe('New Item');
     });
   });
 
@@ -136,32 +146,23 @@ describe('Inbox Routes', () => {
       const mockItem = { id: 'i1', title: 'Inbox 1', space: 'work' };
       const createdTask = { id: 't1', title: 'Inbox 1' };
 
-      // Mock tx flow
-      // 1. select item (inside transaction likely?)
-      (db as any).select.mockReturnValueOnce(createMockQueryBuilder([mockItem]));
+      vi.mocked(db.transaction).mockImplementation(
+        async (cb: (tx: DBTransaction) => Promise<unknown>) => {
+          const tx = {
+            select: vi.fn().mockReturnValue(createMockQueryBuilder([mockItem])),
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            insert: vi.fn().mockReturnThis(),
+            values: vi.fn().mockReturnThis(),
+            returning: vi.fn().mockResolvedValue([createdTask]),
+            update: vi.fn().mockReturnThis(),
+            set: vi.fn().mockReturnThis()
+          };
+          return cb(tx as unknown as DBTransaction);
+        }
+      );
 
-      // 2. insert task
-      // 3. delete item
-      // Order depends on implementation. Usually Insert then Delete or vv.
-      // If using `const [newItem] = await db.insert...returning()`
-      // And `await db.delete...`
-
-      // We can mock `returning` multiple times.
-      // First is typically returning the created task
-      // Second is returning the deleted item (if queried)
-
-      // Implementation usually:
-      // const [item] = await tx.select... (from check)
-      // const [newTask] = await tx.insert(tasks)...returning()
-      // await tx.delete(inbox)...
-
-      (db as any).returning
-        .mockResolvedValueOnce([createdTask]) // Insert Task
-        .mockResolvedValueOnce([{ id: 'i1' }]); // Delete Item (if returning is used) ?
-
-      // Ensure select mocked too
-
-      const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
+      const response = await app.handle(
         new Request('http://localhost/inbox/convert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -171,12 +172,52 @@ describe('Inbox Routes', () => {
 
       const data = await response.json();
       expect(response.status).toBe(200);
+      expect(data.data.id).toBe('t1');
+    });
 
-      if (data.data) {
-        expect(data.data.id).toBe('t1');
-      } else {
-        expect(data.id).toBe('t1');
-      }
+    it('should return error if item not found during conversion', async () => {
+      vi.mocked(db.transaction).mockImplementation(
+        async (cb: (tx: DBTransaction) => Promise<unknown>) => {
+          const tx = {
+            select: vi.fn().mockReturnValue(createMockQueryBuilder([])),
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis()
+          };
+          return cb(tx as unknown as DBTransaction);
+        }
+      );
+
+      const res = await app.handle(
+        new Request('http://localhost/inbox/convert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: 'bad', columnId: 'c1' })
+        })
+      );
+
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe('POST /inbox/delete', () => {
+    it('should handle multiple items deletion', async () => {
+      const mockItems = [
+        { id: 'i1', space: 'work' },
+        { id: 'i2', space: 'personal' }
+      ];
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockItems));
+      vi.mocked(db.delete).mockReturnValue(createMockQueryBuilder([]));
+
+      const res = await app.handle(
+        new Request('http://localhost/inbox/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemIds: ['i1', 'i2'] })
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.delete).toHaveBeenCalled();
     });
   });
 });

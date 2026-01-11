@@ -1,10 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import * as schema from '../../../../drizzle/schema';
+import { habits } from '../../../../drizzle/schema';
+
+type Habit = typeof habits.$inferSelect;
+interface CalendarHabit extends Habit {
+  link?: string | null;
+  completedToday: boolean;
+  currentStreak: number;
+  checkDate?: string;
+}
 
 // --- MOCKS ---
 
-const createMockQueryBuilder = (resolvedValue: any) => {
-  return {
+const createMockQueryBuilder = (resolvedValue: unknown) => {
+  const builder = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
@@ -14,10 +26,12 @@ const createMockQueryBuilder = (resolvedValue: any) => {
     returning: vi.fn().mockResolvedValue(resolvedValue), // For insert/update returning
     values: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
-
     // oxlint-disable-next-line unicorn/no-thenable
-    then: (resolve: any) => Promise.resolve(resolvedValue).then(resolve)
+    then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve)
   };
+  return builder as unknown as PgSelectBuilder<any, any> &
+    PgInsertBuilder<any, any, any> &
+    PgUpdateBuilder<any, any>;
 };
 
 vi.mock('../../db', () => ({
@@ -35,7 +49,7 @@ vi.mock('../../db', () => ({
 }));
 
 vi.mock('../../auth/withAuth', () => ({
-  withAuth: () => (app: any) =>
+  withAuth: () => (app: Elysia) =>
     app
       .decorate('user', { id: 'user-1', email: 'test@example.com' })
       .derive(() => ({ user: { id: 'user-1', email: 'test@example.com' } }))
@@ -45,17 +59,20 @@ import { habitsRoutes } from '../habits';
 import { db } from '../../db';
 
 describe('Habit Routes', () => {
-  let app: unknown;
+  let app: { handle: (request: Request) => Promise<Response> };
 
   beforeEach(() => {
     vi.resetAllMocks();
-
+    console.log('BeforeEach: Mocks reset');
     // Default mocks
-    (db as any).select.mockReturnValue(createMockQueryBuilder([]));
-    (db as any).insert.mockReturnValue(createMockQueryBuilder([]));
-    (db as any).update.mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
+    vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
 
-    app = new Elysia().decorate('db', db).use(habitsRoutes);
+    app = new Elysia()
+      .decorate('db', db as unknown as PostgresJsDatabase<typeof schema>)
+      .use(habitsRoutes);
+    console.log('BeforeEach: App initialized');
   });
 
   describe('GET /habits', () => {
@@ -63,9 +80,9 @@ describe('Habit Routes', () => {
       const mockHabits = [
         { id: 'h1', name: 'Exercise', active: true, userId: 'user-1', frequency: 'daily' }
       ];
-      (db.select as any).mockReturnValue(createMockQueryBuilder(mockHabits));
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockHabits));
 
-      const response = await (app as any).handle(new Request('http://localhost/habits'));
+      const response = await app.handle(new Request('http://localhost/habits'));
 
       const data = await response.json();
       expect(response.status).toBe(200);
@@ -74,9 +91,9 @@ describe('Habit Routes', () => {
     });
 
     it('should filter habits by date (active=true)', async () => {
-      (db.select as any).mockReturnValue(createMockQueryBuilder([]));
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 
-      await (app as any).handle(new Request('http://localhost/habits?date=2024-01-01'));
+      await app.handle(new Request('http://localhost/habits?date=2024-01-01'));
 
       expect(db.select).toHaveBeenCalled();
     });
@@ -95,12 +112,11 @@ describe('Habit Routes', () => {
       ];
 
       // Mock fetch habits
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder(mockHabits));
-      // Mock fetch logs (empty for now)
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockHabits));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
       // query date 2024-01-01 is a Monday
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits?view=week&date=2024-01-01')
       );
 
@@ -110,11 +126,11 @@ describe('Habit Routes', () => {
       expect(Array.isArray(data)).toBe(true);
 
       // Verify Monday (2024-01-01) has both habits
-      const mondayItems = data.filter((d: any) => d.checkDate === '2024-01-01');
+      const mondayItems = data.filter((d: CalendarHabit) => d.checkDate === '2024-01-01');
       expect(mondayItems).toHaveLength(2); // Daily + Monday Weekly
 
       // Verify Tuesday (2024-01-02) has only daily
-      const tuesdayItems = data.filter((d: any) => d.checkDate === '2024-01-02');
+      const tuesdayItems = data.filter((d: CalendarHabit) => d.checkDate === '2024-01-02');
       expect(tuesdayItems).toHaveLength(1); // Daily only
     });
 
@@ -124,21 +140,20 @@ describe('Habit Routes', () => {
         { id: 'h2', name: 'Weekly Monday', frequency: 'weekly', targetDays: [1], active: true }
       ];
 
-      // 1. Test Monday (Match)
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder(mockHabits)); // Habits
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([])); // Logs
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockHabits)); // Habits
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const resMonday = await (app as any).handle(
+      const resMonday = await app.handle(
         new Request('http://localhost/habits?view=day&date=2024-01-01') // Monday
       );
       const dataMonday = await resMonday.json();
       expect(dataMonday).toHaveLength(2);
 
       // 2. Test Tuesday (No Match for h2)
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder(mockHabits)); // Habits
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([])); // Logs
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder(mockHabits)); // Habits
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
-      const resTuesday = await (app as any).handle(
+      const resTuesday = await app.handle(
         new Request('http://localhost/habits?view=day&date=2024-01-02') // Tuesday
       );
       const dataTuesday = await resTuesday.json();
@@ -156,9 +171,9 @@ describe('Habit Routes', () => {
       };
       const newHabitOut = { ...newHabitIn, id: 'h2', userId: 'user-1' };
 
-      (db.insert as any).mockReturnValue(createMockQueryBuilder([newHabitOut]));
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([newHabitOut]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,15 +192,15 @@ describe('Habit Routes', () => {
       const updatePayload = { name: 'Read Book' };
 
       // Mock getting current habit
-      (db.select as any).mockReturnValueOnce(
+      vi.mocked(db.select).mockReturnValueOnce(
         createMockQueryBuilder([{ id: 'h1', userId: 'user-1', active: true }])
       );
       // Mock update return
-      (db.update as any).mockReturnValueOnce(
+      vi.mocked(db.update).mockReturnValueOnce(
         createMockQueryBuilder([{ id: 'h1', name: 'Read Book' }])
       );
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits/h1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -201,9 +216,9 @@ describe('Habit Routes', () => {
 
   describe('DELETE /habits/:id', () => {
     it('should soft delete habit (set active=false)', async () => {
-      (db.update as any).mockReturnValue(createMockQueryBuilder([]));
+      vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits/h1', { method: 'DELETE' })
       );
 
@@ -216,13 +231,13 @@ describe('Habit Routes', () => {
       const logData = { date: '2024-01-01', completed: true };
 
       // 1. Check existing log (empty)
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
       // 2. Insert new log
-      (db.insert as any).mockReturnValueOnce(
+      vi.mocked(db.insert).mockReturnValueOnce(
         createMockQueryBuilder([{ id: 'l1', completed: true }])
       );
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits/h1/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -239,15 +254,15 @@ describe('Habit Routes', () => {
       const logData = { date: '2024-01-01', completed: false };
 
       // 1. Check existing log (found)
-      (db.select as any).mockReturnValueOnce(
+      vi.mocked(db.select).mockReturnValueOnce(
         createMockQueryBuilder([{ id: 'l1', completed: true }])
       );
       // 2. Update log
-      (db.update as any).mockReturnValueOnce(
+      vi.mocked(db.update).mockReturnValueOnce(
         createMockQueryBuilder([{ id: 'l1', completed: false }])
       );
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request('http://localhost/habits/h1/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -272,11 +287,11 @@ describe('Habit Routes', () => {
       };
 
       // 1. Get Habit
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
       // 2. Get Completion Count
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([{ count: 5 }]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ count: 5 }]));
 
-      const response = await (app as any).handle(new Request('http://localhost/habits/h1/stats'));
+      const response = await app.handle(new Request('http://localhost/habits/h1/stats'));
 
       const data = await response.json();
       expect(response.status).toBe(200);
@@ -303,11 +318,10 @@ describe('Habit Routes', () => {
       createdAt: createdDate
     };
 
-    (db.select as any).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
-    (db.select as any).mockReturnValueOnce(createMockQueryBuilder([{ count: 2 }])); // 2 completions
+    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
+    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ count: 2 }])); // 2 completions
 
-    const response = await (app as any).handle(new Request('http://localhost/habits/h2/stats'));
-
+    const response = await app.handle(new Request('http://localhost/habits/h2/stats'));
     const data = await response.json();
     expect(response.status).toBe(200);
     // Just verify it runs the logic without error and returns a number
@@ -335,10 +349,10 @@ describe('Habit Routes', () => {
         completed: true
       };
 
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([mockHabit])); // Habits
-      (db.select as any).mockReturnValueOnce(createMockQueryBuilder([mockLog])); // Logs
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockLog])); // Logs
 
-      const response = await (app as any).handle(
+      const response = await app.handle(
         new Request(`http://localhost/habits?view=week&date=${mondayStr}`)
       );
 
@@ -346,12 +360,12 @@ describe('Habit Routes', () => {
       expect(response.status).toBe(200);
 
       // Monday Item (2024-01-01) -> completedToday should be TRUE
-      const mondayItem = data.find((d: any) => d.checkDate === '2024-01-01');
+      const mondayItem = data.find((d: CalendarHabit) => d.checkDate === '2024-01-01');
       expect(mondayItem).toBeDefined();
       expect(mondayItem.completedToday).toBe(true);
 
       // Tuesday Item (2024-01-02) -> completedToday should be FALSE
-      const tuesdayItem = data.find((d: any) => d.checkDate === '2024-01-02');
+      const tuesdayItem = data.find((d: CalendarHabit) => d.checkDate === '2024-01-02');
       expect(tuesdayItem).toBeDefined();
       expect(tuesdayItem.completedToday).toBe(false);
     });

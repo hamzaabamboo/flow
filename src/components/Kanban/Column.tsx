@@ -32,7 +32,6 @@ export function Column({ column, onDragStart, onDrop, boardId }: ColumnProps) {
     mutationFn: async (title: string) => {
       const { data, error } = await api.api.tasks.post({
         columnId: column.id,
-        userId: 'temp-user-id', // TODO: Get from auth
         title
       });
       if (error) throw new Error('Failed to create task');

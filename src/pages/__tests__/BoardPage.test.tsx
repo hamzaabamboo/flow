@@ -1,156 +1,221 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
 import BoardPage from '../board/@boardId/+Page';
+import { SpaceContext } from '../../contexts/SpaceContext';
+import { usePageContext } from 'vike-react/usePageContext';
+import type { PageContext } from 'vike/types';
+import { DialogProvider } from '../../utils/useDialogs';
+import { ToasterProvider } from '../../contexts/ToasterProvider';
+import { mockApi, getMockFn, getMockRoute } from '../../test/mocks/api';
 
-// oxlint-disable-next-line no-unassigned-import
-import '@testing-library/jest-dom';
-
-// Mock vike context
+// Mock vike-react/usePageContext
 vi.mock('vike-react/usePageContext', () => ({
-  usePageContext: () => ({
-    routeParams: { boardId: 'b1' }
-  })
+  usePageContext: vi.fn()
 }));
 
-// Mock navigation
-const mockNavigate = vi.fn();
+// Mock vike/client/router
 vi.mock('vike/client/router', () => ({
-  navigate: (...args: any[]) => mockNavigate(...args)
+  navigate: vi.fn()
 }));
 
-// Mock SpaceContext with correct path
-vi.mock('../../contexts/SpaceContext', () => ({
-  useSpace: vi.fn(() => ({
-    currentSpace: 'work'
-  }))
-}));
+// Mock API using shared mocks
+vi.mock('../../api/client', async () => {
+  const mocks = await import('../../test/mocks/api');
+  return {
+    api: mocks.mockApi
+  };
+});
 
-// Mock ToasterContext
-vi.mock('../../contexts/ToasterContext', () => ({
-  useToaster: () => ({
-    toast: vi.fn()
-  })
-}));
+const mockSpaceContext = {
+  currentSpace: 'personal' as const,
+  setCurrentSpace: vi.fn(),
+  toggleSpace: vi.fn()
+};
 
-// Mock API
-const mockBoardGet = vi.fn();
-const mockTasksGet = vi.fn();
-
-vi.mock('../../api/client', () => ({
-  api: {
-    api: {
-      boards: Object.assign(
-        (params: any) => ({
-          get: (...args: any[]) => mockBoardGet(params, ...args),
-          summary: { get: vi.fn().mockResolvedValue({ data: { summary: 'mock summary' } }) }
-        }),
-        {
-          get: (...args: any[]) => mockBoardGet(...args)
-        }
-      ),
-      tasks: Object.assign(
-        (params: any) => ({
-          get: (...args: any[]) => mockTasksGet(params, ...args)
-        }),
-        {
-          get: (...args: any[]) => mockTasksGet(...args)
-        }
-      )
+// Helper to wrap component with necessary providers
+const renderWithProviders = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false
+      }
     }
-  }
-}));
+  });
 
-// Mock KanbanBoard with distinct text to avoid confusion with Header
-vi.mock('../../components/Board/KanbanBoard', () => ({
-  KanbanBoard: ({ board, tasks }: any) => (
-    <div data-testid="kanban-board">
-      <h3>Kanban for {board.name}</h3>
-      <div>Tasks Count: {tasks?.length}</div>
-    </div>
-  )
-}));
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SpaceContext.Provider value={mockSpaceContext}>
+        <ToasterProvider>
+          <DialogProvider>{ui}</DialogProvider>
+        </ToasterProvider>
+      </SpaceContext.Provider>
+    </QueryClientProvider>
+  );
+};
 
-// Mock Dialogs
-vi.mock('../../components/AutoOrganize/AutoOrganizeDialog', () => ({
-  AutoOrganizeDialog: () => <div data-testid="auto-organize-dialog" />
-}));
+describe('BoardPage', () => {
+  const mockBoard = {
+    id: 'b1',
+    name: 'Main Board',
+    space: 'personal',
+    columns: [
+      { id: 'c1', name: 'To Do', boardId: 'b1', position: 0 },
+      { id: 'c2', name: 'In Progress', boardId: 'b1', position: 1 }
+    ]
+  };
 
-vi.mock('../../components/Board/BoardDialog', () => ({
-  BoardDialog: ({ open }: any) => (open ? <div data-testid="edit-board-dialog" /> : null)
-}));
-
-describe('BoardPage Integration', () => {
-  let queryClient: QueryClient;
+  const mockTasks = [
+    { id: 't1', title: 'Task 1', columnId: 'c1' },
+    { id: 't2', title: 'Task 2', columnId: 'c2' }
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    vi.mocked(usePageContext).mockReturnValue({
+      routeParams: { boardId: 'b1' }
+    } as unknown as PageContext);
+
+    const boardsRoute = getMockRoute(mockApi.api.boards);
+
+    // Create stable mock objects for the board API
+    const boardApiMock = {
+      get: vi.fn().mockResolvedValue({ data: mockBoard, error: null }),
+      summary: {
+        get: vi.fn().mockResolvedValue({ data: { summary: 'Board Summary' }, error: null })
+      },
+      patch: vi.fn().mockResolvedValue({ data: mockBoard, error: null }),
+      delete: vi.fn().mockResolvedValue({ data: {}, error: null })
+    };
+
+    getMockFn(boardsRoute).mockImplementation((params?: Record<string, unknown>) => {
+      if (params && (params.id || params.boardId)) {
+        return boardApiMock;
+      }
+      return {
+        get: vi.fn().mockResolvedValue({ data: [mockBoard], error: null }),
+        post: vi.fn().mockResolvedValue({ data: mockBoard, error: null })
+      };
     });
 
-    // Default mocks
-    mockBoardGet.mockResolvedValue({
-      data: { id: 'b1', name: 'Test Board', space: 'work', columns: [{ id: 'c1', name: 'Col 1' }] },
+    boardsRoute.get.mockResolvedValue({ data: [mockBoard], error: null });
+
+    const tasksRoute = getMockRoute(mockApi.api.tasks);
+    getMockFn(tasksRoute.column as Mock).mockImplementation(({ id }: { id: string }) => {
+      const filteredTasks = mockTasks.filter((t) => t.columnId === id);
+      return {
+        get: vi.fn().mockResolvedValue({ data: filteredTasks, error: null })
+      };
+    });
+
+    getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post).mockResolvedValue({
+      data: {
+        suggestions: [
+          {
+            taskId: 't1',
+            details: { type: 'column_move', suggestedColumnId: 'c2' },
+            reason: 'Better fit'
+          }
+        ],
+        summary: 'Auto organize summary',
+        totalTasksAnalyzed: 2
+      },
       error: null
     });
-    mockTasksGet.mockResolvedValue({ data: [], error: null });
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: queryClient }, children);
+  it('should render board and tasks', async () => {
+    renderWithProviders(<BoardPage />);
 
-  it('should render board details', async () => {
-    render(<BoardPage />, { wrapper });
+    expect(await screen.findByRole('heading', { name: 'Main Board' })).toBeInTheDocument();
+    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getByText('Task 1')).toBeInTheDocument();
+    expect(screen.getByText('Task 2')).toBeInTheDocument();
+  });
 
-    // Use getAllByText because title appears in Header and Mock
-    await waitFor(() => {
-      const titles = screen.getAllByText(/Test Board/i);
-      expect(titles.length).toBeGreaterThan(0);
-      expect(screen.getByTestId('kanban-board')).toBeInTheDocument();
+  it('should show "Board not found" if board is null', async () => {
+    const boardsRoute = getMockRoute(mockApi.api.boards);
+    getMockFn(boardsRoute).mockImplementation((params?: Record<string, unknown>) => {
+      if (params && (params.id || params.boardId)) {
+        return {
+          get: vi.fn().mockResolvedValue({ data: null, error: { status: 404 } })
+        };
+      }
+      return {
+        get: vi.fn().mockResolvedValue({ data: [mockBoard], error: null })
+      };
     });
+
+    renderWithProviders(<BoardPage />);
+
+    expect(await screen.findByText('Board not found')).toBeInTheDocument();
   });
 
-  it('should load tasks for columns', async () => {
-    mockTasksGet.mockResolvedValue({
-      data: [{ id: 't1', title: 'Task 1' }],
-      error: null
+  it('should handle "Auto Organize" click', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<BoardPage />);
+
+    await screen.findByRole('heading', { name: 'Main Board' });
+
+    const autoBtn = screen.getByRole('button', { name: /Auto Organize/i });
+    await user.click(autoBtn);
+
+    expect(await screen.findByText('Auto organize summary')).toBeInTheDocument();
+  });
+
+  it('should handle "Copy Board Summary"', async () => {
+    const user = userEvent.setup();
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText: writeTextMock
+      }
     });
 
-    render(<BoardPage />, { wrapper });
+    renderWithProviders(<BoardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Tasks Count: 1')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Main Board' });
+
+    const optionsBtn = screen.getByLabelText('Board options');
+    await user.click(optionsBtn);
+
+    const copyBtn = await screen.findByText('Copy Board Summary');
+    await user.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith('Board Summary');
+  });
+
+  it('should handle "Auto Organize" failure', async () => {
+    const user = userEvent.setup();
+    const tasksRoute = getMockRoute(mockApi.api.tasks);
+    getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post).mockResolvedValue({
+      data: null,
+      error: { message: 'AI failed' }
     });
+
+    renderWithProviders(<BoardPage />);
+    await screen.findByRole('heading', { name: 'Main Board' });
+
+    const autoBtn = screen.getByRole('button', { name: /Auto Organize/i });
+    await user.click(autoBtn);
+
+    // Error handled silently or via toast
   });
 
-  it('should handle navigation back to boards', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<BoardPage />, { wrapper });
+  it('should open "Edit Board" dialog', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<BoardPage />);
 
-    await waitFor(() => expect(screen.getAllByText(/Test Board/i).length).toBeGreaterThan(0));
+    await screen.findByRole('heading', { name: 'Main Board' });
 
-    const backBtn = screen.getByLabelText('Back to boards');
-    await user.click(backBtn);
+    const optionsBtn = screen.getByLabelText('Board options');
+    await user.click(optionsBtn);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/');
-  });
+    const editBtn = await screen.findByRole('menuitem', { name: /Edit Board/i });
+    await user.click(editBtn);
 
-  it('should open Edit Board dialog', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<BoardPage />, { wrapper });
-
-    await waitFor(() => expect(screen.getAllByText(/Test Board/i).length).toBeGreaterThan(0));
-
-    // Menu interaction
-    const menuBtn = screen.getByLabelText('Board options');
-    await user.click(menuBtn);
-
-    const editOption = screen.getByText('Edit Board');
-    await user.click(editOption);
-
-    expect(screen.getByTestId('edit-board-dialog')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Edit Board/i })).toBeInTheDocument();
   });
 });

@@ -98,7 +98,6 @@ export default function AgendaPage() {
       }
 
       // Convert to UNIX timestamps (seconds)
-      // Use Math.floor for start, but Math.ceil for end to include tasks at end of day
       const startUnix = Math.floor(start.getTime() / 1000);
       const endUnix = Math.ceil(end.getTime() / 1000);
 
@@ -112,7 +111,7 @@ export default function AgendaPage() {
         }
       });
       if (error) throw new Error('Failed to fetch events');
-      return data;
+      return data as CalendarEvent[];
     }
   });
 
@@ -132,7 +131,7 @@ export default function AgendaPage() {
         query: { date: dateStr, space: currentSpace, view: viewMode }
       });
       if (error) throw new Error('Failed to fetch habits');
-      return data;
+      return data as unknown as Habit[];
     }
   });
 
@@ -142,7 +141,9 @@ export default function AgendaPage() {
       const body: { completed: boolean; instanceDate?: string } = { completed };
       if (instanceDate) {
         body.instanceDate =
-          instanceDate instanceof Date ? instanceDate.toISOString().split('T')[0] : instanceDate;
+          instanceDate instanceof Date
+            ? instanceDate.toISOString().split('T')[0]
+            : (instanceDate as string);
       }
       const { data, error } = await api.api.tasks({ id }).patch(body);
       if (error) throw new Error('Failed to update task');
@@ -165,7 +166,7 @@ export default function AgendaPage() {
     }) => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const { data, error } = await api.api
-        .habits({ habitId })
+        .habits({ id: habitId })
         .log.post({ date: dateStr, completed });
       if (error) throw new Error('Failed to toggle habit');
       return data;
@@ -178,7 +179,12 @@ export default function AgendaPage() {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      const { data, error } = await api.api.tasks.post({ ...taskData, space: currentSpace });
+      // Remove fields that the API doesn't expect
+      const { id: _, columnName: __, subtasks: ___, column: ____, ...payload } = taskData;
+      const { data, error } = await api.api.tasks.post({
+        title: taskData.title || 'Untitled',
+        ...payload
+      } as unknown as { title: string }); // Eden Treaty expects at least title
       if (error) throw new Error('Failed to create task');
       return data;
     },
@@ -192,7 +198,9 @@ export default function AgendaPage() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      const { data, error } = await api.api.tasks({ id: taskData.id! }).patch(taskData);
+      const { data, error } = await api.api
+        .tasks({ id: taskData.id! })
+        .patch(taskData as unknown as Partial<Task>);
       if (error) throw new Error('Failed to update task');
       return data;
     },
@@ -216,11 +224,11 @@ export default function AgendaPage() {
           return Promise.resolve();
         }
 
-        // targetDate is a Date object with JST time components
-        // We need to convert it properly to UTC for storage
         const newUtcDate = jstToUtc(targetDate);
 
-        return api.api.tasks({ id: taskId }).patch({ dueDate: newUtcDate.toISOString() });
+        return api.api
+          .tasks({ id: taskId })
+          .patch({ dueDate: newUtcDate.toISOString() } as unknown as { dueDate: string });
       });
 
       await Promise.all(promises);
@@ -248,14 +256,11 @@ export default function AgendaPage() {
   };
 
   const handleCreateCopy = (event: CalendarEvent) => {
-    // For external events, create a partial task with the event's data
-    // This will open the TaskDialog with pre-filled fields, allowing user to review/edit
     const partialTask: Partial<ExtendedTask> = {
       title: event.title,
       description: event.description,
       dueDate: event.dueDate ? new Date(event.dueDate).toISOString() : undefined,
       priority: event.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined
-      // No board/column info - will default to inbox
     };
     setEditingTask(partialTask as ExtendedTask);
     setIsTaskDialogOpen(true);
@@ -270,22 +275,19 @@ export default function AgendaPage() {
     const taskData: Partial<Task> & { id?: string } = editingTask
       ? {
           id: editingTask.id,
-          title: data.title,
-          description: data.description
+          title: data.title as string,
+          description: data.description as string
         }
       : {
-          title: data.title,
-          description: data.description
+          title: data.title as string,
+          description: data.description as string
         };
 
     if (data.dueDate) {
-      // Convert datetime-local to UTC ISO string
-      const dateStr = data.dueDate;
-      // If already UTC ISO string (from TaskDialog), keep it
+      const dateStr = data.dueDate as string;
       if (dateStr.includes('Z')) {
         taskData.dueDate = dateStr;
       } else {
-        // datetime-local format: YYYY-MM-DDTHH:mm - convert to UTC
         const localDate = new Date(dateStr);
         taskData.dueDate = localDate.toISOString();
       }
@@ -297,7 +299,7 @@ export default function AgendaPage() {
 
     if (data.labels) {
       try {
-        taskData.labels = JSON.parse(data.labels);
+        taskData.labels = JSON.parse(data.labels as string);
       } catch (e) {
         console.error('Failed to parse labels:', e);
       }
@@ -305,18 +307,18 @@ export default function AgendaPage() {
 
     if (data.subtasks) {
       try {
-        taskData.subtasks = JSON.parse(data.subtasks);
+        taskData.subtasks = JSON.parse(data.subtasks as string);
       } catch (e) {
         console.error('Failed to parse subtasks:', e);
       }
     }
 
     if (data.recurringPattern) {
-      taskData.recurringPattern = data.recurringPattern;
+      taskData.recurringPattern = data.recurringPattern as string;
     }
 
     if (data.recurringEndDate) {
-      taskData.recurringEndDate = data.recurringEndDate;
+      taskData.recurringEndDate = data.recurringEndDate as string;
     }
 
     if (data.createReminder) {
@@ -324,7 +326,7 @@ export default function AgendaPage() {
     }
 
     if (data.link) {
-      taskData.link = data.link;
+      taskData.link = data.link as string;
     }
 
     if (editingTask) {
@@ -383,7 +385,6 @@ export default function AgendaPage() {
         { type: 'success' }
       );
 
-      // Refetch events to show updated tasks
       refetchEvents();
     } catch (error) {
       console.error('Apply auto organize error:', error);
@@ -397,25 +398,18 @@ export default function AgendaPage() {
       return [];
     }
 
-    // Now we rely on the backend to provide correct Overdue instances (including recurring)
     const now = new Date();
-    // Use start of today to be strict about what is "overdue" (before today)
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
 
     const overdue: CalendarEvent[] = [];
 
     events.forEach((event) => {
-      // Logic for backend-provided events:
-      // If it has a dueDate < startOfToday -> it's overdue
       if (!event.dueDate || isTaskCompleted(event)) return;
 
       const eventDate = new Date(event.dueDate);
 
-      // Note: Backend 'includeOverdue' returns tasks strictly < startDate (today 00:00)
-      // So we can generally trust that if it's in the list and < startOfToday, it's overdue.
-      // We also check it's not 'upcoming'
-      if (eventDate < startOfToday && !(event as any).isUpcoming) {
+      if (eventDate < startOfToday && !event.isUpcoming) {
         overdue.push(event);
       }
     });
@@ -476,11 +470,8 @@ export default function AgendaPage() {
 
     // Group events
     events?.forEach((event) => {
-      // Always use dueDate converted to local timezone for grouping (ignore instanceDate)
-      // instanceDate is in UTC format and causes timezone issues
       if (!event.dueDate) return;
 
-      // Parse the UTC date and extract local date for grouping
       const eventDate = new Date(event.dueDate);
       const year = eventDate.getFullYear();
       const month = String(eventDate.getMonth() + 1).padStart(2, '0');
@@ -796,7 +787,7 @@ export default function AgendaPage() {
               setTimeout(() => setEditingTask(null), 200);
             }
           }}
-          mode={editingTask ? 'edit' : 'create'}
+          mode={editingTask && editingTask.id ? 'edit' : 'create'}
           task={editingTask ? (editingTask as Task) : undefined}
           onSubmit={handleDialogSubmit}
         />

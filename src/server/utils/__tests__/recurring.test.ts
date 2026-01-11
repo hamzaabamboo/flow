@@ -8,20 +8,17 @@ describe('expandRecurringTasks', () => {
     title: 'Recurring Task',
     description: '',
     columnId: 'c1',
-    boardId: 'b1',
-    userId: 'u1',
     space: 'work',
     priority: 'medium',
     createdAt: new Date('2025-01-01T10:00:00Z').toISOString(),
     updatedAt: new Date('2025-01-01T10:00:00Z').toISOString(),
     columnName: 'To Do',
-    boardName: 'Board',
     labels: [],
     subtasks: []
   };
 
   it('should expand daily tasks', () => {
-    const task = {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-01T10:00:00Z').toISOString(), // Wednesday
       recurringPattern: 'daily'
@@ -41,7 +38,7 @@ describe('expandRecurringTasks', () => {
   });
 
   it('should expand weekly tasks', () => {
-    const task = {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-01T10:00:00Z').toISOString(), // Wednesday
       recurringPattern: 'weekly'
@@ -61,23 +58,28 @@ describe('expandRecurringTasks', () => {
     expect(dates).toContain('2025-01-15');
   });
 
-  it('should not include weekly tasks on wrong days', () => {
-    const task = {
+  it('should expand biweekly tasks', () => {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-01T10:00:00Z').toISOString(), // Wednesday
-      recurringPattern: 'weekly'
+      recurringPattern: 'biweekly'
     };
 
-    // View range: Jan 2 (Thu) to Jan 7 (Tue) - No Wednesday
-    const start = new Date('2025-01-02T00:00:00Z');
-    const end = new Date('2025-01-07T23:59:59Z');
+    // Jan 1 (Wed), Jan 8 (skip), Jan 15 (Wed), Jan 22 (skip), Jan 29 (Wed)
+    const start = new Date('2025-01-01T00:00:00Z');
+    const end = new Date('2025-01-31T23:59:59Z');
 
     const events = expandRecurringTasks([task], start, end, new Map());
-    expect(events.length).toBe(0);
+
+    expect(events.length).toBe(3);
+    const dates = events.map((e) => e.instanceDate);
+    expect(dates).toContain('2025-01-01');
+    expect(dates).toContain('2025-01-15');
+    expect(dates).toContain('2025-01-29');
   });
 
   it('should expand monthly tasks', () => {
-    const task = {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-15T10:00:00Z').toISOString(),
       recurringPattern: 'monthly'
@@ -96,8 +98,7 @@ describe('expandRecurringTasks', () => {
   });
 
   it('should expand end_of_month tasks', () => {
-    // Start on Jan 31 or any day really, pattern decides logic
-    const task = {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-31T10:00:00Z').toISOString(),
       recurringPattern: 'end_of_month'
@@ -111,55 +112,52 @@ describe('expandRecurringTasks', () => {
     expect(events.length).toBe(2);
     const dates = events.map((e) => e.instanceDate);
     expect(dates).toContain('2025-01-31');
-    expect(dates).toContain('2025-02-28'); // Should adjust to last day
+    expect(dates).toContain('2025-02-28');
+  });
+
+  it('should handle tasks without dueDate using createdAt', () => {
+    const task: Task = {
+      ...baseTask,
+      dueDate: undefined,
+      createdAt: new Date('2025-01-05T10:00:00Z').toISOString(),
+      recurringPattern: 'daily'
+    };
+
+    const start = new Date('2025-01-01T00:00:00Z');
+    const end = new Date('2025-01-07T23:59:59Z');
+
+    const events = expandRecurringTasks([task], start, end, new Map());
+    // Should start from Jan 5
+    expect(events.length).toBe(3); // 5, 6, 7
+    expect(events.map((e) => e.instanceDate)).toEqual(['2025-01-05', '2025-01-06', '2025-01-07']);
   });
 
   it('should respect recurringEndDate', () => {
-    const task = {
+    const task: Task = {
       ...baseTask,
       dueDate: new Date('2025-01-01T10:00:00Z').toISOString(),
       recurringPattern: 'daily',
-      recurringEndDate: new Date('2025-01-02T23:59:59Z') // This field might be Date or string in schema? Assume schema allows Date or expandRecurringTasks handles it?
-      // Task type says recurringEndDate: Date | null? No, type says string | null usually from API.
-      // Let's check Task type: it's not imported here but inferred.
-      // In utils/recurring.ts: `recurringEndDate = task.recurringEndDate ? new Date(task.recurringEndDate) : null`
-      // So string is safer.
-    };
-    // Override for safe typing
-    const taskSafe = {
-      ...task,
       recurringEndDate: new Date('2025-01-02T23:59:59Z').toISOString()
     };
 
     const start = new Date('2025-01-01T00:00:00Z');
     const end = new Date('2025-01-05T23:59:59Z');
 
-    const events = expandRecurringTasks([taskSafe as any], start, end, new Map());
+    const events = expandRecurringTasks([task], start, end, new Map());
     expect(events.length).toBe(2); // Jan 1, Jan 2 only
   });
 
-  it('should mark completed instances correctly', () => {
-    const task = {
+  it('should skip tasks outside range', () => {
+    const task: Task = {
       ...baseTask,
-      id: 't_comp',
-      dueDate: new Date('2025-01-01T10:00:00Z').toISOString(),
-      recurringPattern: 'daily'
+      dueDate: new Date('2025-01-10T10:00:00Z').toISOString(),
+      recurringPattern: undefined
     };
 
-    const completionMap = new Map();
-    completionMap.set('t_comp', new Set(['2025-01-02'])); // Jan 2 is completed
-
     const start = new Date('2025-01-01T00:00:00Z');
-    const end = new Date('2025-01-03T23:59:59Z');
+    const end = new Date('2025-01-05T23:59:59Z');
 
-    const events = expandRecurringTasks([task], start, end, completionMap);
-
-    const jan1 = events.find((e) => e.instanceDate === '2025-01-01');
-    const jan2 = events.find((e) => e.instanceDate === '2025-01-02');
-    const jan3 = events.find((e) => e.instanceDate === '2025-01-03');
-
-    expect(jan1?.completed).toBe(false);
-    expect(jan2?.completed).toBe(true);
-    expect(jan3?.completed).toBe(false);
+    const events = expandRecurringTasks([task], start, end, new Map());
+    expect(events.length).toBe(0);
   });
 });

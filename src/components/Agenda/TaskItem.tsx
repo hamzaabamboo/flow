@@ -96,6 +96,7 @@ export function TaskItem({
                 checked={completed}
                 onCheckedChange={onToggleComplete}
                 onClick={(e) => e.stopPropagation()}
+                aria-label={`Complete task: ${event.title}`}
               />
             ) : null}
             <VStack flex="1" gap="1" alignItems="start">

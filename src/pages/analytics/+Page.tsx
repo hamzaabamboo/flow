@@ -8,9 +8,15 @@ import { Button } from '../../components/ui/button';
 import { Spinner } from '../../components/ui/spinner';
 import { useSpace } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
-import type { CalendarEvent } from '../../shared/types/calendar';
 
 type DateRange = 'today' | 'week' | 'month' | '7days' | '30days';
+
+interface CompletionStatTask {
+  id: string;
+  title: string;
+  priority?: string | null;
+  dueDate?: string | null;
+}
 
 export default function AnalyticsPage() {
   const { currentSpace } = useSpace();
@@ -60,7 +66,11 @@ export default function AnalyticsPage() {
   }, [dateRange]);
 
   // Fetch completion stats
-  const { data: completions = [], isLoading } = useQuery<CalendarEvent[]>({
+  const {
+    data: analyticsData,
+    isLoading,
+    isError
+  } = useQuery({
     queryKey: ['analytics', 'completions', startDate, endDate, currentSpace],
     queryFn: async () => {
       const startStr = format(startDate, 'yyyy-MM-dd');
@@ -69,9 +79,16 @@ export default function AnalyticsPage() {
         query: { startDate: startStr, endDate: endStr, space: currentSpace }
       });
       if (error) throw new Error('Failed to fetch completions');
-      return data;
+      return data as {
+        completions: { date: string; count: number; tasks: CompletionStatTask[] }[];
+      };
     }
   });
+
+  const completions = useMemo(() => {
+    if (!analyticsData || !analyticsData.completions) return [];
+    return analyticsData.completions.flatMap((c) => c.tasks) || [];
+  }, [analyticsData]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -92,15 +109,12 @@ export default function AnalyticsPage() {
 
     // Group by date for chart
     const byDate: Record<string, number> = {};
-    completions.forEach((task) => {
-      if (task.dueDate) {
-        const dateKey = format(new Date(task.dueDate), 'yyyy-MM-dd');
-        byDate[dateKey] = (byDate[dateKey] || 0) + 1;
-      }
+    analyticsData?.completions.forEach((c) => {
+      byDate[c.date] = c.count;
     });
 
     return { total, avgPerDay, byPriority, byDate, daysInRange };
-  }, [completions, startDate, endDate]);
+  }, [completions, analyticsData, endDate, startDate]);
 
   return (
     <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
@@ -143,6 +157,12 @@ export default function AnalyticsPage() {
           <VStack gap="3" justifyContent="center" alignItems="center" minH="40vh" p="8">
             <Spinner size="lg" />
             <Text color="fg.muted">Loading analytics...</Text>
+          </VStack>
+        ) : isError ? (
+          <VStack gap="3" justifyContent="center" alignItems="center" minH="40vh" p="8">
+            <Text color="fg.destructive">
+              Failed to load analytics data. Please try again later.
+            </Text>
           </VStack>
         ) : (
           <>
@@ -195,31 +215,32 @@ export default function AnalyticsPage() {
               <VStack gap="3" alignItems="stretch">
                 <Heading size="md">Completions by Priority</Heading>
                 <Grid gap="3" columns={{ base: 2, sm: 4 }}>
-                  {Object.entries(stats.byPriority).map(([priority, count]) => (
-                    <Box
-                      key={priority}
-                      borderRadius="md"
-                      p="3"
-                      bg={
-                        priority === 'urgent'
-                          ? 'red.subtle'
-                          : priority === 'high'
-                            ? 'orange.subtle'
-                            : priority === 'medium'
-                              ? 'yellow.subtle'
-                              : 'gray.subtle'
-                      }
-                    >
-                      <VStack gap="1">
-                        <Text fontSize="2xl" fontWeight="bold">
-                          {count}
-                        </Text>
-                        <Text fontSize="sm" textTransform="capitalize">
-                          {priority}
-                        </Text>
-                      </VStack>
-                    </Box>
-                  ))}
+                  {Object.entries(stats.byPriority).map(([priority, count]) => {
+                    const bgMap: Record<string, string> = {
+                      urgent: 'red.subtle',
+                      high: 'orange.subtle',
+                      medium: 'yellow.subtle',
+                      low: 'gray.subtle'
+                    };
+                    const bgColor = bgMap[priority] || 'gray.subtle';
+                    return (
+                      <Box
+                        key={priority}
+                        borderRadius="md"
+                        p="3"
+                        style={{ backgroundColor: `var(--colors-${bgColor.replace('.', '-')})` }}
+                      >
+                        <VStack gap="1">
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {count}
+                          </Text>
+                          <Text fontSize="sm" textTransform="capitalize">
+                            {priority}
+                          </Text>
+                        </VStack>
+                      </Box>
+                    );
+                  })}
                 </Grid>
               </VStack>
             </Box>

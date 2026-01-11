@@ -7,6 +7,7 @@ import { QuickAddDialog } from '../QuickAdd/QuickAddDialog';
 // oxlint-disable-next-line no-unassigned-import
 import '@testing-library/jest-dom';
 import { useToaster } from '../../contexts/ToasterContext';
+import { asMock } from '../../test/mocks/api';
 
 // Mocks
 vi.mock('../../contexts/SpaceContext', () => ({
@@ -21,7 +22,15 @@ vi.mock('../../contexts/ToasterContext', () => ({
 
 // Enhanced Mock TaskDialog to allow triggering submit
 vi.mock('../Board/TaskDialog', () => ({
-  TaskDialog: ({ open, onSubmit, task }: any) =>
+  TaskDialog: ({
+    open,
+    onSubmit,
+    task
+  }: {
+    open: boolean;
+    onSubmit: React.FormEventHandler;
+    task: { title: string };
+  }) =>
     open ? (
       <div data-testid="task-dialog" data-title={task.title}>
         <form onSubmit={onSubmit}>
@@ -44,10 +53,10 @@ vi.mock('../../api/client', () => ({
   api: {
     api: {
       command: {
-        post: (...args: any[]) => mockPost(...args)
+        post: (...args: unknown[]) => mockPost(...args)
       },
       tasks: {
-        post: (...args: any[]) => mockTaskPost(...args)
+        post: (...args: unknown[]) => mockTaskPost(...args)
       }
     }
   }
@@ -65,7 +74,7 @@ describe('QuickAddDialog', () => {
     queryClient = new QueryClient();
 
     // Inject mock toast
-    (useToaster as any).mockReturnValue({
+    asMock(useToaster).mockReturnValue({
       toast: mockToast
     });
   });

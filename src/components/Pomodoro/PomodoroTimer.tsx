@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Minimize2, Maximize2, Timer } from 'lucide-react';
-import type { PomodoroSession } from '../../shared/types';
+import type { PomodoroSession, ActivePomodoroState } from '../../shared/types';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -22,17 +22,6 @@ const formatTime = (seconds: number) => {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-interface ActivePomodoroState {
-  type: 'work' | 'short-break' | 'long-break';
-  duration: number;
-  timeLeft: number;
-  isRunning: boolean;
-  startTime?: string | null; // ISO string timestamp when timer started
-  completedSessions: number;
-  taskId?: string;
-  taskTitle?: string;
-}
-
 // Singleton AudioContext to prevent memory leaks
 let audioContext: AudioContext | null = null;
 
@@ -41,7 +30,9 @@ function getAudioContext(): AudioContext | null {
 
   try {
     if (!audioContext) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) {
         console.warn('AudioContext not supported');
         return null;
@@ -130,7 +121,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
     queryFn: async () => {
       const { data, error } = await api.api.pomodoro.active.get();
       if (error) return null;
-      return data;
+      return data as ActivePomodoroState | null;
     },
     // Disable polling - rely on local timer and WebSocket for updates
     refetchInterval: false,
@@ -159,7 +150,11 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   // Update server state
   const updateStateMutation = useMutation({
     mutationFn: async (state: ActivePomodoroState) => {
-      const { data, error } = await api.api.pomodoro.active.post(state);
+      const { data, error } = await api.api.pomodoro.active.post({
+        ...state,
+        taskId: state.taskId ?? undefined,
+        taskTitle: state.taskTitle ?? undefined
+      });
       if (error) throw new Error('Failed to update state');
       return data;
     },
@@ -172,7 +167,7 @@ export function PomodoroTimer({ taskId, taskTitle }: { taskId?: string; taskTitl
   const saveSessionMutation = useMutation({
     mutationFn: async (session: PomodoroSession) => {
       const { data, error } = await api.api.pomodoro.post({
-        taskId: session.taskId,
+        taskId: session.taskId ?? undefined,
         duration: Math.floor(session.duration / 60),
         startTime: new Date().toISOString()
       });

@@ -55,12 +55,13 @@ export function BoardDialog({ open, onOpenChange, onSuccess, board }: BoardDialo
       if (error) throw new Error('Failed to create board');
       return data;
     },
-    onSuccess: (newBoard) => {
+    onSuccess: (response) => {
+      const resp = response as unknown as { id: string };
       queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
       toast?.('Board created successfully', { type: 'success' });
       onOpenChange(false);
-      if (onSuccess) {
-        onSuccess(newBoard.id);
+      if (onSuccess && resp.id) {
+        onSuccess(resp.id);
       }
     },
     onError: () => {
@@ -78,13 +79,16 @@ export function BoardDialog({ open, onOpenChange, onSuccess, board }: BoardDialo
       if (error) throw new Error('Failed to update board');
       return data;
     },
-    onSuccess: (updatedBoard) => {
+    onSuccess: (response) => {
+      const resp = response as unknown as { data: { id: string } };
       queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
-      queryClient.invalidateQueries({ queryKey: ['board', updatedBoard.id] });
+      if (resp.data) {
+        queryClient.invalidateQueries({ queryKey: ['board', resp.data.id] });
+      }
       toast?.('Board updated successfully', { type: 'success' });
       onOpenChange(false);
-      if (onSuccess) {
-        onSuccess(updatedBoard.id);
+      if (onSuccess && resp.data) {
+        onSuccess(resp.data.id);
       }
     },
     onError: () => {
@@ -191,7 +195,6 @@ export function BoardDialog({ open, onOpenChange, onSuccess, board }: BoardDialo
               {isEditMode ? (
                 <Button
                   variant="outline"
-                  visual="error"
                   onClick={handleDelete}
                   loading={deleteBoard.isPending}
                   disabled={isPending}

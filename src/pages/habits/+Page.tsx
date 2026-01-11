@@ -36,6 +36,12 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Sat' }
 ];
 
+interface HabitStats {
+  habitId: string;
+  totalCompletions: number;
+  completionRate: number;
+}
+
 export default function HabitsPage() {
   const { currentSpace } = useSpace();
   const queryClient = useQueryClient();
@@ -57,7 +63,18 @@ export default function HabitsPage() {
     queryFn: async () => {
       const { data, error } = await api.api.habits.get({ query: { space: currentSpace } });
       if (error) throw new Error('Failed to fetch habits');
-      return data as Habit[];
+      if (!data) return [];
+
+      return (data as unknown[]).map((item) => {
+        const h = item as Record<string, unknown>;
+        return {
+          ...h,
+          createdAt:
+            h.createdAt instanceof Date ? h.createdAt.toISOString() : (h.createdAt as string),
+          updatedAt:
+            h.updatedAt instanceof Date ? h.updatedAt.toISOString() : (h.updatedAt as string)
+        } as unknown as Habit;
+      });
     }
   });
 
@@ -68,9 +85,9 @@ export default function HabitsPage() {
       if (!habits || habits.length === 0) return [];
 
       const statsPromises = habits.map(async (habit) => {
-        const { data, error } = await api.api.habits({ habitId: habit.id }).stats.get();
+        const { data, error } = await api.api.habits({ id: habit.id }).stats.get();
         if (error) return { habitId: habit.id, totalCompletions: 0, completionRate: 0 };
-        return data;
+        return data as HabitStats;
       });
 
       return Promise.all(statsPromises);
@@ -81,7 +98,16 @@ export default function HabitsPage() {
   // Create habit
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { data: result, error } = await api.api.habits.post({ ...data, space: currentSpace });
+      const { data: result, error } = await api.api.habits.post({
+        name: data.name,
+        description: data.description,
+        frequency: data.frequency,
+        targetDays: data.targetDays,
+        reminderTime: data.reminderTime,
+        color: data.color,
+        link: data.link,
+        space: currentSpace
+      });
       if (error) throw new Error('Failed to create habit');
       return result;
     },
@@ -95,7 +121,7 @@ export default function HabitsPage() {
   // Update habit
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      const { data: result, error } = await api.api.habits({ habitId: id }).patch(data);
+      const { data: result, error } = await api.api.habits({ id }).patch(data);
       if (error) throw new Error('Failed to update habit');
       return result;
     },
@@ -109,7 +135,7 @@ export default function HabitsPage() {
   // Delete habit
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api.habits({ habitId: id }).delete();
+      const { data, error } = await api.api.habits({ id }).delete();
       if (error) throw new Error('Failed to delete habit');
       return data;
     },
@@ -121,7 +147,10 @@ export default function HabitsPage() {
   // Toggle habit completion (used in Agenda view, not here)
   const _toggleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await api.api.habits({ habitId: id }).log.post({});
+      const { data, error } = await api.api.habits({ id }).log.post({
+        date: new Date().toISOString().split('T')[0],
+        completed: true
+      });
       if (error) throw new Error('Failed to log habit');
       return data;
     },
@@ -133,7 +162,7 @@ export default function HabitsPage() {
   // Toggle habit active status
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { data, error } = await api.api.habits({ habitId: id }).patch({ active });
+      const { data, error } = await api.api.habits({ id }).patch({ active });
       if (error) throw new Error('Failed to toggle habit');
       return data;
     },
@@ -167,7 +196,7 @@ export default function HabitsPage() {
     setFormData({
       name: habit.name,
       description: habit.description || '',
-      frequency: habit.frequency === 'custom' ? 'weekly' : habit.frequency,
+      frequency: habit.frequency === 'custom' ? 'weekly' : (habit.frequency as 'daily' | 'weekly'),
       targetDays: habit.targetDays || [],
       reminderTime: habit.reminderTime || '',
       color: habit.color || '#3b82f6',
@@ -280,7 +309,7 @@ export default function HabitsPage() {
             }}
           >
             {filteredHabits.map((habit) => {
-              const habitStats = habitsStats?.find((s) => s.habitId === habit.id);
+              const habitStats = habitsStats?.find((s: HabitStats) => s.habitId === habit.id);
               return (
                 <Card.Root
                   key={habit.id}

@@ -8,6 +8,7 @@ import { Box, VStack, HStack } from 'styled-system/jsx';
 import { createListCollection, Select } from './ui/select';
 import * as Dialog from './ui/styled/dialog';
 import type { Column, CalendarEvent, ExtendedTask, Task } from '@hamflow/shared';
+import { api } from '../api/client';
 
 interface MoveTaskDialogProps {
   open: boolean;
@@ -32,11 +33,9 @@ export function MoveTaskDialog({
   const { data: boards = [] } = useQuery<Array<{ id: string; name: string; columns: Column[] }>>({
     queryKey: ['boards', currentSpace],
     queryFn: async () => {
-      const response = await fetch(`/api/boards?space=${currentSpace}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      return response.json();
+      const { data, error } = await api.api.boards.get({ query: { space: currentSpace } });
+      if (error) throw new Error('Failed to fetch boards');
+      return data as unknown as Array<{ id: string; name: string; columns: Column[] }>;
     }
   });
 
