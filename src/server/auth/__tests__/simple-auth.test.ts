@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
 import { simpleAuth } from '../simple-auth';
 import { db } from '../../db';
+import { asMock } from '../../../test/mocks/api';
 
 const JWT_CONFIG = {
   name: 'jwt',
@@ -38,7 +39,7 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     _brand: 'PgSelect',
     [Symbol.toStringTag]: 'PgSelect'
   } as unknown as MockQueryBuilder;
-  return builder;
+  return asMock<MockQueryBuilder>(builder);
 };
 
 vi.mock('../../db', () => ({
@@ -59,7 +60,7 @@ describe('Simple Auth', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([]));
     app = new Elysia().decorate('db', db).use(simpleAuth);
   });
 
@@ -86,7 +87,7 @@ describe('Simple Auth', () => {
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
-    (db.select as Mock).mockReturnValue(
+    asMock(db.select).mockReturnValue(
       createMockQueryBuilder([{ id: 'u1', email: 't@t.com', name: 'T' }])
     );
     const req = new Request('http://localhost/api/auth/me');
@@ -99,14 +100,14 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/setup should create user and return hash', async () => {
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No users
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // No users
     const mockInsertChain = {
       values: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }]),
       _brand: 'PgInsert',
       [Symbol.toStringTag]: 'PgInsert'
     };
-    (db.insert as Mock).mockReturnValue(mockInsertChain);
+    asMock(db.insert).mockReturnValue(mockInsertChain as unknown as ReturnType<typeof db.insert>);
 
     const res = await app.handle(
       new Request('http://localhost/api/auth/setup', {
@@ -123,7 +124,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/setup should fail if users already exist', async () => {
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([{ id: 'existing' }]));
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'existing' }]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/setup', {
         method: 'POST',
@@ -136,14 +137,14 @@ describe('Simple Auth', () => {
 
   it('POST /api/auth/login should work with correct credentials', async () => {
     process.env.USER_PASSWORD_HASH = undefined;
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
     const mockInsertChain = {
       values: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([{ id: 'u1', email: 't@t.com' }]),
       _brand: 'PgInsert',
       [Symbol.toStringTag]: 'PgInsert'
     };
-    (db.insert as Mock).mockReturnValue(mockInsertChain);
+    asMock(db.insert).mockReturnValue(mockInsertChain as unknown as ReturnType<typeof db.insert>);
     await app.handle(
       new Request('http://localhost/api/auth/setup', {
         method: 'POST',
@@ -152,9 +153,7 @@ describe('Simple Auth', () => {
       })
     );
 
-    (db.select as Mock).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }])
-    );
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/login', {
         method: 'POST',
@@ -169,9 +168,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/login should fail with invalid credentials', async () => {
-    (db.select as Mock).mockReturnValueOnce(
-      createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }])
-    );
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/login', {
         method: 'POST',
@@ -189,7 +186,7 @@ describe('Simple Auth', () => {
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();
 
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
     const req = new Request('http://localhost/api/auth/me');
     req.headers.append('Cookie', `auth=${token}`);
     const res = await app.handle(req);
@@ -197,7 +194,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/auto-login should return 404 if no users', async () => {
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/auto-login', { method: 'POST' })
     );
@@ -205,7 +202,7 @@ describe('Simple Auth', () => {
   });
 
   it('POST /api/auth/auto-login should login first user', async () => {
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([{ id: 'u1', email: 't@t.com' }]));
     const res = await app.handle(
       new Request('http://localhost/api/auth/auto-login', { method: 'POST' })
     );

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
@@ -83,6 +83,7 @@ vi.mock('../../utils/ownership', () => ({
 
 import { boardRoutes } from '../boards';
 import { db } from '../../db'; // Mocked
+import { asMock } from '../../../test/mocks/api';
 
 describe('Board Routes', () => {
   let app: { handle: (request: Request) => Promise<Response> };
@@ -159,7 +160,7 @@ describe('Board Routes', () => {
     });
 
     it('should return 404 if board not found', async () => {
-      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No board
+      asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // No board
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-bad')
@@ -179,7 +180,7 @@ describe('Board Routes', () => {
       ];
 
       // Mock transaction
-      (db.transaction as Mock).mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+      asMock(db.transaction).mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           insert: vi.fn().mockReturnThis(),
           values: vi.fn().mockReturnThis(),
@@ -282,7 +283,7 @@ describe('Board Routes', () => {
       const mockColumns = [{ id: 'col-1', name: 'To Do', boardId: 'board-1' }];
 
       // Return valid board, valid columns list
-      (db.select as Mock)
+      asMock(db.select)
         .mockReturnValueOnce(createMockQueryBuilder([mockBoard]))
         .mockReturnValueOnce(createMockQueryBuilder(mockColumns));
       // No task fetch expected if column validation fails first?
@@ -298,7 +299,7 @@ describe('Board Routes', () => {
       // So tasks are fetched for the INVALID column ID. Likely returns empty.
       // Then validation checks if column exists in boardColumns.
 
-      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // Empty tasks
+      asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // Empty tasks
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-1/summary?columnId=bad-col')
@@ -308,7 +309,7 @@ describe('Board Routes', () => {
     });
 
     it('should return 404 if board not found', async () => {
-      (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([])); // No board
+      asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([])); // No board
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/boards/board-1/summary')

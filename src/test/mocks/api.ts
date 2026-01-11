@@ -62,10 +62,15 @@ export function getMockFn<T extends (...args: unknown[]) => unknown>(mock: T): M
   return mock as unknown as MockedFunction<T>;
 }
 
+export function asMock<T = Mock>(fn: unknown): T {
+  return fn as T;
+}
+
 // Also mock some common sub-routes
 Object.assign(mockApi.api.tasks, {
   reorder: { post: vi.fn() },
-  'auto-organize': { post: vi.fn() }
+  'auto-organize': { post: vi.fn() },
+  column: vi.fn(() => createMockRoute())
 });
 
 Object.assign(mockApi.api.subtasks, {

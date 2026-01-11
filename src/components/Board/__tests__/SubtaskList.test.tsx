@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SubtaskList } from '../SubtaskList';
-import { mockApi, getMockFn, getMockRoute } from '../../../test/mocks/api';
+import { mockApi, getMockFn, getMockRoute, asMock } from '../../../test/mocks/api';
 
 // Correctly mock using dynamic import to avoid hoisting issues with shared mocks
 vi.mock('../../../api/client', async () => {
@@ -55,7 +55,7 @@ describe('SubtaskList', () => {
     const subtasks = getMockRoute(mockApi.api.subtasks);
 
     // We mock the .task({}).get() chain
-    getMockFn(subtasks.task as Mock).mockReturnValue({
+    getMockFn(asMock(subtasks.task)).mockReturnValue({
       get: vi.fn().mockResolvedValue({ data: mockSubtasks, error: null })
     });
   });

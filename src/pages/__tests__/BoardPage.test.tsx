@@ -102,10 +102,11 @@ describe('BoardPage', () => {
     boardsRoute.get.mockResolvedValue({ data: [mockBoard], error: null });
 
     const tasksRoute = getMockRoute(mockApi.api.tasks);
-    tasksRoute.get.mockImplementation(({ query }: { query?: Record<string, string> }) => {
-      const columnId = query?.columnId;
-      const filteredTasks = columnId ? mockTasks.filter((t) => t.columnId === columnId) : mockTasks;
-      return Promise.resolve({ data: filteredTasks, error: null });
+    getMockFn(tasksRoute.column as Mock).mockImplementation(({ id }: { id: string }) => {
+      const filteredTasks = mockTasks.filter((t) => t.columnId === id);
+      return {
+        get: vi.fn().mockResolvedValue({ data: filteredTasks, error: null })
+      };
     });
 
     getMockFn((tasksRoute['auto-organize'] as { post: Mock }).post).mockResolvedValue({

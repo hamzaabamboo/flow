@@ -6,6 +6,7 @@ import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
 import { navigate } from 'vike/client/router';
 import type { Task } from '../../shared/types';
+import { asMock } from '../../test/mocks/api';
 
 interface MockTasks extends Mock {
   post?: Mock;
@@ -64,15 +65,13 @@ describe('useTaskActions', () => {
     queryClient.clear();
 
     // Setup nested mocks for api.api.tasks
-    (api.api.tasks as unknown as MockTasks).mockReturnValue({
+    asMock<MockTasks>(api.api.tasks).mockReturnValue({
       delete: vi.fn().mockResolvedValue({ data: {}, error: null }),
       get: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
       patch: vi.fn().mockResolvedValue({ data: {}, error: null })
     });
     // For tasks.post
-    (api.api.tasks as unknown as MockTasks).post = vi
-      .fn()
-      .mockResolvedValue({ data: {}, error: null });
+    asMock<MockTasks>(api.api.tasks).post = vi.fn().mockResolvedValue({ data: {}, error: null });
   });
 
   it('handleEdit should call onTaskEdit', () => {
@@ -128,7 +127,7 @@ describe('useTaskActions', () => {
 
     await waitFor(() => {
       expect(api.api.tasks).toHaveBeenCalledWith({ id: 'task-1' });
-      expect((api.api.tasks as unknown as MockTasks).post).toHaveBeenCalledWith(
+      expect(asMock<MockTasks>(api.api.tasks).post).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Test Task (Copy)',
           completed: false

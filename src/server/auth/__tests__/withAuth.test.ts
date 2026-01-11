@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { withAuth } from '../withAuth';
 import { db } from '../../db';
 import { validateHamAuthTokenCached } from '../hamauth-utils';
+import { asMock } from '../../../test/mocks/api';
 
 // Mock DB module
 vi.mock('../../db', () => ({
@@ -47,9 +48,9 @@ describe('withAuth Elysia middleware', () => {
     vi.resetAllMocks();
     process.env.NODE_ENV = 'development';
 
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([mockUser]));
-    (db.update as Mock).mockReturnValue(createMockQueryBuilder([]));
-    (db.insert as Mock).mockReturnValue(createMockQueryBuilder([mockUser]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([mockUser]));
+    asMock(db.update).mockReturnValue(createMockQueryBuilder([]));
+    asMock(db.insert).mockReturnValue(createMockQueryBuilder([mockUser]));
 
     // We can use withAuth().get() to create a test app
     app = withAuth().get('/test', ({ user }) => ({ user })) as unknown as AuthApp;
@@ -90,7 +91,7 @@ describe('withAuth Elysia middleware', () => {
     };
 
     // Setup specific sequence for this test
-    const mockSelect = db.select as Mock;
+    const mockSelect = asMock(db.select);
     mockSelect.mockReset();
 
     mockSelect
@@ -121,7 +122,7 @@ describe('withAuth Elysia middleware', () => {
       expiresAt: expiredDate
     };
 
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([mockTokenRecord]));
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTokenRecord]));
 
     const response = await app.handle(
       new Request('http://localhost/test', {
@@ -134,16 +135,16 @@ describe('withAuth Elysia middleware', () => {
 
   it('should validate with HamAuth if not an API token', async () => {
     // 1. Select token returns nothing
-    (db.select as Mock).mockReturnValueOnce(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
     // 2. HamAuth validation success
-    (validateHamAuthTokenCached as Mock).mockResolvedValue({
+    asMock(validateHamAuthTokenCached).mockResolvedValue({
       sub: 'ext-1',
       email: 'ham@example.com'
     });
 
     // 3. Find or create user
-    (db.select as Mock).mockReturnValueOnce(
+    asMock(db.select).mockReturnValueOnce(
       createMockQueryBuilder([{ id: 'u2', email: 'ham@example.com' }])
     );
 

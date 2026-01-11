@@ -127,7 +127,7 @@ describe('Task Routes', () => {
 
       vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks));
 
-      const response = await app.handle(new Request('http://localhost/tasks/col-1'));
+      const response = await app.handle(new Request('http://localhost/tasks/column/col-1'));
       const data = await response.json();
 
       expect(response.status).toBe(200);

@@ -6,6 +6,7 @@ import SettingsPage from '../settings/+Page';
 import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { ToasterContext } from '../../contexts/ToasterContext';
 import { api } from '../../api/client';
+import { asMock } from '../../test/mocks/api';
 
 // Mock API client
 vi.mock('../../api/client', () => ({
@@ -45,9 +46,9 @@ interface MockEndpoint extends Mock {
 const mockApiTokensDelete = vi.fn();
 const mockApiTokensPost = vi.fn();
 const mockApiTokensGet = vi.fn();
-(api.api['api-tokens'] as unknown as MockEndpoint).get = mockApiTokensGet;
-(api.api['api-tokens'] as unknown as MockEndpoint).post = mockApiTokensPost;
-(api.api['api-tokens'] as unknown as MockEndpoint).mockImplementation(() => ({
+asMock<MockEndpoint>(api.api['api-tokens']).get = mockApiTokensGet;
+asMock<MockEndpoint>(api.api['api-tokens']).post = mockApiTokensPost;
+asMock<MockEndpoint>(api.api['api-tokens']).mockImplementation(() => ({
   delete: mockApiTokensDelete
 }));
 
@@ -55,9 +56,9 @@ const mockExternalCalendarsPatch = vi.fn();
 const mockExternalCalendarsDelete = vi.fn();
 const mockExternalCalendarsPost = vi.fn();
 const mockExternalCalendarsGet = vi.fn();
-(api.api['external-calendars'] as unknown as MockEndpoint).get = mockExternalCalendarsGet;
-(api.api['external-calendars'] as unknown as MockEndpoint).post = mockExternalCalendarsPost;
-(api.api['external-calendars'] as unknown as MockEndpoint).mockImplementation(() => ({
+asMock<MockEndpoint>(api.api['external-calendars']).get = mockExternalCalendarsGet;
+asMock<MockEndpoint>(api.api['external-calendars']).post = mockExternalCalendarsPost;
+asMock<MockEndpoint>(api.api['external-calendars']).mockImplementation(() => ({
   patch: mockExternalCalendarsPatch,
   delete: mockExternalCalendarsDelete
 }));
@@ -122,12 +123,12 @@ describe('SettingsPage', () => {
     queryClient.clear();
 
     // Default mock responses
-    (api.api.settings.get as Mock).mockResolvedValue({ data: mockSettings, error: null });
-    (api.api.notes.collections.get as Mock).mockResolvedValue({
+    asMock(api.api.settings.get).mockResolvedValue({ data: mockSettings, error: null });
+    asMock(api.api.notes.collections.get).mockResolvedValue({
       data: { data: [{ id: 'coll-1', name: 'Collection 1' }] },
       error: null
     });
-    (api.api.calendar['feed-url'].get as Mock).mockResolvedValue({
+    asMock(api.api.calendar['feed-url'].get).mockResolvedValue({
       data: { url: 'http://cal.feed' },
       error: null
     });
@@ -136,7 +137,7 @@ describe('SettingsPage', () => {
   });
 
   it('should render loading state initially', () => {
-    (api.api.settings.get as Mock).mockImplementation(() => new Promise(() => {}));
+    asMock(api.api.settings.get).mockImplementation(() => new Promise(() => {}));
     renderWithProviders(<SettingsPage />);
     expect(screen.getByText(/Loading settings.../i)).toBeInTheDocument();
   });
@@ -236,7 +237,7 @@ describe('SettingsPage', () => {
 
   it('should save Outline settings', async () => {
     const user = userEvent.setup();
-    (api.api.settings.patch as Mock).mockResolvedValue({ data: {}, error: null });
+    asMock(api.api.settings.patch).mockResolvedValue({ data: {}, error: null });
 
     renderWithProviders(<SettingsPage />);
     await screen.findByText('Outline Integration');
@@ -261,7 +262,7 @@ describe('SettingsPage', () => {
 
   it('should toggle evening summary and summary spaces', async () => {
     const user = userEvent.setup();
-    (api.api.settings.patch as Mock).mockResolvedValue({ data: {}, error: null });
+    asMock(api.api.settings.patch).mockResolvedValue({ data: {}, error: null });
 
     renderWithProviders(<SettingsPage />);
     await screen.findByText('Daily Summaries (HamBot)');
@@ -288,7 +289,7 @@ describe('SettingsPage', () => {
 
   it('should test HamBot summaries', async () => {
     const user = userEvent.setup();
-    const testSummaryPost = api.api.settings['test-summary'].post as Mock;
+    const testSummaryPost = asMock(api.api.settings['test-summary'].post);
     testSummaryPost.mockResolvedValue({ data: { message: 'Sent!' }, error: null });
 
     renderWithProviders(<SettingsPage />);

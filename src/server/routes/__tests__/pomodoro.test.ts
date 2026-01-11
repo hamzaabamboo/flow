@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
+import { asMock } from '../../../test/mocks/api';
 import { PgSelectBuilder, PgInsertBuilder, PgUpdateBuilder } from 'drizzle-orm/pg-core';
+
+// Define Mock DB Chain Helper
 
 const createMockQueryBuilder = (resolvedValue: unknown) => {
   const builder = {
@@ -76,7 +79,7 @@ describe('Pomodoro Routes', () => {
   describe('GET /pomodoro', () => {
     it('should fetch today sessions', async () => {
       const mockSessions = [{ id: 's1', duration: 25, userId: mockUser.id }];
-      (db.select as Mock).mockReturnValue(createMockQueryBuilder(mockSessions));
+      asMock(db.select).mockReturnValue(createMockQueryBuilder(mockSessions));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro')
@@ -111,7 +114,7 @@ describe('Pomodoro Routes', () => {
 
   describe('GET /pomodoro/active', () => {
     it('should return null if no active state', async () => {
-      (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+      asMock(db.select).mockReturnValue(createMockQueryBuilder([]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(
         new Request('http://localhost/pomodoro/active')
@@ -131,7 +134,7 @@ describe('Pomodoro Routes', () => {
         startTime: startTime
       };
 
-      (db.select as Mock).mockReturnValue(createMockQueryBuilder([mockState]));
+      asMock(db.select).mockReturnValue(createMockQueryBuilder([mockState]));
       vi.mocked(db.update).mockReturnValue(createMockQueryBuilder([]));
 
       const response = await (app as { handle: (request: Request) => Promise<Response> }).handle(

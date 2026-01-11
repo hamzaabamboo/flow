@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { QuickAddDialog } from '../QuickAdd/QuickAddDialog';
 // oxlint-disable-next-line no-unassigned-import
 import '@testing-library/jest-dom';
 import { useToaster } from '../../contexts/ToasterContext';
+import { asMock } from '../../test/mocks/api';
 
 // Mocks
 vi.mock('../../contexts/SpaceContext', () => ({
@@ -73,7 +74,7 @@ describe('QuickAddDialog', () => {
     queryClient = new QueryClient();
 
     // Inject mock toast
-    (useToaster as Mock).mockReturnValue({
+    asMock(useToaster).mockReturnValue({
       toast: mockToast
     });
   });

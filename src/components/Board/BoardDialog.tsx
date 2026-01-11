@@ -56,12 +56,12 @@ export function BoardDialog({ open, onOpenChange, onSuccess, board }: BoardDialo
       return data;
     },
     onSuccess: (response) => {
-      const resp = response as unknown as { data: { id: string } };
+      const resp = response as unknown as { id: string };
       queryClient.invalidateQueries({ queryKey: ['boards', currentSpace] });
       toast?.('Board created successfully', { type: 'success' });
       onOpenChange(false);
-      if (onSuccess && resp.data) {
-        onSuccess(resp.data.id);
+      if (onSuccess && resp.id) {
+        onSuccess(resp.id);
       }
     },
     onError: () => {

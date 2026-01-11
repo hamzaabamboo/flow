@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
 import { PgSelectBuilder } from 'drizzle-orm/pg-core';
 
@@ -58,6 +58,7 @@ import { publicCalendarRoutes, calendarRoutes } from '../calendar';
 import { db } from '../../db';
 import { expandRecurringTasks } from '../../utils/recurring';
 import { fetchAndParseIcal, convertIcalToEvents } from '../../utils/ical-parser';
+import { asMock } from '../../../test/mocks/api';
 
 describe('Calendar Routes', () => {
   let app: { handle: (request: Request) => Promise<Response> };
@@ -67,7 +68,7 @@ describe('Calendar Routes', () => {
     vi.resetAllMocks();
 
     // Default mocks
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([]));
 
     app = new Elysia().use(publicCalendarRoutes).use(calendarRoutes);
   });
@@ -87,7 +88,7 @@ describe('Calendar Routes', () => {
       const mockTasks = [
         { id: 't1', title: 'Task 1', dueDate: new Date().toISOString(), userId: 'user-1' }
       ];
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(mockTasks));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // No habits
 
@@ -124,7 +125,7 @@ describe('Calendar Routes', () => {
       };
 
       // Sequence: Main -> Recurring -> Subtasks -> Completions -> External
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockTask])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Subtasks
@@ -161,12 +162,12 @@ describe('Calendar Routes', () => {
 
       // 1. Main window call (empty)
       // 2. Upcoming window call (should find the instance)
-      (expandRecurringTasks as Mock).mockReturnValueOnce([]); // Main
+      asMock(expandRecurringTasks).mockReturnValueOnce([]); // Main
       // The Upcoming logic calls expandRecurringTasks.
-      (expandRecurringTasks as Mock).mockReturnValueOnce([expandedInstance]); // Upcoming
+      asMock(expandRecurringTasks).mockReturnValueOnce([expandedInstance]); // Upcoming
 
       // Sequence calls...
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring (Main Window)
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
@@ -201,7 +202,7 @@ describe('Calendar Routes', () => {
 
       // Sequence: Main -> Recurring -> [SKIP Subtasks] -> Completions -> Overdue -> External
       // Subtasks skipped because Main & Recurring are empty
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       // Subtasks SKIPPED
@@ -224,7 +225,7 @@ describe('Calendar Routes', () => {
       const nodateTask = { id: 'nd-1', title: 'No Date', dueDate: null, userId: 'user-1' };
 
       // Sequence: Main -> Recurring -> NoDueDate -> Subtasks -> Completions -> External
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([nodateTask])); // No Due Date
@@ -253,7 +254,7 @@ describe('Calendar Routes', () => {
       const mockEvent = { id: 'ext-evt-1', title: 'External Event', dueDate: new Date() };
 
       // Sequence: Main -> Recurring -> [SKIP Subtasks] -> Completions -> External (Found!)
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       // Subtasks SKIPPED because tasks array is empty
@@ -261,8 +262,8 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockExtCal])); // External query returns calendar config
 
       // Mock parser result using top-level mocks
-      (fetchAndParseIcal as Mock).mockResolvedValue({});
-      (convertIcalToEvents as Mock).mockReturnValue([mockEvent]);
+      asMock(fetchAndParseIcal).mockResolvedValue({});
+      asMock(convertIcalToEvents).mockReturnValue([mockEvent]);
 
       const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
@@ -281,14 +282,14 @@ describe('Calendar Routes', () => {
         enabled: true
       };
 
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockExtCal])); // External
 
       // Mock failure
-      (fetchAndParseIcal as Mock).mockRejectedValue(new Error('Network Fail'));
+      asMock(fetchAndParseIcal).mockRejectedValue(new Error('Network Fail'));
 
       const response = await app.handle(
         new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
@@ -316,7 +317,7 @@ describe('Calendar Routes', () => {
       };
 
       // Sequence calls...
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
@@ -325,8 +326,8 @@ describe('Calendar Routes', () => {
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
 
       // Mock expansion
-      (expandRecurringTasks as Mock).mockReturnValueOnce([]); // Main
-      (expandRecurringTasks as Mock).mockReturnValueOnce([expandedInstance]); // Overdue
+      asMock(expandRecurringTasks).mockReturnValueOnce([]); // Main
+      asMock(expandRecurringTasks).mockReturnValueOnce([expandedInstance]); // Overdue
 
       const response = await app.handle(
         new Request(
@@ -342,7 +343,7 @@ describe('Calendar Routes', () => {
       const task1 = { id: 't1', dueDate: new Date('2024-01-02') };
       const task2 = { id: 't2', dueDate: new Date('2024-01-01') };
 
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([task1, task2])); // Main returns unordered
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Subtasks
@@ -388,7 +389,7 @@ describe('Calendar Routes', () => {
         }
       ];
 
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -423,7 +424,7 @@ describe('Calendar Routes', () => {
         }
       ];
 
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder(tasksPatterns));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -452,7 +453,7 @@ describe('Calendar Routes', () => {
 
       // 1. Tasks
       // 2. Habits
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockTask]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
 
@@ -479,7 +480,7 @@ describe('Calendar Routes', () => {
 
       // 1. Tasks (empty)
       // 2. Habits (found)
-      const mockSelect = db.select as Mock;
+      const mockSelect = asMock(db.select);
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
       mockSelect.mockReturnValueOnce(createMockQueryBuilder([mockHabit]));
 

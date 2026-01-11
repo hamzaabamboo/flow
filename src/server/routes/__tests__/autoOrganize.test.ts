@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
 import { autoOrganizeRoutes } from '../autoOrganize';
 import { db } from '../../db';
 import { autoOrganizer } from '../../../mastra/agents/autoOrganizer';
 import { GenerateTextResult } from 'ai';
+import { asMock } from '../../../test/mocks/api';
 
 interface MockQueryBuilder {
   from: () => MockQueryBuilder;
@@ -28,8 +29,8 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
     then: (resolve: (value: unknown) => void) => Promise.resolve(resolvedValue).then(resolve),
     _brand: 'PgSelect' as const,
     [Symbol.toStringTag]: 'PgSelect'
-  } as unknown as MockQueryBuilder;
-  return builder;
+  };
+  return asMock<MockQueryBuilder>(builder);
 };
 
 vi.mock('../../auth/withAuth', async () => {
@@ -67,7 +68,7 @@ describe('Auto Organize Routes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (db.select as Mock).mockReturnValue(createMockQueryBuilder([]));
+    asMock(db.select).mockReturnValue(createMockQueryBuilder([]));
 
     const mockAiResult: Partial<GenerateTextResult<any, any>> = {
       text: JSON.stringify({
@@ -84,7 +85,7 @@ describe('Auto Organize Routes', () => {
       steps: []
     };
 
-    (autoOrganizer.generate as Mock).mockResolvedValue(mockAiResult);
+    asMock(autoOrganizer.generate).mockResolvedValue(mockAiResult);
 
     app = new Elysia()
       .onError(({ error }) => {
@@ -98,7 +99,7 @@ describe('Auto Organize Routes', () => {
 
   it('POST / should return suggestions', async () => {
     const apiMock = db;
-    (apiMock.select as Mock)
+    asMock(apiMock.select)
       .mockReturnValueOnce(createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }]))
       .mockReturnValueOnce(createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }]))
       .mockReturnValueOnce(

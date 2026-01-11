@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+// This is a complex replacement to remove many casts. I'll provide the whole file.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,54 +9,18 @@ import { api } from '../../api/client';
 import { DialogProvider } from '../../utils/useDialogs';
 import { ToasterProvider } from '../../contexts/ToasterProvider';
 import { addHours, addDays } from 'date-fns';
+import { asMock, getMockRoute } from '../../test/mocks/api';
 
 // Mock vike-react/usePageContext
 vi.mock('vike-react/usePageContext', () => ({
   usePageContext: vi.fn(() => ({ urlPathname: '/' }))
 }));
 
-interface MockRoute extends Mock {
-  get?: Mock;
-  post?: Mock;
-  patch?: Mock;
-  delete?: Mock;
-  log?: { post: Mock };
-  ['auto-organize']?: { post: Mock };
-}
-
 // Mock API client
-vi.mock('../../api/client', () => {
-  const habitsMock = vi.fn(() => ({
-    get: vi.fn(),
-    log: { post: vi.fn() }
-  })) as unknown as MockRoute;
-  habitsMock.get = vi.fn();
-
-  const calendarMock = {
-    events: { get: vi.fn() }
-  };
-
-  const tasksMock = vi.fn(() => ({
-    patch: vi.fn(),
-    delete: vi.fn()
-  })) as unknown as MockRoute;
-  tasksMock.post = vi.fn();
-  tasksMock['auto-organize'] = { post: vi.fn() };
-
-  const boardsMock = vi.fn(() => ({
-    get: vi.fn()
-  })) as unknown as MockRoute;
-  boardsMock.get = vi.fn();
-
+vi.mock('../../api/client', async () => {
+  const mocks = await import('../../test/mocks/api');
   return {
-    api: {
-      api: {
-        habits: habitsMock,
-        calendar: calendarMock,
-        tasks: tasksMock,
-        boards: boardsMock
-      }
-    }
+    api: mocks.mockApi
   };
 });
 
@@ -115,22 +80,17 @@ describe('AgendaPage', () => {
     window.history.replaceState({}, '', '/');
     vi.clearAllMocks();
 
-    const apiMock = api.api as unknown as {
-      calendar: { events: { get: Mock } };
-      habits: MockRoute;
-      boards: MockRoute;
-      tasks: MockRoute;
-    };
-    apiMock.calendar.events.get.mockResolvedValue({ data: mockEvents, error: null });
-    (apiMock.habits.get as Mock).mockResolvedValue({ data: mockHabits, error: null });
-    (apiMock.boards.get as Mock).mockResolvedValue({ data: [], error: null });
+    const apiMock = getMockRoute(api.api);
+    asMock(apiMock.calendar.events.get).mockResolvedValue({ data: mockEvents, error: null });
+    asMock(apiMock.habits.get).mockResolvedValue({ data: mockHabits, error: null });
+    asMock(apiMock.boards.get).mockResolvedValue({ data: [], error: null });
 
-    apiMock.tasks.mockImplementation(() => ({
+    asMock(apiMock.tasks).mockImplementation(() => ({
       patch: vi.fn().mockResolvedValue({ data: {}, error: null }),
       delete: vi.fn().mockResolvedValue({ data: {}, error: null })
     }));
-    (apiMock.tasks.post as Mock).mockResolvedValue({ data: { id: 'new-t' }, error: null });
-    (apiMock.tasks['auto-organize']!.post as Mock).mockResolvedValue({
+    asMock(apiMock.tasks.post).mockResolvedValue({ data: { id: 'new-t' }, error: null });
+    asMock(apiMock.tasks['auto-organize'].post).mockResolvedValue({
       data: {
         suggestions: [],
         summary: 'Auto organize summary',
@@ -149,7 +109,7 @@ describe('AgendaPage', () => {
   it('should toggle habit completion', async () => {
     const user = userEvent.setup();
     const logMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    (api.api.habits as unknown as MockRoute).mockImplementation(() => ({
+    asMock(api.api.habits).mockImplementation(() => ({
       log: { post: logMock }
     }));
 
@@ -162,7 +122,7 @@ describe('AgendaPage', () => {
   it('should complete a task', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    (api.api.tasks as unknown as MockRoute).mockImplementation(() => ({
+    asMock(api.api.tasks).mockImplementation(() => ({
       patch: patchMock
     }));
 
@@ -195,7 +155,7 @@ describe('AgendaPage', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Create Task' }));
 
-    expect(api.api.tasks.post).toHaveBeenCalledWith(
+    expect(asMock(api.api.tasks.post)).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'New Task Title'
       })
@@ -205,7 +165,7 @@ describe('AgendaPage', () => {
   it('should handle task carry over', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    (api.api.tasks as unknown as MockRoute).mockImplementation(() => ({
+    asMock(api.api.tasks).mockImplementation(() => ({
       patch: patchMock
     }));
 
@@ -232,7 +192,7 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    (api.api.calendar.events.get as Mock).mockResolvedValue({ data: [extEvent], error: null });
+    asMock(api.api.calendar.events.get).mockResolvedValue({ data: [extEvent], error: null });
 
     renderWithProviders(<AgendaPage />);
 
@@ -253,7 +213,7 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    (api.api.calendar.events.get as Mock).mockResolvedValue({
+    asMock(api.api.calendar.events.get).mockResolvedValue({
       data: [upcomingTask],
       error: null
     });
@@ -267,11 +227,11 @@ describe('AgendaPage', () => {
   it('should handle applying auto-organize suggestions', async () => {
     const user = userEvent.setup();
     const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
-    (api.api.tasks as unknown as Mock).mockImplementation(() => ({
+    asMock(api.api.tasks).mockImplementation(() => ({
       patch: patchMock
     }));
 
-    (api.api.tasks['auto-organize'].post as Mock).mockResolvedValue({
+    asMock(api.api.tasks['auto-organize']!.post).mockResolvedValue({
       data: {
         suggestions: [
           {

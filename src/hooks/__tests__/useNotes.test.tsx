@@ -10,11 +10,14 @@ import {
   useUnlinkNote
 } from '../useNotes';
 import { api } from '../../api/client';
+import { asMock } from '../../test/mocks/api';
 
 interface MockRoute extends Mock {
   get?: Mock;
   post?: Mock;
   delete?: Mock;
+  log?: { post: Mock };
+  ['auto-organize']?: { post: Mock };
 }
 
 // Mock API client
@@ -51,7 +54,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useNotesEnabled should fetch status', async () => {
-    (api.api.notes.enabled.get as Mock).mockResolvedValue({
+    asMock(api.api.notes.enabled.get).mockResolvedValue({
       data: { enabled: true },
       error: null
     });
@@ -65,7 +68,7 @@ describe('useNotes hooks', () => {
 
   it('useTaskNote should fetch note for a task', async () => {
     const mockNote = { id: 'note-1', title: 'Note 1', url: 'http://note' };
-    (api.api.notes.task as unknown as MockRoute).mockReturnValue({
+    asMock<MockRoute>(api.api.notes.task).mockReturnValue({
       get: vi.fn().mockResolvedValue({ data: { note: mockNote }, error: null })
     });
 
@@ -77,7 +80,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useCreateNote should trigger mutation', async () => {
-    (api.api.notes.create.post as Mock).mockResolvedValue({
+    asMock(api.api.notes.create.post).mockResolvedValue({
       data: { id: 'new-note' },
       error: null
     });
@@ -92,7 +95,7 @@ describe('useNotes hooks', () => {
 
   it('useSearchNotes should return search results', async () => {
     const mockDocs = [{ id: '1', title: 'Doc 1', url: 'url1', updatedAt: '' }];
-    (api.api.notes.search.post as Mock).mockResolvedValue({
+    asMock(api.api.notes.search.post).mockResolvedValue({
       data: { documents: mockDocs },
       error: null
     });
@@ -107,7 +110,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useLinkNote should link a note to a task', async () => {
-    (api.api.notes.link.post as Mock).mockResolvedValue({
+    asMock(api.api.notes.link.post).mockResolvedValue({
       data: { success: true },
       error: null
     });
@@ -121,7 +124,7 @@ describe('useNotes hooks', () => {
   });
 
   it('useUnlinkNote should unlink note from task', async () => {
-    (api.api.notes.unlink as unknown as MockRoute).mockReturnValue({
+    asMock<MockRoute>(api.api.notes.unlink).mockReturnValue({
       delete: vi.fn().mockResolvedValue({ data: { success: true }, error: null })
     });
 

@@ -1,9 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MoveTaskDialog } from '../MoveTaskDialog';
 import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
+import { asMock } from '../../test/mocks/api';
 import type { Task } from '../../shared/types';
 
 // Mock the API client
@@ -63,7 +64,7 @@ describe('MoveTaskDialog', () => {
     queryClient.clear();
 
     // Mock API response
-    (api.api.boards.get as Mock).mockResolvedValue({
+    asMock(api.api.boards.get).mockResolvedValue({
       data: mockBoards,
       error: null
     });
