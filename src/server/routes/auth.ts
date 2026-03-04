@@ -1,11 +1,11 @@
 import { Elysia, t } from 'elysia';
 import { eq } from 'drizzle-orm';
-import { db } from '../db';
+import { db as database } from '../db';
 import { users } from '../../../drizzle/schema';
 
 // This will integrate with HamCloud auth
 export const authRoutes = new Elysia({ prefix: '/auth' })
-  .decorate('db', db)
+  .decorate('db', database)
   // Login via HamCloud
   .post(
     '/login',

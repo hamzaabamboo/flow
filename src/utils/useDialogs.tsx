@@ -1,4 +1,13 @@
-import { createContext, useContext, useState, lazy, Suspense, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  lazy,
+  Suspense,
+  useCallback,
+  useMemo,
+  type ReactNode
+} from 'react';
 
 const DialogComponents = lazy(() =>
   import('./DialogComponents').then((module) => ({ default: module.DialogComponents }))
@@ -37,17 +46,19 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     resolve: () => void;
   } | null>(null);
 
-  const confirm = (options: ConfirmOptions): Promise<boolean> => {
+  const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmDialog({ options, resolve });
     });
-  };
+  }, []);
 
-  const alert = (options: AlertOptions): Promise<void> => {
+  const alert = useCallback((options: AlertOptions): Promise<void> => {
     return new Promise((resolve) => {
       setAlertDialog({ options, resolve });
     });
-  };
+  }, []);
+
+  const value = useMemo(() => ({ confirm, alert }), [confirm, alert]);
 
   const handleConfirmClose = (confirmed: boolean) => {
     if (confirmDialog) {
@@ -64,7 +75,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <DialogContext.Provider value={{ confirm, alert }}>
+    <DialogContext.Provider value={value}>
       {children}
 
       {(confirmDialog || alertDialog) && (

@@ -159,12 +159,12 @@ describe('withAuth Elysia middleware', () => {
   });
 
   it('should return 401 if no authentication provided in production', async () => {
-    const originalEnv = process.env.NODE_ENV;
+    const previousNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
     const response = await app.handle(new Request('http://localhost/test'));
     expect(response.status).toBe(401);
 
-    process.env.NODE_ENV = originalEnv;
+    process.env.NODE_ENV = previousNodeEnv;
   });
 });

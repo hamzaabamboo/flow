@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode
+} from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 type ColorMode = 'light' | 'dark';
@@ -43,15 +50,18 @@ export function ColorModeProvider({ children }: ColorModeProviderProps) {
     }
   }, [colorMode, setColorMode]);
 
-  const toggleColorMode = () => {
+  const toggleColorMode = useCallback(() => {
     setColorMode(colorMode === 'dark' ? 'light' : 'dark');
-  };
+  }, [colorMode, setColorMode]);
 
-  const value = {
-    colorMode: colorMode ?? 'light',
-    setColorMode,
-    toggleColorMode
-  };
+  const value = useMemo(
+    () => ({
+      colorMode: colorMode ?? 'light',
+      setColorMode,
+      toggleColorMode
+    }),
+    [colorMode, setColorMode, toggleColorMode]
+  );
 
   return (
     <>

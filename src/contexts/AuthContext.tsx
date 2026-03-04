@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, AuthContextType } from '@hamflow/shared';
 export type { AuthContextType };
@@ -82,14 +82,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const value: AuthContextType = {
-    user: user ?? null,
-    isLoading: isLoading && !isInitialized,
-    isAuthenticated: !!user,
-    login,
-    logout: async () => logoutMutation.mutateAsync(),
-    refreshToken: async () => {}
-  };
+  const logout = useCallback(async () => logoutMutation.mutateAsync(), [logoutMutation]);
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user: user ?? null,
+      isLoading: isLoading && !isInitialized,
+      isAuthenticated: !!user,
+      login,
+      logout,
+      refreshToken: async () => {}
+    }),
+    [user, isLoading, isInitialized, login, logout]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

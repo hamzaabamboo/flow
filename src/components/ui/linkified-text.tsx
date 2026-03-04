@@ -14,10 +14,11 @@ export function LinkifiedText({ children, ...textProps }: LinkifiedTextProps) {
   return (
     <Text {...textProps}>
       {parts.map((part, index) => {
+        const key = `${parts.slice(0, index).join('').length}-${part}`;
         if (part.match(URL_REGEX)) {
           return (
             <Link
-              key={`${part}-${index}`}
+              key={key}
               href={part}
               target="_blank"
               rel="noopener noreferrer"
@@ -30,7 +31,7 @@ export function LinkifiedText({ children, ...textProps }: LinkifiedTextProps) {
             </Link>
           );
         }
-        return <span key={`text-${index}`}>{part}</span>;
+        return <span key={key}>{part}</span>;
       })}
     </Text>
   );

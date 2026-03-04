@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia';
-import { cookie } from '@elysiajs/cookie';
-import { jwt } from '@elysiajs/jwt';
+import { cookie as cookiePlugin } from '@elysiajs/cookie';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
 import { eq, asc } from 'drizzle-orm';
 import { users, apiTokens } from '../../../drizzle/schema';
-import { db } from '../db';
+import { db as database } from '../db';
 import { logger } from '../logger';
 import { validateHamAuthTokenCached } from './hamauth-utils';
 
@@ -23,11 +23,11 @@ async function hashToken(token: string): Promise<string> {
 // Create a function that returns an Elysia instance with auth context
 export const withAuth = () =>
   new Elysia()
-    .decorate('db', db)
+    .decorate('db', database)
     .decorate('logger', logger)
-    .use(cookie())
+    .use(cookiePlugin())
     .use(
-      jwt({
+      jwtPlugin({
         name: 'jwt',
         secret: process.env.JWT_SECRET || 'your-secret-key'
       })

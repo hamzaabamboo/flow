@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { db } from '../db';
+import { db as database } from '../db';
 import { externalCalendars } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { eq, and } from 'drizzle-orm';
@@ -7,7 +7,7 @@ import { logger } from '../logger';
 import { validateIcalUrl } from '../utils/ical-parser';
 
 export const externalCalendarsRoutes = new Elysia({ prefix: '/external-calendars' })
-  .decorate('db', db)
+  .decorate('db', database)
   .group('', (app) =>
     app
       .use(withAuth())

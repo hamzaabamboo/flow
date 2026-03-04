@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, gte, lte } from 'drizzle-orm';
-import { db } from '../db';
+import { db as database } from '../db';
 import { tasks, columns, boards, inboxItems } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
 import { isTaskCompleted } from '../utils/taskCompletion';
@@ -13,7 +13,7 @@ interface Habit {
 }
 
 export const statsRoutes = new Elysia({ prefix: '/stats' })
-  .decorate('db', db)
+  .decorate('db', database)
   .use(withAuth())
 
   .get('/test', () => ({ test: 'working' }))
@@ -52,9 +52,9 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
         .leftJoin(boards, eq(columns.boardId, boards.id))
         .where(tasksWhere);
 
-      const tasksWithColumns = userTasks.map((t) => ({
-        ...t.task,
-        columnName: t.columnName ?? null
+      const tasksWithColumns = userTasks.map((taskWithColumn) => ({
+        ...taskWithColumn.task,
+        columnName: taskWithColumn.columnName ?? null
       }));
 
       // Count incomplete tasks (due today or overdue)
@@ -162,10 +162,10 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
 
       // Convert to array format
       const completions = Object.entries(groupedByDate)
-        .map(([date, tasks]) => ({
+        .map(([date, dayTasks]) => ({
           date,
-          count: tasks.length,
-          tasks
+          count: dayTasks.length,
+          tasks: dayTasks
         }))
         .toSorted((a, b) => a.date.localeCompare(b.date));
 

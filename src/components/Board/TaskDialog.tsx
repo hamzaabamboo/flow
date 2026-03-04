@@ -41,6 +41,8 @@ const recurringOptions = createListCollection({
   ]
 });
 
+const createSubtaskId = () => crypto.randomUUID();
+
 export function TaskDialog({
   open,
   onOpenChange,
@@ -112,7 +114,7 @@ export function TaskDialog({
       // Convert full Subtask to SimpleSubtask for UI
       setSubtasks(
         task?.subtasks?.map((st) => ({
-          id: st.id,
+          id: st.id || createSubtaskId(),
           title: st.title,
           completed: st.completed
         })) || []
@@ -213,7 +215,7 @@ export function TaskDialog({
 
   const handleAddSubtask = () => {
     if (newSubtask.trim()) {
-      setSubtasks([...subtasks, { title: newSubtask, completed: false }]);
+      setSubtasks([...subtasks, { id: createSubtaskId(), title: newSubtask, completed: false }]);
       setNewSubtask('');
       setShowAdvanced(true); // Auto-show when subtask is added
     }
@@ -659,7 +661,7 @@ export function TaskDialog({
                         </Text>
                         <VStack gap="2" alignItems="start">
                           {subtasks.map((subtask, index) => (
-                            <HStack key={`subtask-${index}-${subtask.title}`} gap="2" w="full">
+                            <HStack key={subtask.id || subtask.title} gap="2" w="full">
                               <Checkbox
                                 size="sm"
                                 checked={subtask.completed}

@@ -54,7 +54,11 @@ export function expandRecurringTasks(
       const currentDay = taskStartDay < startDay ? new Date(startDay) : new Date(taskStartDay);
       currentDay.setUTCHours(0, 0, 0, 0);
 
-      while (currentDay <= effectiveEndDate) {
+      for (
+        ;
+        currentDay.getTime() <= effectiveEndDate.getTime();
+        currentDay.setUTCDate(currentDay.getUTCDate() + 1)
+      ) {
         const instance = new Date(currentDay);
         instance.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
@@ -73,14 +77,16 @@ export function expandRecurringTasks(
           completed: isCompleted,
           instanceDate: dateStr
         });
-
-        currentDay.setUTCDate(currentDay.getUTCDate() + 1);
       }
     } else if (pattern === 'weekly') {
       const current = new Date(Math.max(taskDueDate.getTime(), startDate.getTime()));
       current.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
-      while (current <= effectiveEndDate) {
+      for (
+        ;
+        current.getTime() <= effectiveEndDate.getTime();
+        current.setUTCDate(current.getUTCDate() + 1)
+      ) {
         if (current >= startDate && current.getUTCDay() === taskDueDate.getUTCDay()) {
           const dateStr = current.toISOString().split('T')[0];
 
@@ -97,13 +103,16 @@ export function expandRecurringTasks(
             instanceDate: dateStr
           });
         }
-        current.setUTCDate(current.getUTCDate() + 1);
       }
     } else if (pattern === 'biweekly') {
       const current = new Date(Math.max(taskDueDate.getTime(), startDate.getTime()));
       current.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
-      while (current <= effectiveEndDate) {
+      for (
+        ;
+        current.getTime() <= effectiveEndDate.getTime();
+        current.setUTCDate(current.getUTCDate() + 1)
+      ) {
         if (current >= startDate && current.getUTCDay() === taskDueDate.getUTCDay()) {
           const weeksDiff = Math.floor(
             (current.getTime() - taskDueDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
@@ -127,13 +136,16 @@ export function expandRecurringTasks(
             });
           }
         }
-        current.setUTCDate(current.getUTCDate() + 1);
       }
     } else if (pattern === 'monthly') {
       const current = new Date(taskDueDate);
       current.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
-      while (current <= effectiveEndDate) {
+      for (
+        ;
+        current.getTime() <= effectiveEndDate.getTime();
+        current.setUTCMonth(current.getUTCMonth() + 1)
+      ) {
         if (current >= startDate) {
           const dateStr = current.toISOString().split('T')[0];
 
@@ -150,7 +162,6 @@ export function expandRecurringTasks(
             instanceDate: dateStr
           });
         }
-        current.setUTCMonth(current.getUTCMonth() + 1);
       }
     } else if (pattern === 'end_of_month') {
       const current = new Date(taskDueDate);
@@ -158,7 +169,11 @@ export function expandRecurringTasks(
       current.setUTCDate(1);
       current.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
-      while (current <= effectiveEndDate) {
+      for (
+        ;
+        current.getTime() <= effectiveEndDate.getTime();
+        current.setUTCMonth(current.getUTCMonth() + 1)
+      ) {
         // Calculate last day of this current month in UTC
         // Date.UTC(year, month + 1, 0) gives the timestamp for 00:00 UTC on the last day of 'month'
         const lastDayTimestamp = Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0);
@@ -182,9 +197,6 @@ export function expandRecurringTasks(
             instanceDate: dateStr
           });
         }
-
-        // Move to next month safely (we are on 1st)
-        current.setUTCMonth(current.getUTCMonth() + 1);
       }
     } else {
       if (taskDueDate >= startDate && taskDueDate <= endDate) {

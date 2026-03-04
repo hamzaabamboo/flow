@@ -24,7 +24,7 @@ export const Slider = forwardRef<HTMLDivElement, SliderProps>((props, ref) => {
                 <StyledSlider.Range />
               </StyledSlider.Track>
               {api.value.map((value, index) => (
-                <StyledSlider.Thumb key={`${value}-${index}`} index={index}>
+                <StyledSlider.Thumb key={value.toString()} index={index}>
                   <StyledSlider.HiddenInput />
                 </StyledSlider.Thumb>
               ))}

@@ -87,16 +87,16 @@ export function SimpleDatePicker({
                     <DatePicker.Table>
                       <DatePicker.TableHead>
                         <DatePicker.TableRow>
-                          {datePicker.weekDays.map((weekDay, idx) => (
-                            <DatePicker.TableHeader key={weekDay.short || idx}>
+                          {datePicker.weekDays.map((weekDay) => (
+                            <DatePicker.TableHeader key={weekDay.short}>
                               {weekDay.short}
                             </DatePicker.TableHeader>
                           ))}
                         </DatePicker.TableRow>
                       </DatePicker.TableHead>
                       <DatePicker.TableBody>
-                        {datePicker.weeks.map((week, weekIndex) => (
-                          <DatePicker.TableRow key={`week-${weekIndex}`}>
+                        {datePicker.weeks.map((week) => (
+                          <DatePicker.TableRow key={week.map((day) => day.toString()).join('-')}>
                             {week.map((day) => (
                               <DatePicker.TableCell key={day.toString()} value={day}>
                                 <DatePicker.TableCellTrigger>{day.day}</DatePicker.TableCellTrigger>
@@ -133,22 +133,22 @@ export function SimpleDatePicker({
                     </DatePicker.ViewControl>
                     <DatePicker.Table>
                       <DatePicker.TableBody>
-                        {datePicker
-                          .getMonthsGrid({ columns: 4, format: 'short' })
-                          .map((months, rowIndex) => (
-                            <DatePicker.TableRow key={`month-row-${rowIndex}`}>
-                              {months.map((month) => (
-                                <DatePicker.TableCell
-                                  key={month.value.toString()}
-                                  value={month.value}
-                                >
-                                  <DatePicker.TableCellTrigger>
-                                    {month.label}
-                                  </DatePicker.TableCellTrigger>
-                                </DatePicker.TableCell>
-                              ))}
-                            </DatePicker.TableRow>
-                          ))}
+                        {datePicker.getMonthsGrid({ columns: 4, format: 'short' }).map((months) => (
+                          <DatePicker.TableRow
+                            key={months.map((month) => month.value.toString()).join('-')}
+                          >
+                            {months.map((month) => (
+                              <DatePicker.TableCell
+                                key={month.value.toString()}
+                                value={month.value}
+                              >
+                                <DatePicker.TableCellTrigger>
+                                  {month.label}
+                                </DatePicker.TableCellTrigger>
+                              </DatePicker.TableCell>
+                            ))}
+                          </DatePicker.TableRow>
+                        ))}
                       </DatePicker.TableBody>
                     </DatePicker.Table>
                   </>
@@ -178,8 +178,10 @@ export function SimpleDatePicker({
                     </DatePicker.ViewControl>
                     <DatePicker.Table>
                       <DatePicker.TableBody>
-                        {datePicker.getYearsGrid({ columns: 4 }).map((years, rowIndex) => (
-                          <DatePicker.TableRow key={`year-row-${rowIndex}`}>
+                        {datePicker.getYearsGrid({ columns: 4 }).map((years) => (
+                          <DatePicker.TableRow
+                            key={years.map((year) => year.value.toString()).join('-')}
+                          >
                             {years.map((year) => (
                               <DatePicker.TableCell key={year.value.toString()} value={year.value}>
                                 <DatePicker.TableCellTrigger>

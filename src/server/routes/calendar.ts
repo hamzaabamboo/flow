@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
 import { and, eq, isNotNull, inArray, gte, lte, gt, sql } from 'drizzle-orm';
 import ical, { ICalEventStatus, ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
-import { db } from '../db';
+import { db as database } from '../db';
 import {
   tasks,
   boards,
@@ -22,248 +22,250 @@ import { logger } from '../logger';
 import { isColumnDone } from '../utils/taskCompletion';
 
 // Public iCal route (no auth required)
-export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
-  '/ical/:userId/:token',
-  async ({ params, db, set }) => {
-    const { userId, token } = params;
+export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' })
+  .decorate('db', database)
+  .get(
+    '/ical/:userId/:token',
+    async ({ params, db, set }) => {
+      const { userId, token } = params;
 
-    // Verify token
-    const expectedToken = createHash('sha256')
-      .update(`${userId}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
-      .digest('hex');
+      // Verify token
+      const expectedToken = createHash('sha256')
+        .update(`${userId}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
+        .digest('hex');
 
-    if (token !== expectedToken) {
-      set.status = 401;
-      return 'Unauthorized';
-    }
-
-    // Create calendar (UTC - ical-generator will handle timezone conversion)
-    const calendar = ical({
-      name: 'HamFlow Tasks & Habits',
-      description: 'Your tasks and habits from HamFlow',
-      prodId: {
-        company: 'HamFlow',
-        product: 'Tasks Calendar'
-      }
-    });
-
-    // Fetch user's tasks with due dates
-    const userTasks = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        description: tasks.description,
-        dueDate: tasks.dueDate,
-        priority: tasks.priority,
-        columnName: columns.name,
-        recurringPattern: tasks.recurringPattern,
-        recurringEndDate: tasks.recurringEndDate,
-        metadata: tasks.metadata,
-        boardId: boards.id,
-        boardName: boards.name,
-        space: boards.space
-      })
-      .from(tasks)
-      .leftJoin(columns, eq(tasks.columnId, columns.id))
-      .leftJoin(boards, eq(columns.boardId, boards.id))
-      .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
-
-    // Add tasks as events
-    for (const task of userTasks) {
-      if (!task.dueDate) continue;
-
-      // Use UTC date directly - ical-generator handles timezone conversion
-      const dueDate = new Date(task.dueDate);
-      const jstComponents = getJstDateComponents(dueDate);
-      const jstDateKey = `${jstComponents.year}-${String(jstComponents.month).padStart(2, '0')}-${String(jstComponents.day).padStart(2, '0')}`;
-      const isAllDayDeadline =
-        jstComponents.hours === 0 && jstComponents.minutes === 0 && jstComponents.seconds === 0;
-      const eventStart = isAllDayDeadline
-        ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day))
-        : dueDate;
-      const eventEnd = isAllDayDeadline
-        ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day + 1))
-        : new Date(dueDate.getTime() + 60 * 60 * 1000);
-
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const taskUrl = task.boardId
-        ? `${frontendUrl}/board/${task.boardId}`
-        : `${frontendUrl}/agenda?date=${jstDateKey}`;
-
-      // Build description with metadata link if available
-      let eventDescription = task.description || '';
-      if (task.metadata?.link) {
-        eventDescription = eventDescription
-          ? `${eventDescription}\n\nLink: ${task.metadata.link}`
-          : `Link: ${task.metadata.link}`;
+      if (token !== expectedToken) {
+        set.status = 401;
+        return 'Unauthorized';
       }
 
-      const event = calendar.createEvent({
-        id: task.id,
-        start: eventStart,
-        end: eventEnd,
-        summary: `[${task.space || 'work'}] ${task.title}`,
-        description: eventDescription || undefined,
-        categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
-        allDay: isAllDayDeadline,
-        url: taskUrl
+      // Create calendar (UTC - ical-generator will handle timezone conversion)
+      const calendar = ical({
+        name: 'HamFlow Tasks & Habits',
+        description: 'Your tasks and habits from HamFlow',
+        prodId: {
+          company: 'HamFlow',
+          product: 'Tasks Calendar'
+        }
       });
 
-      // Set status - CANCELLED if in Done column, otherwise CONFIRMED
-      const isCompleted = task.columnName ? isColumnDone(task.columnName) : false;
-      event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
+      // Fetch user's tasks with due dates
+      const userTasks = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          columnName: columns.name,
+          recurringPattern: tasks.recurringPattern,
+          recurringEndDate: tasks.recurringEndDate,
+          metadata: tasks.metadata,
+          boardId: boards.id,
+          boardName: boards.name,
+          space: boards.space
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(eq(tasks.userId, userId), isNotNull(tasks.dueDate)));
 
-      // Set priority
-      if (task.priority) {
-        const priorityMap: Record<string, number> = {
-          urgent: 1,
-          high: 3,
-          medium: 5,
-          low: 7
-        };
-        event.priority(priorityMap[task.priority] || 5);
-      }
+      // Add tasks as events
+      for (const task of userTasks) {
+        if (!task.dueDate) continue;
 
-      // Add RRULE for recurring tasks
-      if (task.recurringPattern) {
-        const pattern = task.recurringPattern.toLowerCase();
+        // Use UTC date directly - ical-generator handles timezone conversion
+        const dueDate = new Date(task.dueDate);
+        const jstComponents = getJstDateComponents(dueDate);
+        const jstDateKey = `${jstComponents.year}-${String(jstComponents.month).padStart(2, '0')}-${String(jstComponents.day).padStart(2, '0')}`;
+        const isAllDayDeadline =
+          jstComponents.hours === 0 && jstComponents.minutes === 0 && jstComponents.seconds === 0;
+        const eventStart = isAllDayDeadline
+          ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day))
+          : dueDate;
+        const eventEnd = isAllDayDeadline
+          ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day + 1))
+          : new Date(dueDate.getTime() + 60 * 60 * 1000);
 
-        let freq: ICalEventRepeatingFreq | undefined;
-        let interval: number | undefined;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const taskUrl = task.boardId
+          ? `${frontendUrl}/board/${task.boardId}`
+          : `${frontendUrl}/agenda?date=${jstDateKey}`;
 
-        if (pattern === 'daily') {
-          freq = ICalEventRepeatingFreq.DAILY;
-        } else if (pattern === 'weekly') {
-          freq = ICalEventRepeatingFreq.WEEKLY;
-        } else if (pattern === 'biweekly') {
-          freq = ICalEventRepeatingFreq.WEEKLY;
-          interval = 2; // Every 2 weeks
-        } else if (pattern === 'monthly') {
-          freq = ICalEventRepeatingFreq.MONTHLY;
-        } else if (pattern === 'end_of_month') {
-          freq = ICalEventRepeatingFreq.MONTHLY;
-          // Will occur on the last day of each month
-        } else if (pattern === 'yearly') {
-          freq = ICalEventRepeatingFreq.YEARLY;
+        // Build description with metadata link if available
+        let eventDescription = task.description || '';
+        if (task.metadata?.link) {
+          eventDescription = eventDescription
+            ? `${eventDescription}\n\nLink: ${task.metadata.link}`
+            : `Link: ${task.metadata.link}`;
         }
 
-        if (freq) {
-          const repeatOptions: {
-            freq: ICalEventRepeatingFreq;
-            until?: Date;
-            interval?: number;
-            byMonthDay?: number;
-          } = {
-            freq,
-            until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
-          };
-
-          if (interval) {
-            repeatOptions.interval = interval;
-          }
-
-          // For end_of_month, set to last day
-          if (pattern === 'end_of_month') {
-            repeatOptions.byMonthDay = -1; // Last day of month
-          }
-
-          event.repeating(repeatOptions);
-        }
-      }
-    }
-
-    // Fetch habits for recurring events (only active habits)
-    const allUserHabits = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.userId, userId), eq(habits.active, true)));
-
-    // Add habits as recurring events
-    for (const habit of allUserHabits) {
-      // Parse reminder time or default to 9 AM JST
-      const [hours = 9, minutes = 0] = habit.reminderTime
-        ? habit.reminderTime.split(':').map(Number)
-        : [9, 0];
-
-      // reminderTime is stored as JST time (e.g., "09:00" = 9 AM JST)
-      // Get date components from habit creation date in JST
-      const createdComponents = getJstDateComponents(new Date(habit.createdAt));
-
-      // Build JST date string with reminder time, then convert to UTC
-      const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-${String(createdComponents.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-
-      // Convert JST to UTC for ical-generator
-      const startDate = jstToUtc(jstDateString);
-      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 minute duration
-
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
-
-      // Build description with metadata link if available
-      let habitDescription = habit.description || '';
-      if (habit.metadata?.link) {
-        habitDescription = habitDescription
-          ? `${habitDescription}\n\nLink: ${habit.metadata.link}`
-          : `Link: ${habit.metadata.link}`;
-      }
-
-      const event = calendar.createEvent({
-        id: `habit-${habit.id}`,
-        start: startDate,
-        end: endDate,
-        summary: habit.name,
-        description: habitDescription || undefined,
-        categories: [{ name: habit.space || 'personal' }, { name: 'habits' }],
-        allDay: false,
-        url: habitUrl
-      });
-
-      event.status(ICalEventStatus.CONFIRMED);
-      event.priority(5); // Default priority for habits
-
-      // Add recurrence rule based on frequency
-      if (habit.frequency === 'daily') {
-        event.repeating({ freq: ICalEventRepeatingFreq.DAILY });
-      } else if (habit.frequency === 'weekly') {
-        // For weekly habits, specify which days
-        const targetDays = habit.targetDays || [];
-        const dayNames: ICalWeekday[] = [
-          ICalWeekday.SU,
-          ICalWeekday.MO,
-          ICalWeekday.TU,
-          ICalWeekday.WE,
-          ICalWeekday.TH,
-          ICalWeekday.FR,
-          ICalWeekday.SA
-        ];
-        const byDay = targetDays.map((d) => dayNames[d]);
-
-        event.repeating({
-          freq: ICalEventRepeatingFreq.WEEKLY,
-          byDay: byDay.length > 0 ? byDay : undefined
+        const event = calendar.createEvent({
+          id: task.id,
+          start: eventStart,
+          end: eventEnd,
+          summary: `[${task.space || 'work'}] ${task.title}`,
+          description: eventDescription || undefined,
+          categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
+          allDay: isAllDayDeadline,
+          url: taskUrl
         });
+
+        // Set status - CANCELLED if in Done column, otherwise CONFIRMED
+        const isCompleted = task.columnName ? isColumnDone(task.columnName) : false;
+        event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
+
+        // Set priority
+        if (task.priority) {
+          const priorityMap: Record<string, number> = {
+            urgent: 1,
+            high: 3,
+            medium: 5,
+            low: 7
+          };
+          event.priority(priorityMap[task.priority] || 5);
+        }
+
+        // Add RRULE for recurring tasks
+        if (task.recurringPattern) {
+          const pattern = task.recurringPattern.toLowerCase();
+
+          let freq: ICalEventRepeatingFreq | undefined;
+          let interval: number | undefined;
+
+          if (pattern === 'daily') {
+            freq = ICalEventRepeatingFreq.DAILY;
+          } else if (pattern === 'weekly') {
+            freq = ICalEventRepeatingFreq.WEEKLY;
+          } else if (pattern === 'biweekly') {
+            freq = ICalEventRepeatingFreq.WEEKLY;
+            interval = 2; // Every 2 weeks
+          } else if (pattern === 'monthly') {
+            freq = ICalEventRepeatingFreq.MONTHLY;
+          } else if (pattern === 'end_of_month') {
+            freq = ICalEventRepeatingFreq.MONTHLY;
+            // Will occur on the last day of each month
+          } else if (pattern === 'yearly') {
+            freq = ICalEventRepeatingFreq.YEARLY;
+          }
+
+          if (freq) {
+            const repeatOptions: {
+              freq: ICalEventRepeatingFreq;
+              until?: Date;
+              interval?: number;
+              byMonthDay?: number;
+            } = {
+              freq,
+              until: task.recurringEndDate ? new Date(task.recurringEndDate) : undefined
+            };
+
+            if (interval) {
+              repeatOptions.interval = interval;
+            }
+
+            // For end_of_month, set to last day
+            if (pattern === 'end_of_month') {
+              repeatOptions.byMonthDay = -1; // Last day of month
+            }
+
+            event.repeating(repeatOptions);
+          }
+        }
       }
+
+      // Fetch habits for recurring events (only active habits)
+      const allUserHabits = await db
+        .select()
+        .from(habits)
+        .where(and(eq(habits.userId, userId), eq(habits.active, true)));
+
+      // Add habits as recurring events
+      for (const habit of allUserHabits) {
+        // Parse reminder time or default to 9 AM JST
+        const [hours = 9, minutes = 0] = habit.reminderTime
+          ? habit.reminderTime.split(':').map(Number)
+          : [9, 0];
+
+        // reminderTime is stored as JST time (e.g., "09:00" = 9 AM JST)
+        // Get date components from habit creation date in JST
+        const createdComponents = getJstDateComponents(new Date(habit.createdAt));
+
+        // Build JST date string with reminder time, then convert to UTC
+        const jstDateString = `${createdComponents.year}-${String(createdComponents.month).padStart(2, '0')}-${String(createdComponents.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+
+        // Convert JST to UTC for ical-generator
+        const startDate = jstToUtc(jstDateString);
+        const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 minute duration
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const habitUrl = `${frontendUrl}/agenda?date=${startDate.toISOString().split('T')[0]}`;
+
+        // Build description with metadata link if available
+        let habitDescription = habit.description || '';
+        if (habit.metadata?.link) {
+          habitDescription = habitDescription
+            ? `${habitDescription}\n\nLink: ${habit.metadata.link}`
+            : `Link: ${habit.metadata.link}`;
+        }
+
+        const event = calendar.createEvent({
+          id: `habit-${habit.id}`,
+          start: startDate,
+          end: endDate,
+          summary: habit.name,
+          description: habitDescription || undefined,
+          categories: [{ name: habit.space || 'personal' }, { name: 'habits' }],
+          allDay: false,
+          url: habitUrl
+        });
+
+        event.status(ICalEventStatus.CONFIRMED);
+        event.priority(5); // Default priority for habits
+
+        // Add recurrence rule based on frequency
+        if (habit.frequency === 'daily') {
+          event.repeating({ freq: ICalEventRepeatingFreq.DAILY });
+        } else if (habit.frequency === 'weekly') {
+          // For weekly habits, specify which days
+          const targetDays = habit.targetDays || [];
+          const dayNames: ICalWeekday[] = [
+            ICalWeekday.SU,
+            ICalWeekday.MO,
+            ICalWeekday.TU,
+            ICalWeekday.WE,
+            ICalWeekday.TH,
+            ICalWeekday.FR,
+            ICalWeekday.SA
+          ];
+          const byDay = targetDays.map((d) => dayNames[d]);
+
+          event.repeating({
+            freq: ICalEventRepeatingFreq.WEEKLY,
+            byDay: byDay.length > 0 ? byDay : undefined
+          });
+        }
+      }
+
+      // Set response headers for iCal
+      set.headers = {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="hamflow.ics"'
+      };
+
+      return calendar.toString();
+    },
+    {
+      params: t.Object({
+        userId: t.String(),
+        token: t.String()
+      })
     }
-
-    // Set response headers for iCal
-    set.headers = {
-      'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="hamflow.ics"'
-    };
-
-    return calendar.toString();
-  },
-  {
-    params: t.Object({
-      userId: t.String(),
-      token: t.String()
-    })
-  }
-);
+  );
 
 // Authenticated calendar routes
 export const calendarRoutes = new Elysia({ prefix: '/calendar' })
-  .decorate('db', db)
+  .decorate('db', database)
   .use(withAuth())
   // Get iCal feed URL (returns the URL for subscription)
   .get('/feed-url', ({ user, request }) => {
@@ -376,8 +378,10 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       const recurringTasks = await recurringQueryBuilder;
 
       // Merge recurring tasks, avoiding duplicates
-      const existingTaskIds = new Set(allTasks.map((t) => t.id));
-      const uniqueRecurringTasks = recurringTasks.filter((t) => !existingTaskIds.has(t.id));
+      const existingTaskIds = new Set(allTasks.map((taskItem) => taskItem.id));
+      const uniqueRecurringTasks = recurringTasks.filter(
+        (taskItem) => !existingTaskIds.has(taskItem.id)
+      );
 
       allTasks = [...allTasks, ...uniqueRecurringTasks];
 
@@ -425,16 +429,16 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         });
 
         // Merge with existing tasks, avoiding duplicates
-        const currentTaskIds = new Set(allTasks.map((t) => t.id));
+        const currentTaskIds = new Set(allTasks.map((taskItem) => taskItem.id));
         const uniqueNoDueDateTasks = filteredNoDueDateTasks.filter(
-          (t) => !currentTaskIds.has(t.id)
+          (taskItem) => !currentTaskIds.has(taskItem.id)
         );
 
         allTasks = [...allTasks, ...uniqueNoDueDateTasks];
       }
 
       // Fetch subtasks separately for the fetched tasks
-      const taskIds = allTasks.map((t) => t.id);
+      const taskIds = allTasks.map((taskItem) => taskItem.id);
       const subtasksData = taskIds.length
         ? await db.select().from(subtasks).where(inArray(subtasks.taskId, taskIds))
         : [];
@@ -554,17 +558,17 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         });
 
         // Add non-recurring overdue
-        for (const t of overdueNonRecurring) {
+        for (const taskItem of overdueNonRecurring) {
           // Avoid duplicates
-          if (!finalEvents.find((e) => e.id === t.id)) {
+          if (!finalEvents.find((eventItem) => eventItem.id === taskItem.id)) {
             finalEvents.push({
-              ...formatTask(t),
-              space: t.space as 'work' | 'personal',
+              ...formatTask(taskItem),
+              space: taskItem.space as 'work' | 'personal',
               type: 'task' as const,
               completed: false,
               completionState: 'active' as const,
-              instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
-              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+              instanceDate: taskItem.dueDate?.toISOString().split('T')[0] || '',
+              dueDate: taskItem.dueDate ? new Date(taskItem.dueDate) : undefined
             } as unknown as CalendarEvent);
           }
         }
@@ -673,24 +677,27 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           return task.columnName ? !isColumnDone(task.columnName) : true;
         });
 
-        for (const t of upcomingNonRecurring) {
-          if (!finalEvents.find((e) => e.id === t.id)) {
+        for (const taskItem of upcomingNonRecurring) {
+          if (!finalEvents.find((eventItem) => eventItem.id === taskItem.id)) {
             finalEvents.push({
-              ...formatTask(t),
-              space: t.space as 'work' | 'personal',
+              ...formatTask(taskItem),
+              space: taskItem.space as 'work' | 'personal',
               type: 'task' as const,
               completed: false,
               completionState: 'active' as const,
-              instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
-              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+              instanceDate: taskItem.dueDate?.toISOString().split('T')[0] || '',
+              dueDate: taskItem.dueDate ? new Date(taskItem.dueDate) : undefined
             });
           }
         }
 
         // 2. RECURRING UPCOMING
         // We need to fetch recurring tasks that MIGHT occur in this upcoming window
-        const recurringConditions = [eq(tasks.userId, user.id), isNotNull(tasks.recurringPattern)];
-        if (space !== 'all') recurringConditions.push(eq(boards.space, space));
+        const upcomingRecurringConditions = [
+          eq(tasks.userId, user.id),
+          isNotNull(tasks.recurringPattern)
+        ];
+        if (space !== 'all') upcomingRecurringConditions.push(eq(boards.space, space));
 
         const possibleRecurringTasks = await db
           .select({
@@ -717,7 +724,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
           .from(tasks)
           .leftJoin(columns, eq(tasks.columnId, columns.id))
           .leftJoin(boards, eq(columns.boardId, boards.id))
-          .where(and(...recurringConditions));
+          .where(and(...upcomingRecurringConditions));
 
         const formattedRecurring = possibleRecurringTasks.map(formatTask);
         // We won't check completions for upcoming - assumption: future tasks are usually not complete yet.

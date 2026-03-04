@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
-import { cookie } from '@elysiajs/cookie';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
+import { cookie as cookiePlugin } from '@elysiajs/cookie';
 import { eq } from 'drizzle-orm';
 import { users } from '../../../drizzle/schema';
-import { db } from '../db';
+import { db as database } from '../db';
 
 interface AuthUser {
   id: string;
@@ -12,10 +12,10 @@ interface AuthUser {
 }
 
 export const authMiddleware = new Elysia({ name: 'auth-middleware' })
-  .decorate('db', db)
-  .use(cookie())
+  .decorate('db', database)
+  .use(cookiePlugin())
   .use(
-    jwt({
+    jwtPlugin({
       name: 'jwt',
       secret: process.env.JWT_SECRET || 'your-secret-key'
     })
@@ -62,10 +62,10 @@ export const authMiddleware = new Elysia({ name: 'auth-middleware' })
 
 // Optional auth middleware (doesn't throw error if not authenticated)
 export const optionalAuthMiddleware = new Elysia({ name: 'optional-auth' })
-  .decorate('db', db)
-  .use(cookie())
+  .decorate('db', database)
+  .use(cookiePlugin())
   .use(
-    jwt({
+    jwtPlugin({
       name: 'jwt',
       secret: process.env.JWT_SECRET || 'your-secret-key'
     })

@@ -235,7 +235,10 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           .from(tasks)
           .leftJoin(columns, eq(tasks.columnId, columns.id))
           .where(eq(tasks.columnId, query.columnId));
-        boardTasks = tasksWithColumns.map((t) => ({ ...t.task, columnName: t.columnName ?? null }));
+        boardTasks = tasksWithColumns.map((taskWithColumn) => ({
+          ...taskWithColumn.task,
+          columnName: taskWithColumn.columnName ?? null
+        }));
       } else {
         const columnIds = boardColumns.map((c) => c.id);
         if (columnIds.length > 0) {
@@ -247,9 +250,9 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
             .from(tasks)
             .leftJoin(columns, eq(tasks.columnId, columns.id))
             .where(inArray(tasks.columnId, columnIds));
-          boardTasks = tasksWithColumns.map((t) => ({
-            ...t.task,
-            columnName: t.columnName ?? null
+          boardTasks = tasksWithColumns.map((taskWithColumn) => ({
+            ...taskWithColumn.task,
+            columnName: taskWithColumn.columnName ?? null
           }));
         } else {
           boardTasks = [];
@@ -272,7 +275,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
 
       const totalTasks = boardTasks.length;
       const completedTasks = boardTasks.filter(
-        (t) => t.columnName && isColumnDone(t.columnName)
+        (taskItem) => taskItem.columnName && isColumnDone(taskItem.columnName)
       ).length;
       const incompleteTasks = totalTasks - completedTasks;
 
@@ -285,7 +288,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       if (!query.columnId) {
         summary += `**Tasks by Column:**\n\n`;
         for (const column of boardColumns) {
-          const columnTasks = boardTasks.filter((t) => t.columnId === column.id);
+          const columnTasks = boardTasks.filter((taskItem) => taskItem.columnId === column.id);
           if (columnTasks.length > 0) {
             summary += `### ${column.name} (${columnTasks.length})\n`;
             for (const task of columnTasks) {

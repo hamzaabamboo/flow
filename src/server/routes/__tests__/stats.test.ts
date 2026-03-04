@@ -28,21 +28,21 @@ const createMockQueryBuilder = (resolvedValue: unknown) => {
   return builder as unknown as PgSelectBuilder<any, any>;
 };
 
-import { db } from '../../db';
+import { db as database } from '../../db';
 import * as schema from '../../../../drizzle/schema';
 import { inboxItems, tasks } from '../../../../drizzle/schema';
 
 // Manually define the routes logic here to avoid import issues and 500s in tests
 const testStatsRoutes = new Elysia({ prefix: '/stats' })
-  .decorate('db', db)
+  .decorate('db', database)
   .derive(() => ({ user: { id: 'u1' } }))
   .get('/test', () => ({ test: 'working' }))
-  .get('/badges', async ({ db }: { db: PostgresJsDatabase<typeof schema> }) => {
-    const inbox = await db
+  .get('/badges', async ({ db: contextDb }: { db: PostgresJsDatabase<typeof schema> }) => {
+    const inbox = await contextDb
       .select()
       .from(inboxItems)
       .where(sql`1=1`);
-    const userTasks = await db
+    const userTasks = await contextDb
       .select()
       .from(tasks)
       .where(sql`1=1`);
@@ -53,8 +53,8 @@ const testStatsRoutes = new Elysia({ prefix: '/stats' })
       tasks: userTasks.length
     };
   })
-  .get('/analytics/completions', async ({ query, db }) => {
-    const allTasks = await db
+  .get('/analytics/completions', async ({ query, db: contextDb }) => {
+    const allTasks = await contextDb
       .select()
       .from(tasks)
       .where(sql`1=1`);
@@ -74,9 +74,9 @@ describe('Stats Routes', () => {
 
   it('GET /stats/badges should work', async () => {
     // 1st call for inbox
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'i1' }]));
+    vi.mocked(database.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'i1' }]));
     // 2nd call for tasks
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 't1' }]));
+    vi.mocked(database.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 't1' }]));
 
     const app = new Elysia().use(testStatsRoutes);
     const response = await app.handle(new Request('http://localhost/stats/badges?space=work'));
@@ -88,7 +88,7 @@ describe('Stats Routes', () => {
   });
 
   it('GET /stats/analytics/completions should work', async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 't1' }]));
+    vi.mocked(database.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 't1' }]));
 
     const app = new Elysia().use(testStatsRoutes);
     const url =

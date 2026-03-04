@@ -58,7 +58,6 @@ export default function AgendaPage() {
   const autoOrganizeMutation = useAutoOrganize();
   const applyAutoOrganizeMutation = useApplyAutoOrganize();
 
-  // Use task actions hook
   const taskActions = useTaskActions({
     onTaskEdit: (task) => {
       const extendedTask = calendarEventToExtendedTask(task as CalendarEvent);
@@ -70,7 +69,6 @@ export default function AgendaPage() {
     }
   });
 
-  // Get calendar events
   const {
     data: events,
     refetch: refetchEvents,
@@ -82,13 +80,11 @@ export default function AgendaPage() {
       let start: Date, end: Date;
 
       if (viewMode === 'day') {
-        // Day view: fetch only the selected day
         start = new Date(selectedDate);
         start.setHours(0, 0, 0, 0);
         end = new Date(selectedDate);
         end.setHours(23, 59, 59, 999);
       } else {
-        // Week view: fetch the entire week
         const weekStart = startOfWeek(selectedDate);
         const weekEnd = endOfWeek(selectedDate);
         start = new Date(weekStart);
@@ -97,7 +93,6 @@ export default function AgendaPage() {
         end.setHours(23, 59, 59, 999);
       }
 
-      // Convert to UNIX timestamps (seconds)
       const startUnix = Math.floor(start.getTime() / 1000);
       const endUnix = Math.ceil(end.getTime() / 1000);
 
@@ -135,7 +130,6 @@ export default function AgendaPage() {
     }
   });
 
-  // Complete task mutation
   const completeTaskMutation = useMutation({
     mutationFn: async ({ id, completed, instanceDate }: CompleteTaskPayload) => {
       const body: { completed: boolean; instanceDate?: string } = { completed };
@@ -176,15 +170,13 @@ export default function AgendaPage() {
     }
   });
 
-  // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
-      // Remove fields that the API doesn't expect
       const { id: _, columnName: __, subtasks: ___, column: ____, ...payload } = taskData;
       const { data, error } = await api.api.tasks.post({
         title: taskData.title || 'Untitled',
         ...payload
-      } as unknown as { title: string }); // Eden Treaty expects at least title
+      } as unknown as { title: string });
       if (error) throw new Error('Failed to create task');
       return data;
     },
@@ -195,7 +187,6 @@ export default function AgendaPage() {
     }
   });
 
-  // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (taskData: Partial<Task>) => {
       const { data, error } = await api.api
@@ -211,10 +202,8 @@ export default function AgendaPage() {
     }
   });
 
-  // Carry over tasks mutation
   const carryOverTasksMutation = useMutation({
     mutationFn: async ({ taskIds, targetDate }: { taskIds: string[]; targetDate: Date }) => {
-      // Get unique task IDs since recurring tasks may have duplicate IDs
       const uniqueTaskIds = Array.from(new Set(taskIds));
 
       const promises = uniqueTaskIds.map((taskId) => {
@@ -300,16 +289,16 @@ export default function AgendaPage() {
     if (data.labels) {
       try {
         taskData.labels = JSON.parse(data.labels as string);
-      } catch (e) {
-        console.error('Failed to parse labels:', e);
+      } catch (parseError) {
+        console.error('Failed to parse labels:', parseError);
       }
     }
 
     if (data.subtasks) {
       try {
         taskData.subtasks = JSON.parse(data.subtasks as string);
-      } catch (e) {
-        console.error('Failed to parse subtasks:', e);
+      } catch (parseError) {
+        console.error('Failed to parse subtasks:', parseError);
       }
     }
 
@@ -336,7 +325,6 @@ export default function AgendaPage() {
     }
   };
 
-  // Auto Organize handlers
   const handleAutoOrganize = async () => {
     try {
       let start: Date, end: Date;
@@ -392,7 +380,6 @@ export default function AgendaPage() {
     }
   };
 
-  // Separate overdue tasks
   const overdueTasks = useMemo(() => {
     if (!events || viewMode !== 'day') {
       return [];
@@ -417,7 +404,6 @@ export default function AgendaPage() {
     return overdue;
   }, [events, viewMode]);
 
-  // Separate unscheduled and upcoming tasks
   const unscheduledAndUpcomingTasks = useMemo(() => {
     if (!events) {
       return [];
@@ -425,26 +411,22 @@ export default function AgendaPage() {
 
     const tasks: CalendarEvent[] = [];
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
+    today.setHours(23, 59, 59, 999);
 
     events.forEach((event) => {
-      // Skip completed tasks
       if (isTaskCompleted(event)) return;
 
-      // Include unscheduled tasks (no due date)
       if (!event.dueDate) {
         tasks.push({ ...event, isUpcoming: false });
         return;
       }
 
-      // Include upcoming tasks (due date after today)
       const dueDate = new Date(event.dueDate);
       if (dueDate > today) {
         tasks.push({ ...event, isUpcoming: true });
       }
     });
 
-    // Sort: unscheduled first, then upcoming by due date
     return tasks.toSorted((a, b) => {
       if (!a.dueDate && !b.dueDate) return 0;
       if (!a.dueDate) return -1;
@@ -457,7 +439,6 @@ export default function AgendaPage() {
     const grouped: Record<string, CalendarEvent[]> = {};
 
     if (viewMode === 'week') {
-      // Initialize all days of the week
       for (let i = 0; i < 7; i++) {
         const date = addDays(startOfWeek(selectedDate), i);
         const dateKey = format(date, 'yyyy-MM-dd');
@@ -468,7 +449,6 @@ export default function AgendaPage() {
       grouped[dateKey] = [];
     }
 
-    // Group events
     events?.forEach((event) => {
       if (!event.dueDate) return;
 
@@ -486,7 +466,6 @@ export default function AgendaPage() {
     return grouped;
   }, [events, viewMode, selectedDate]);
 
-  // Calculate stats
   const stats = useMemo(() => {
     if (!events) {
       return { total: 0, completed: 0, remaining: 0, overdue: 0, todo: 0 };
@@ -504,7 +483,6 @@ export default function AgendaPage() {
         return eventDate >= weekStart && eventDate <= weekEnd;
       });
     } else {
-      // Day view
       const dayKey = format(selectedDate, 'yyyy-MM-dd');
       filteredEvents = events.filter((event) => {
         if (!event.dueDate) return false;
@@ -523,10 +501,9 @@ export default function AgendaPage() {
       if (isTaskCompleted(event)) return false;
       if (!event.dueDate) return false;
       const dueDate = new Date(event.dueDate);
-      return dueDate >= now; // Future or today (not overdue)
+      return dueDate >= now;
     }).length;
 
-    // Add incomplete habits to todo count (only for day view)
     const incompleteHabitsCount =
       viewMode === 'day' && habits ? habits.filter((habit) => !habit.completedToday).length : 0;
 
@@ -544,7 +521,6 @@ export default function AgendaPage() {
   return (
     <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
       <VStack gap="6" alignItems="stretch">
-        {/* Header */}
         <VStack gap="4" alignItems="stretch" width="100%">
           <HStack
             gap="3"
@@ -562,7 +538,6 @@ export default function AgendaPage() {
             </VStack>
 
             <HStack gap="2" justifyContent={{ base: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
-              {/* Auto Organize Button */}
               <Button
                 variant="outline"
                 size={{ base: 'xs', sm: 'sm' }}
@@ -574,7 +549,6 @@ export default function AgendaPage() {
                 <Box display={{ base: 'none', sm: 'block' }}>Auto Organize</Box>
               </Button>
 
-              {/* Create Task Button */}
               <Button
                 variant="solid"
                 size={{ base: 'xs', sm: 'sm' }}
@@ -588,7 +562,6 @@ export default function AgendaPage() {
                 <Box display={{ base: 'none', sm: 'block' }}>New Task</Box>
               </Button>
 
-              {/* View Mode Toggle */}
               <HStack gap="1">
                 <Button
                   variant={viewMode === 'day' ? 'solid' : 'ghost'}
@@ -606,7 +579,6 @@ export default function AgendaPage() {
                 </Button>
               </HStack>
 
-              {/* Date Navigation */}
               <HStack gap="1">
                 <IconButton
                   variant="ghost"
@@ -644,7 +616,6 @@ export default function AgendaPage() {
           </HStack>
         </VStack>
 
-        {/* Main Content */}
         {isLoadingEvents ? (
           <Center minH="60vh">
             <Spinner size="xl" label="Loading events..." />
@@ -687,14 +658,12 @@ export default function AgendaPage() {
             />
           </Grid>
         ) : (
-          // Day View - CSS Grid with responsive positioning
           <Grid
             gap={4}
             gridTemplateColumns={{ base: '1fr', lg: '4fr 1fr' }}
             gridTemplateRows={{ base: 'auto auto auto', lg: 'auto auto' }}
             w="full"
           >
-            {/* Habits - Top on mobile, sidebar top on desktop */}
             <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '1', lg: '1' }}>
               <HabitsCard
                 habits={habits}
@@ -708,7 +677,6 @@ export default function AgendaPage() {
                   })
                 }
                 onCompleteAll={() => {
-                  // Complete all incomplete habits
                   habits
                     ?.filter((habit) => !habit.completedToday)
                     .forEach((habit) => {
@@ -722,7 +690,6 @@ export default function AgendaPage() {
               />
             </Box>
 
-            {/* Tasks - Middle on mobile, left spanning both rows on desktop */}
             <Box gridColumn={{ base: '1', lg: '1' }} gridRow={{ base: '2', lg: '1 / 3' }}>
               <VStack gap="3" alignItems="stretch" w="full">
                 <OverdueTasksCard
@@ -756,7 +723,6 @@ export default function AgendaPage() {
                   extraActions={taskActions.extraActions}
                 />
 
-                {/* Unscheduled & Upcoming Tasks */}
                 {unscheduledAndUpcomingTasks.length > 0 && (
                   <UpcomingTasksCard
                     tasks={unscheduledAndUpcomingTasks}
@@ -772,20 +738,17 @@ export default function AgendaPage() {
               </VStack>
             </Box>
 
-            {/* Stats - Bottom on mobile, sidebar bottom on desktop */}
             <Box gridColumn={{ base: '1', lg: '2' }} gridRow={{ base: '3', lg: '2' }}>
               <StatsCard title="Daily Stats" stats={stats} />
             </Box>
           </Grid>
         )}
 
-        {/* Task Dialog */}
         <TaskDialog
           open={isTaskDialogOpen}
           onOpenChange={(isOpen) => {
             setIsTaskDialogOpen(isOpen);
             if (!isOpen) {
-              // Delay reset until after dialog animation completes
               setTimeout(() => setEditingTask(null), 200);
             }
           }}
@@ -794,7 +757,6 @@ export default function AgendaPage() {
           onSubmit={handleDialogSubmit}
         />
 
-        {/* Move Task Dialog */}
         <MoveTaskDialog
           open={taskActions.isMoveDialogOpen}
           onOpenChange={taskActions.setIsMoveDialogOpen}
@@ -803,7 +765,6 @@ export default function AgendaPage() {
           isMoving={taskActions.isMoving}
         />
 
-        {/* Auto Organize Dialog */}
         <AutoOrganizeDialog
           open={isAutoOrganizeDialogOpen}
           onOpenChange={setIsAutoOrganizeDialogOpen}

@@ -44,7 +44,7 @@ export function NotificationDropdown() {
   };
 
   return (
-    <Popover.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+    <Popover.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
       <Popover.Trigger asChild>
         <IconButton
           variant="ghost"

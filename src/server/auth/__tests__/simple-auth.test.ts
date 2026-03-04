@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Elysia } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
 import { simpleAuth } from '../simple-auth';
 import { db } from '../../db';
 import { asMock } from '../../../test/mocks/api';
@@ -77,7 +77,7 @@ describe('Simple Auth', () => {
   });
 
   it('GET /api/auth/me should return user if token valid', async () => {
-    const signerApp = new Elysia().use(jwt(JWT_CONFIG)).get('/sign', ({ jwt }) =>
+    const signerApp = new Elysia().use(jwtPlugin(JWT_CONFIG)).get('/sign', ({ jwt }) =>
       jwt.sign({
         userId: 'u1',
         email: 't@t.com',
@@ -181,7 +181,7 @@ describe('Simple Auth', () => {
 
   it('GET /api/auth/me should return 401 if user not found in DB', async () => {
     const signerApp = new Elysia()
-      .use(jwt(JWT_CONFIG))
+      .use(jwtPlugin(JWT_CONFIG))
       .get('/sign', ({ jwt }) => jwt.sign({ userId: 'missing' }));
     const signRes = await signerApp.handle(new Request('http://localhost/sign'));
     const token = await signRes.text();

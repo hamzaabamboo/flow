@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import BoardsPage from '../boards/+Page';
 import { SpaceContext, SpaceContextType } from '../../contexts/SpaceContext';
 import { AuthContext, AuthContextType } from '../../contexts/AuthContext';
@@ -12,37 +13,66 @@ vi.mock('vike/client/router', () => ({
   navigate: vi.fn()
 }));
 
+function TestProviders({
+  children,
+  queryClient,
+  isAuthenticated,
+  currentSpace
+}: {
+  children: ReactNode;
+  queryClient: QueryClient;
+  isAuthenticated: boolean;
+  currentSpace: 'work' | 'personal';
+}) {
+  const authValue = useMemo(
+    () =>
+      ({
+        isAuthenticated,
+        login: vi.fn(),
+        logout: vi.fn(),
+        user: null,
+        loading: false,
+        refreshToken: vi.fn()
+      }) as unknown as AuthContextType,
+    [isAuthenticated]
+  );
+  const spaceValue = useMemo(
+    () =>
+      ({
+        currentSpace,
+        setCurrentSpace: vi.fn(),
+        toggleSpace: vi.fn()
+      }) as SpaceContextType,
+    [currentSpace]
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={authValue}>
+        <SpaceContext.Provider value={spaceValue}>
+          <DialogProvider>{children}</DialogProvider>
+        </SpaceContext.Provider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
 const renderWithProviders = (
-  ui: React.ReactElement,
-  { isAuthenticated = true, currentSpace = 'personal' } = {}
+  ui: ReactElement,
+  { isAuthenticated = true, currentSpace = 'personal' as const } = {}
 ) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider
-        value={
-          {
-            isAuthenticated,
-            login: vi.fn(),
-            logout: vi.fn(),
-            user: null,
-            loading: false,
-            refreshToken: vi.fn()
-          } as unknown as AuthContextType
-        }
-      >
-        <SpaceContext.Provider
-          value={
-            { currentSpace, setCurrentSpace: vi.fn(), toggleSpace: vi.fn() } as SpaceContextType
-          }
-        >
-          <DialogProvider>{ui}</DialogProvider>
-        </SpaceContext.Provider>
-      </AuthContext.Provider>
-    </QueryClientProvider>
+    <TestProviders
+      queryClient={queryClient}
+      isAuthenticated={isAuthenticated}
+      currentSpace={currentSpace}
+    >
+      {ui}
+    </TestProviders>
   );
 };
 

@@ -3,7 +3,7 @@ import { cron } from '@elysiajs/cron';
 import { and, eq, lte } from 'drizzle-orm';
 import { reminders, users, tasks } from '../../drizzle/schema';
 import { MORNING_SUMMARY_HOUR_UTC, EVENING_SUMMARY_HOUR_UTC } from '../shared/constants';
-import { db, type Database } from './db';
+import { db as database, type Database } from './db';
 import { HamBotIntegration } from './integrations/hambot';
 import { SummaryService } from './services/summary-service';
 import { HabitReminderService } from './services/habit-reminder-service';
@@ -79,7 +79,7 @@ export async function sendDailySummary(
 
 async function sendDailySummaries(type: 'morning' | 'evening') {
   try {
-    const hambot = new HamBotIntegration(db);
+    const hambot = new HamBotIntegration(database);
 
     if (!hambot.isConfigured()) {
       logger.warn('HamBot not configured, skipping daily summaries');
@@ -90,7 +90,7 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
     const settingKey = type === 'evening' ? 'eveningSummaryEnabled' : 'morningSummaryEnabled';
 
     // Fetch all users and filter in memory (JSONB queries in Drizzle are tricky)
-    const allUsers = await db.select().from(users);
+    const allUsers = await database.select().from(users);
     const optedInUsers = allUsers.filter((user) => {
       const settings = user.settings as {
         morningSummaryEnabled?: boolean;
@@ -112,7 +112,7 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
           // Default to both spaces if not specified
           const spaces = userSettings.summarySpaces || ['work', 'personal'];
 
-          await sendDailySummary(user.id, type, spaces, db);
+          await sendDailySummary(user.id, type, spaces, database);
           logger.info(`Sent ${type} summary to user ${user.id} for spaces: ${spaces.join(', ')}`);
         } catch (error) {
           logger.error(error, `Failed to send ${type} summary to user ${user.id}`);
@@ -125,7 +125,7 @@ async function sendDailySummaries(type: 'morning' | 'evening') {
 }
 
 export const cronJobs = new Elysia()
-  .decorate('db', db)
+  .decorate('db', database)
   // Reminder checker - runs every minute
   .use(
     cron({
@@ -137,7 +137,7 @@ export const cronJobs = new Elysia()
         const now = new Date();
 
         // Get all unsent reminders that are due
-        const dueReminders = await db
+        const dueReminders = await database
           .select()
           .from(reminders)
           .where(and(eq(reminders.sent, false), lte(reminders.reminderTime, now)));
@@ -146,10 +146,13 @@ export const cronJobs = new Elysia()
           dueReminders.map(async (reminder) => {
             try {
               // Send reminder via HamBot and WebSocket
-              await sendToHamBot(reminder, db);
+              await sendToHamBot(reminder, database);
 
               // Mark as sent
-              await db.update(reminders).set({ sent: true }).where(eq(reminders.id, reminder.id));
+              await database
+                .update(reminders)
+                .set({ sent: true })
+                .where(eq(reminders.id, reminder.id));
 
               logger.info(`Reminder sent: ${reminder.id}`);
             } catch (error) {
@@ -189,7 +192,7 @@ export const cronJobs = new Elysia()
       name: 'create-habit-reminders',
       pattern: '0 * * * *',
       async run() {
-        const service = new HabitReminderService(db);
+        const service = new HabitReminderService(database);
         await service.createDailyReminders();
       }
     })
@@ -205,7 +208,7 @@ export const cronJobs = new Elysia()
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        await db
+        await database
           .delete(reminders)
           .where(and(eq(reminders.sent, true), lte(reminders.reminderTime, thirtyDaysAgo)));
 

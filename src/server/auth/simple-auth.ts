@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
 import { eq, asc } from 'drizzle-orm';
 import { users } from '../../../drizzle/schema';
-import { db } from '../db';
+import { db as database } from '../db';
 
 // Simple password hashing (in production, use bcrypt or argon2)
 function hashPassword(password: string): string {
@@ -13,9 +13,9 @@ function hashPassword(password: string): string {
 }
 
 export const simpleAuth = new Elysia()
-  .decorate('db', db)
+  .decorate('db', database)
   .use(
-    jwt({
+    jwtPlugin({
       name: 'jwt',
       secret: process.env.JWT_SECRET || 'your-secret-key-change-this',
       exp: '30d'

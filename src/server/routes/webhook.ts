@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import { Elysia, t } from 'elysia';
-import { db } from '../db';
+import { db as database } from '../db';
 import { logger } from '../logger';
 import { HamBotIntegration } from '../integrations/hambot';
 import { wsManager } from '../websocket';
 
 export const webhookRoutes = new Elysia({ prefix: '/webhook' })
-  .decorate('db', db)
+  .decorate('db', database)
   // HamBot webhook endpoint
   .post(
     '/hambot',

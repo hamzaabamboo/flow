@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'crypto';
 import { Elysia, t } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
 import { eq } from 'drizzle-orm';
-import { db } from '../db';
+import { db as database } from '../db';
 import { users } from '../../../drizzle/schema';
 import { HAMAUTH_CONFIG, validateHamAuthToken } from './hamauth-utils';
 
@@ -26,9 +26,9 @@ function generatePKCE() {
 const stateStore = new Map<string, { verifier: string; space: string; returnUrl: string }>();
 
 export const oidcAuth = new Elysia()
-  .decorate('db', db)
+  .decorate('db', database)
   .use(
-    jwt({
+    jwtPlugin({
       name: 'jwt',
       secret: process.env.JWT_SECRET || 'your-secret-key',
       exp: '7d'

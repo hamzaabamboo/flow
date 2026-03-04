@@ -34,9 +34,9 @@ const createMockQueryBuilder = (resolvedValue: unknown): MockQueryBuilder => {
 };
 
 vi.mock('../../auth/withAuth', async () => {
-  const { Elysia } = await import('elysia');
+  const { Elysia: MockElysia } = await import('elysia');
   return {
-    withAuth: () => new Elysia().derive({ as: 'global' }, () => ({ user: { id: 'user-1' } }))
+    withAuth: () => new MockElysia().derive({ as: 'global' }, () => ({ user: { id: 'user-1' } }))
   };
 });
 

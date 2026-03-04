@@ -252,7 +252,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
+    const activeTaskId = active.id as string;
     const overId = over.id as string;
 
     const activeData = active.data.current;
@@ -260,7 +260,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
 
     // If dragging a column over another column, handle column reordering
     if (activeData?.type === 'column' && overData?.type === 'column') {
-      const oldIndex = sortedColumns.findIndex((col) => col.id === activeId);
+      const oldIndex = sortedColumns.findIndex((col) => col.id === activeTaskId);
       const newIndex = sortedColumns.findIndex((col) => col.id === overId);
 
       if (oldIndex !== newIndex) {
@@ -275,7 +275,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     }
 
     // Find the task being dragged
-    const activeTask = tasks.find((t) => t.id === activeId);
+    const activeTask = tasks.find((t) => t.id === activeTaskId);
     if (!activeTask) return;
 
     // Determine the target column
@@ -303,7 +303,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
 
     if (!over) return;
 
-    const activeId = active.id as string;
+    const activeTaskId = active.id as string;
     const overId = over.id as string;
 
     const activeData = active.data.current;
@@ -313,7 +313,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
       return;
     }
 
-    const activeTask = tasks.find((t) => t.id === activeId);
+    const activeTask = tasks.find((t) => t.id === activeTaskId);
     const overTask = tasks.find((t) => t.id === overId);
 
     if (!activeTask) return;
@@ -321,7 +321,7 @@ export function KanbanBoard({ board, tasks, onTaskUpdate, onCopySummary }: Kanba
     // If dropped on a task, reorder within the column
     if (overTask && activeTask.columnId === overTask.columnId) {
       const columnTasks = getTasksByColumn(activeTask.columnId);
-      const oldIndex = columnTasks.findIndex((t) => t.id === activeId);
+      const oldIndex = columnTasks.findIndex((t) => t.id === activeTaskId);
       const newIndex = columnTasks.findIndex((t) => t.id === overId);
 
       if (oldIndex !== newIndex) {

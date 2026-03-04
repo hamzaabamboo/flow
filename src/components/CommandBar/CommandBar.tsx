@@ -487,18 +487,25 @@ export function CommandBar({ open, onOpenChange }: CommandBarProps) {
                     borderLeftColor="colorPalette.default"
                   >
                     <HStack gap="2" flexWrap="wrap">
-                      {currentSessionCommands.map((cmd, index) => (
-                        <React.Fragment key={`${cmd}-${index}`}>
-                          <Text fontSize="xs" color="fg.muted">
-                            {cmd}
-                          </Text>
-                          {index < currentSessionCommands.length - 1 && (
-                            <Text fontSize="xs" color="fg.subtle">
-                              →
-                            </Text>
-                          )}
-                        </React.Fragment>
-                      ))}
+                      {(() => {
+                        const commandCounts = new Map<string, number>();
+                        return currentSessionCommands.map((cmd, index) => {
+                          const count = commandCounts.get(cmd) ?? 0;
+                          commandCounts.set(cmd, count + 1);
+                          return (
+                            <React.Fragment key={`${cmd}-${count}`}>
+                              <Text fontSize="xs" color="fg.muted">
+                                {cmd}
+                              </Text>
+                              {index < currentSessionCommands.length - 1 && (
+                                <Text fontSize="xs" color="fg.subtle">
+                                  →
+                                </Text>
+                              )}
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
                     </HStack>
                   </Box>
                 )}

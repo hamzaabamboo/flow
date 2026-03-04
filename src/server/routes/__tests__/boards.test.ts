@@ -33,11 +33,11 @@ const createMockQueryBuilder = (resolvedValue: unknown) => {
 // Mock dependencies
 // Mock withAuth to avoid DB queries during auth
 vi.mock('../../auth/withAuth', async () => {
-  const { Elysia } = await import('elysia');
+  const { Elysia: MockElysia } = await import('elysia');
   const { db } = await import('../../db');
   return {
     withAuth: () =>
-      new Elysia({ name: 'with-auth' })
+      new MockElysia({ name: 'with-auth' })
         .decorate('db', db)
         .decorate('user', { id: 'user-1', email: 'test@example.com', name: 'Test User' })
         .derive(() => ({

@@ -456,8 +456,8 @@ function TaskRow({
   onToggleComplete,
   onEdit,
   onDelete,
-  getPriorityColor,
-  getPriorityIcon
+  getPriorityColor: taskPriorityColor,
+  getPriorityIcon: taskPriorityIcon
 }: {
   task: Task & { boardName: string; columnName: string };
   columnName: string;
@@ -515,9 +515,9 @@ function TaskRow({
                 {columnName}
               </Badge>
               {task.priority && (
-                <Badge size="sm" colorPalette={getPriorityColor(task.priority)}>
+                <Badge size="sm" colorPalette={taskPriorityColor(task.priority)}>
                   <HStack gap="1">
-                    {getPriorityIcon(task.priority)}
+                    {taskPriorityIcon(task.priority)}
                     {task.priority}
                   </HStack>
                 </Badge>

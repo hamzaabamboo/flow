@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import AgendaPage from '../index/+Page';
 import { SpaceContext } from '../../contexts/SpaceContext';
 import { api } from '../../api/client';
@@ -24,10 +25,36 @@ vi.mock('../../api/client', async () => {
   };
 });
 
-const renderWithProviders = (
-  ui: React.ReactElement,
-  currentSpace: 'work' | 'personal' = 'personal'
-) => {
+function TestProviders({
+  children,
+  queryClient,
+  currentSpace
+}: {
+  children: ReactNode;
+  queryClient: QueryClient;
+  currentSpace: 'work' | 'personal';
+}) {
+  const spaceValue = useMemo(
+    () => ({
+      currentSpace,
+      setCurrentSpace: vi.fn(),
+      toggleSpace: vi.fn()
+    }),
+    [currentSpace]
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SpaceContext.Provider value={spaceValue}>
+        <ToasterProvider>
+          <DialogProvider>{children}</DialogProvider>
+        </ToasterProvider>
+      </SpaceContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
+const renderWithProviders = (ui: ReactElement, currentSpace: 'work' | 'personal' = 'personal') => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false }
@@ -35,15 +62,9 @@ const renderWithProviders = (
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <SpaceContext.Provider
-        value={{ currentSpace, setCurrentSpace: vi.fn(), toggleSpace: vi.fn() }}
-      >
-        <ToasterProvider>
-          <DialogProvider>{ui}</DialogProvider>
-        </ToasterProvider>
-      </SpaceContext.Provider>
-    </QueryClientProvider>
+    <TestProviders queryClient={queryClient} currentSpace={currentSpace}>
+      {ui}
+    </TestProviders>
   );
 };
 

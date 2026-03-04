@@ -2,8 +2,8 @@ import { join } from 'path';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
-import { cookie } from '@elysiajs/cookie';
-import { jwt } from '@elysiajs/jwt';
+import { cookie as cookiePlugin } from '@elysiajs/cookie';
+import { jwt as jwtPlugin } from '@elysiajs/jwt';
 import { wrap } from '@bogeychan/elysia-logger';
 import { renderPage } from 'vike/server';
 import { connect } from 'elysia-connect-middleware';
@@ -67,9 +67,9 @@ const app = _app
       credentials: true
     })
   )
-  .use(cookie())
+  .use(cookiePlugin())
   .use(
-    jwt({
+    jwtPlugin({
       name: 'jwt',
       secret: process.env.JWT_SECRET || 'your-secret-key'
     })
