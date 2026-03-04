@@ -19,9 +19,9 @@
   "scripts": {
     "codegen": "panda codegen",
     "dev": "panda codegen && nodemon",
-    "build": "bun run build:ssr && bun run build:server",
-    "build:ssr": "panda codegen && bunx --bun vike build",
-    "build:server": "bun build src/server/index.ts --outfile=./build/server --compile --target=bun-darwin-x64",
+    "build": "NODE_ENV=production bun run build:ssr && NODE_ENV=production bun run build:server",
+    "build:ssr": "NODE_ENV=production panda codegen && NODE_ENV=production bunx --bun vike build",
+    "build:server": "bun build src/server/index.ts --outfile=./build/server --compile --target=bun-darwin-x64-baseline",
     "start:server": "NODE_ENV=production bun run build/index.js",
     "start:prod": "NODE_ENV=production bun run src/server/index.ts",
     "db:generate": "drizzle-kit generate",
@@ -39,7 +39,7 @@
     "test:ui": "vitest --ui",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "test:endpoints": "bun run scripts/test-endpoints.ts",
+    "test:endpoints": "bash scripts/test-endpoints-with-server.sh",
     "test:integration": "vitest run src/__tests__/integration",
     "seed": "bun run scripts/seed-db.ts",
     "analyze": "bunx vite-bundle-visualizer"

@@ -251,7 +251,7 @@ const app = _app
     const pageContextInit = {
       urlOriginal: request.url,
       user,
-      headers: Object.fromEntries(request.headers.entries())
+      headersOriginal: Object.fromEntries(request.headers.entries())
     };
     const pageContext = await renderPage(pageContextInit);
     const { httpResponse } = pageContext;

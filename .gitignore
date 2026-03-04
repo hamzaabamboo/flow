@@ -16,3 +16,5 @@ styled-system/
 *.sqlite3
 build/
 coverage/
+dogfood-output/
+--annotate
