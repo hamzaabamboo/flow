@@ -15,19 +15,26 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>((props, ref) 
         </IconButton>
       </StyledPagination.PrevTrigger>
       <StyledPagination.Context>
-        {(pagination) =>
-          pagination.pages.map((page) =>
-            page.type === 'page' ? (
-              <StyledPagination.Item key={`page-${page.value}`} {...page} asChild>
-                <Button variant="outline">{page.value}</Button>
-              </StyledPagination.Item>
-            ) : (
-              <StyledPagination.Ellipsis key={`ellipsis-${page.index}`} index={page.index}>
+        {(pagination) => {
+          let ellipsisCount = 0;
+          return pagination.pages.map((page) => {
+            if (page.type === 'page') {
+              return (
+                <StyledPagination.Item key={`page-${page.value}`} {...page} asChild>
+                  <Button variant="outline">{page.value}</Button>
+                </StyledPagination.Item>
+              );
+            }
+            const ellipsisKey = `ellipsis-${ellipsisCount}`;
+            const ellipsisIndex = ellipsisCount;
+            ellipsisCount++;
+            return (
+              <StyledPagination.Ellipsis key={ellipsisKey} index={ellipsisIndex}>
                 &#8230;
               </StyledPagination.Ellipsis>
-            )
-          )
-        }
+            );
+          });
+        }}
       </StyledPagination.Context>
       <StyledPagination.NextTrigger asChild>
         <IconButton variant="ghost" aria-label="Next Page">

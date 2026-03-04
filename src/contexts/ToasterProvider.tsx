@@ -35,7 +35,14 @@ export function ToasterProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, options?: { type?: 'success' | 'error' | 'info' }) => {
+    (
+      message: string,
+      options?: {
+        title?: string;
+        type?: 'success' | 'error' | 'info' | 'warning';
+        duration?: number;
+      }
+    ) => {
       toaster?.create({
         description: message,
         type: 'info',
