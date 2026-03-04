@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import {
+  format,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  differenceInCalendarDays
+} from 'date-fns';
 import { Box, VStack, HStack, Grid } from '../../../styled-system/jsx';
 import { Heading } from '../../components/ui/heading';
 import { Text } from '../../components/ui/text';
@@ -22,7 +30,6 @@ export default function AnalyticsPage() {
   const { currentSpace } = useSpace();
   const [dateRange, setDateRange] = useState<DateRange>('7days');
 
-  // Calculate date range
   const { startDate, endDate, label } = useMemo(() => {
     const now = new Date();
     let start: Date, end: Date, rangeLabel: string;
@@ -65,7 +72,6 @@ export default function AnalyticsPage() {
     return { startDate: start, endDate: end, label: rangeLabel };
   }, [dateRange]);
 
-  // Fetch completion stats
   const {
     data: analyticsData,
     isLoading,
@@ -90,14 +96,11 @@ export default function AnalyticsPage() {
     return analyticsData.completions.flatMap((c) => c.tasks) || [];
   }, [analyticsData]);
 
-  // Calculate stats
   const stats = useMemo(() => {
     const total = completions.length;
-    const daysInRange =
-      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysInRange = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
     const avgPerDay = daysInRange > 0 ? (total / daysInRange).toFixed(1) : '0';
 
-    // Group by priority
     const byPriority = completions.reduce(
       (acc, task) => {
         const priority = task.priority || 'none';
@@ -107,7 +110,6 @@ export default function AnalyticsPage() {
       {} as Record<string, number>
     );
 
-    // Group by date for chart
     const byDate: Record<string, number> = {};
     analyticsData?.completions.forEach((c) => {
       byDate[c.date] = c.count;
@@ -119,13 +121,11 @@ export default function AnalyticsPage() {
   return (
     <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
       <VStack gap="6" alignItems="stretch">
-        {/* Header */}
         <VStack gap="1" alignItems="start">
           <Heading size="2xl">Task Analytics</Heading>
           <Text color="fg.muted">Track your task completion statistics over time</Text>
         </VStack>
 
-        {/* Date Range Selector */}
         <Box borderRadius="lg" w="full" p="4" bg="bg.muted">
           <VStack gap="3" alignItems="stretch">
             <Text fontWeight="medium">Date Range</Text>
@@ -166,7 +166,6 @@ export default function AnalyticsPage() {
           </VStack>
         ) : (
           <>
-            {/* Summary Stats */}
             <Grid gap="4" w="full" columns={{ base: 1, sm: 2, md: 4 }}>
               <Box borderRadius="lg" p="4" bg="bg.muted">
                 <VStack gap="1" justifyContent="flex-start">
@@ -210,7 +209,6 @@ export default function AnalyticsPage() {
               </Box>
             </Grid>
 
-            {/* By Priority */}
             <Box borderRadius="lg" w="full" p="4" bg="bg.muted">
               <VStack gap="3" alignItems="stretch">
                 <Heading size="md">Completions by Priority</Heading>
@@ -245,7 +243,6 @@ export default function AnalyticsPage() {
               </VStack>
             </Box>
 
-            {/* Simple Daily Breakdown */}
             <Box borderRadius="lg" w="full" p="4" bg="bg.muted">
               <VStack gap="3" alignItems="stretch">
                 <Heading size="md">Daily Breakdown</Heading>

@@ -115,7 +115,7 @@ describe('AnalyticsPage', () => {
     await screen.findByText('Total Completed');
 
     expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('0.6')).toBeInTheDocument(); // Avg per day (5 tasks / 8 days)
+    expect(screen.getByText('0.7')).toBeInTheDocument();
     expect(screen.getByText('Completions by Priority')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // High priority
     expect(screen.getAllByText('1')).toHaveLength(3); // Medium, Low, Urgent
