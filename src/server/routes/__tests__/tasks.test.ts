@@ -103,6 +103,10 @@ describe('Task Routes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.select).mockReset();
+    vi.mocked(db.insert).mockReset();
+    vi.mocked(db.update).mockReset();
+    vi.mocked(db.delete).mockReset();
 
     // Setup chainable mocks on the imported db object
     vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
@@ -120,18 +124,47 @@ describe('Task Routes', () => {
 
   describe('GET /tasks', () => {
     it('should fetch tasks for a column', async () => {
-      const mockTasks = [
-        { id: 'task-1', title: 'Task 1', columnId: 'col-1' },
-        { id: 'task-2', title: 'Task 2', columnId: 'col-1' }
+      const mockRows = [
+        {
+          task: { id: 'task-1', title: 'Task 1', columnId: 'col-1', metadata: {} },
+          columnName: 'To Do'
+        },
+        {
+          task: { id: 'task-2', title: 'Task 2', columnId: 'col-1', metadata: {} },
+          columnName: 'Completed'
+        }
       ];
 
-      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks));
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockRows));
 
       const response = await app.handle(new Request('http://localhost/tasks/column/col-1'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(toResponse(mockTasks));
+      expect(data).toEqual(
+        toResponse([
+          {
+            id: 'task-1',
+            title: 'Task 1',
+            columnId: 'col-1',
+            metadata: {},
+            columnName: 'To Do',
+            link: undefined,
+            completed: false,
+            completionState: 'active'
+          },
+          {
+            id: 'task-2',
+            title: 'Task 2',
+            columnId: 'col-1',
+            metadata: {},
+            columnName: 'Completed',
+            link: undefined,
+            completed: true,
+            completionState: 'completed'
+          }
+        ])
+      );
     });
 
     it('should apply search, priority, label filters', async () => {
@@ -148,6 +181,51 @@ describe('Task Routes', () => {
         return app.handle(new Request(url));
       });
       await Promise.all(requests);
+    });
+
+    it('should filter tasks by semantic completion state', async () => {
+      const mockTasks = [
+        { id: 'task-1', title: 'Task 1', columnId: 'col-1', columnName: 'Done', metadata: {} },
+        {
+          id: 'task-2',
+          title: 'Task 2',
+          columnId: 'col-1',
+          columnName: 'Completed',
+          metadata: {}
+        },
+        { id: 'task-3', title: 'Task 3', columnId: 'col-1', columnName: 'To Do', metadata: {} }
+      ];
+
+      vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks));
+
+      const response = await app.handle(new Request('http://localhost/tasks?completed=true'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual(
+        toResponse([
+          {
+            id: 'task-1',
+            title: 'Task 1',
+            columnId: 'col-1',
+            columnName: 'Done',
+            metadata: {},
+            link: undefined,
+            completed: true,
+            completionState: 'completed'
+          },
+          {
+            id: 'task-2',
+            title: 'Task 2',
+            columnId: 'col-1',
+            columnName: 'Completed',
+            metadata: {},
+            link: undefined,
+            completed: true,
+            completionState: 'completed'
+          }
+        ])
+      );
     });
   });
 
@@ -271,20 +349,16 @@ describe('Task Routes', () => {
 
     it('should handle recurring task completion (create log)', async () => {
       const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: 'daily' };
+      const mockUpdateBuilder = createMockUpdateBuilder([mockTask]);
+      const setSpy = (mockUpdateBuilder as unknown as { set: ReturnType<typeof vi.fn> }).set;
 
       // 1. Get task
       vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]));
-      // 2. Get current col
-      vi.mocked(db.select).mockReturnValueOnce(
-        createMockQueryBuilder([{ id: 'c1', boardId: 'b1' }])
-      );
-      // 3. Get target col
-      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([{ id: 'c2' }]));
-      // 4. Check existing log
+      // 2. Existing completion check
       vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
 
       vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
-      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([mockTask]));
+      vi.mocked(db.update).mockReturnValue(mockUpdateBuilder);
 
       const response = await app.handle(
         new Request('http://localhost/tasks/t1', {
@@ -299,26 +373,83 @@ describe('Task Routes', () => {
 
       expect(response.status).toBe(200);
       expect(db.insert).toHaveBeenCalled(); // taskCompletions insert
+      expect(setSpy).toHaveBeenCalled();
+      const updatePayload = setSpy.mock.calls[0][0] as Record<string, unknown>;
+      expect(updatePayload.columnId).toBeUndefined();
+    });
+  });
+
+  describe('POST /tasks/:id/completion', () => {
+    it('should complete recurring task instance without moving parent column', async () => {
+      const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: 'daily' };
+
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([mockTask]));
+      vi.mocked(db.select).mockReturnValueOnce(createMockQueryBuilder([]));
+      vi.mocked(db.insert).mockReturnValue(createMockQueryBuilder([]));
+
+      const response = await app.handle(
+        new Request('http://localhost/tasks/t1/completion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            completed: true,
+            instanceDate: '2024-01-01'
+          })
+        })
+      );
+
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.recurring).toBe(true);
+      expect(data.instanceDate).toBe('2024-01-01');
+      expect(db.insert).toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('should complete non-recurring task by moving it to semantic done column', async () => {
+      const currentTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: null };
+      const currentColumn = { id: 'c1', boardId: 'b1', name: 'To Do' };
+      const boardColumns = [
+        { id: 'c1', name: 'To Do' },
+        { id: 'c2', name: 'Completed' }
+      ];
+      const updatedTask = { ...currentTask, columnId: 'c2' };
+
+      vi.mocked(db.select)
+        .mockReturnValueOnce(createMockQueryBuilder([currentTask]))
+        .mockReturnValueOnce(createMockQueryBuilder([currentColumn]))
+        .mockReturnValueOnce(createMockQueryBuilder(boardColumns));
+      vi.mocked(db.update).mockReturnValue(createMockUpdateBuilder([updatedTask]));
+
+      const response = await app.handle(
+        new Request('http://localhost/tasks/t1/completion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            completed: true
+          })
+        })
+      );
+
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.recurring).toBe(false);
+      expect(data.task.columnId).toBe('c2');
+      expect(db.update).toHaveBeenCalled();
     });
   });
 
   describe('POST /tasks/bulk-complete', () => {
     it('should bulk complete tasks', async () => {
-      const taskIds = ['task-1', 'task-2'];
-      const mockTasks = [
-        { id: 'task-1', columnId: 'col-1', userId: mockUser.id },
-        { id: 'task-2', columnId: 'col-1', userId: mockUser.id }
-      ];
+      const taskIds = ['task-1'];
+      const mockTask = { id: 'task-1', columnId: 'col-1', userId: mockUser.id };
       const mockColumn = { id: 'col-1', boardId: 'board-1', name: 'To Do' };
       const doneColumn = { id: 'col-done', boardId: 'board-1', name: 'Done' };
 
-      // Task 1:
       vi.mocked(db.select)
-        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[0]]))
-        .mockReturnValueOnce(createMockQueryBuilder([mockColumn]))
-        .mockReturnValueOnce(createMockQueryBuilder([doneColumn]))
-        // Task 2:
-        .mockReturnValueOnce(createMockQueryBuilder([mockTasks[1]]))
+        .mockReturnValueOnce(createMockQueryBuilder([mockTask]))
         .mockReturnValueOnce(createMockQueryBuilder([mockColumn]))
         .mockReturnValueOnce(createMockQueryBuilder([doneColumn]));
 

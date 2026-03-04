@@ -54,7 +54,7 @@ export function useTaskNote(taskId: string | undefined, enabled: boolean = true)
       if (!taskId) return null;
       const { data, error } = await api.api.notes.task({ taskId }).get();
       if (error) throw new Error('Failed to fetch task note');
-      return data.note as Note | null;
+      return data && 'note' in data ? (data.note as Note | null) : null;
     },
     enabled: enabled && !!taskId
   });
@@ -88,7 +88,7 @@ export function useSearchNotes() {
       if (error) {
         throw new Error(error.value?.message || 'Failed to search notes');
       }
-      return data.documents as NoteDocument[];
+      return data && 'documents' in data ? (data.documents as NoteDocument[]) : [];
     }
   });
 }

@@ -175,6 +175,7 @@ export default function BoardPage() {
             size={{ base: 'xs', sm: 'sm' }}
             onClick={() => void handleAutoOrganize()}
             loading={autoOrganizeMutation.isPending}
+            aria-label="Auto Organize"
           >
             <Sparkles width="16" height="16" />
             <Box display={{ base: 'none', sm: 'block' }}>Auto Organize</Box>

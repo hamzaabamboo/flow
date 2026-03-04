@@ -1,17 +1,9 @@
-/**
- * Helper utilities for determining task completion based on column name
- */
+const DONE_COLUMN_NAMES = new Set(['done', 'completed']);
 
-/**
- * Check if a column name represents a "Done" state
- */
 export function isColumnDone(columnName: string): boolean {
-  return columnName.toLowerCase() === 'done';
+  return DONE_COLUMN_NAMES.has(columnName.trim().toLowerCase());
 }
 
-/**
- * Check if a task is completed based on its column name
- */
 export function isTaskCompleted(columnName?: string | null): boolean {
   if (!columnName) return false;
   return isColumnDone(columnName);

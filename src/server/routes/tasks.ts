@@ -1,9 +1,47 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, or, sql, ilike, desc, asc } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
-import { boards, columns, tasks, subtasks, taskCompletions } from '../../../drizzle/schema';
+import {
+  boards,
+  columns,
+  tasks,
+  subtasks,
+  taskCompletions,
+  pomodoroSessions,
+  pomodoroActiveState
+} from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
 import { ReminderSyncService } from '../services/reminder-sync';
+import { isColumnDone, resolveCompletionColumnId } from '../utils/taskCompletion';
+import { nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
+
+function getTodayJstDateString() {
+  const now = nowInJst();
+  const { year, month, day } = getJstDateComponents(now);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function normalizeCompletionDate(instanceDate?: string) {
+  if (!instanceDate) return getTodayJstDateString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(instanceDate)) return instanceDate;
+
+  const parsed = new Date(instanceDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return getTodayJstDateString();
+  }
+
+  const { year, month, day } = getJstDateComponents(parsed);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function withCompletionState<T extends { columnName?: string | null }>(task: T) {
+  const completed = task.columnName ? isColumnDone(task.columnName) : false;
+  return {
+    ...task,
+    completed,
+    completionState: completed ? 'completed' : 'active'
+  };
+}
 
 export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   .use(withAuth())
@@ -75,7 +113,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
           break;
       }
 
-      const userTasks = await db
+      const userTasksRaw = await db
         .select({
           id: tasks.id,
           title: tasks.title,
@@ -100,6 +138,18 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         .where(and(...conditions))
         .orderBy(...orderByClause);
 
+      const userTasks = userTasksRaw.map((task) =>
+        withCompletionState({
+          ...task,
+          link: task.metadata?.link
+        })
+      );
+
+      if (query.completed === 'true' || query.completed === 'false') {
+        const completed = query.completed === 'true';
+        return userTasks.filter((task) => task.completed === completed);
+      }
+
       return userTasks;
     },
     {
@@ -110,6 +160,7 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         label: t.Optional(t.String()),
         dueBefore: t.Optional(t.String()),
         dueAfter: t.Optional(t.String()),
+        completed: t.Optional(t.String()),
         sortBy: t.Optional(t.String()),
         sortOrder: t.Optional(t.String())
       })
@@ -117,12 +168,26 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   )
   .get(
     '/column/:id',
-    async ({ params, db }) => {
-      const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, params.id));
-      return columnTasks.map((task) => ({
-        ...task,
-        link: task.metadata?.link
-      }));
+    async ({ params, db, user }) => {
+      const columnTasks = await db
+        .select({
+          task: tasks,
+          columnName: columns.name
+        })
+        .from(tasks)
+        .leftJoin(columns, eq(tasks.columnId, columns.id))
+        .leftJoin(boards, eq(columns.boardId, boards.id))
+        .where(
+          and(eq(tasks.columnId, params.id), eq(tasks.userId, user.id), eq(boards.userId, user.id))
+        );
+
+      return columnTasks.map((item) =>
+        withCompletionState({
+          ...item.task,
+          columnName: item.columnName,
+          link: item.task.metadata?.link
+        })
+      );
     },
     {
       params: t.Object({ id: t.String() })
@@ -169,11 +234,11 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
         .where(eq(subtasks.taskId, task.id))
         .orderBy(asc(subtasks.order));
 
-      return {
+      return withCompletionState({
         ...task,
         subtasks: taskSubtasks,
         link: task.metadata?.link
-      };
+      });
     },
     {
       params: t.Object({ id: t.String() })
@@ -302,29 +367,61 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       if (body.columnId !== undefined) updateData.columnId = body.columnId;
       if (body.priority !== undefined) updateData.priority = body.priority;
 
-      // Handle completion toggle by moving to Done/In Progress column
+      // Handle completion toggle with recurring-safe semantics
       if (body.completed !== undefined) {
-        // Get the current column to find the board
-        const [currentColumn] = await db
-          .select()
-          .from(columns)
-          .where(eq(columns.id, currentTask.columnId));
+        if (currentTask.recurringPattern) {
+          const completionDate = normalizeCompletionDate(body.instanceDate);
 
-        if (currentColumn) {
-          const boardId = currentColumn.boardId;
-          const targetColumnName = body.completed ? 'Done' : 'In Progress';
+          if (body.completed === true) {
+            const existing = await db
+              .select()
+              .from(taskCompletions)
+              .where(
+                and(
+                  eq(taskCompletions.taskId, params.id),
+                  eq(taskCompletions.completedDate, completionDate)
+                )
+              );
 
-          // Find the target column
-          const [targetColumn] = await db
+            if (existing.length === 0) {
+              await db.insert(taskCompletions).values({
+                taskId: params.id,
+                completedDate: completionDate,
+                userId: user.id
+              });
+            }
+          } else {
+            await db
+              .delete(taskCompletions)
+              .where(
+                and(
+                  eq(taskCompletions.taskId, params.id),
+                  eq(taskCompletions.completedDate, completionDate)
+                )
+              );
+          }
+        } else {
+          const [currentColumn] = await db
             .select()
             .from(columns)
-            .where(and(eq(columns.boardId, boardId), eq(columns.name, targetColumnName)));
+            .where(eq(columns.id, currentTask.columnId));
 
-          // Only move if target column exists
-          if (targetColumn) {
-            updateData.columnId = targetColumn.id;
+          if (currentColumn) {
+            const boardColumns = await db
+              .select({ id: columns.id, name: columns.name })
+              .from(columns)
+              .where(eq(columns.boardId, currentColumn.boardId));
+
+            const targetColumnId = resolveCompletionColumnId(
+              boardColumns,
+              body.completed,
+              currentTask.columnId
+            );
+
+            updateData.columnId = targetColumnId;
           }
         }
+        delete updateData.completed;
       }
       if (body.labels !== undefined) updateData.labels = body.labels;
       if (body.recurringPattern !== undefined) updateData.recurringPattern = body.recurringPattern;
@@ -337,41 +434,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
       }
       if (body.link !== undefined) {
         updateData.metadata = { ...currentTask.metadata, link: body.link };
-      }
-
-      // For recurring tasks, track completion per date instead of updating the task
-      if (body.completed !== undefined && currentTask.recurringPattern && body.instanceDate) {
-        const instanceDate = new Date(body.instanceDate);
-        const dateStr = instanceDate.toISOString().split('T')[0]; // Get just the date part
-
-        if (body.completed === true) {
-          // Check if already completed for this date
-          const existing = await db
-            .select()
-            .from(taskCompletions)
-            .where(
-              and(eq(taskCompletions.taskId, params.id), eq(taskCompletions.completedDate, dateStr))
-            );
-
-          if (existing.length === 0) {
-            // Create completion record for this specific date
-            await db.insert(taskCompletions).values({
-              taskId: params.id,
-              completedDate: dateStr,
-              userId: user.id
-            });
-          }
-        } else {
-          // Uncomplete - remove the completion record for this date
-          await db
-            .delete(taskCompletions)
-            .where(
-              and(eq(taskCompletions.taskId, params.id), eq(taskCompletions.completedDate, dateStr))
-            );
-        }
-
-        // Don't update the parent task's completed status
-        delete updateData.completed;
       }
 
       const [updated] = await db
@@ -438,18 +500,161 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
             })
           )
         ),
-        recurringPattern: t.Optional(t.String()),
-        recurringEndDate: t.Optional(t.String()),
+        recurringPattern: t.Optional(t.Union([t.String(), t.Null()])),
+        recurringEndDate: t.Optional(t.Union([t.String(), t.Null()])),
         reminderMinutesBefore: t.Optional(t.Number()),
         instanceDate: t.Optional(t.String()),
         link: t.Optional(t.String())
       })
     }
   )
+  .post(
+    '/:id/completion',
+    async ({ params, body, db, user, set }) => {
+      const [currentTask] = await db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.id, params.id), eq(tasks.userId, user.id)));
+
+      if (!currentTask) {
+        set.status = 404;
+        return { error: 'Task not found' };
+      }
+
+      if (currentTask.recurringPattern) {
+        const completionDate = normalizeCompletionDate(body.instanceDate);
+
+        if (body.completed) {
+          const existing = await db
+            .select()
+            .from(taskCompletions)
+            .where(
+              and(
+                eq(taskCompletions.taskId, currentTask.id),
+                eq(taskCompletions.completedDate, completionDate)
+              )
+            );
+
+          if (existing.length === 0) {
+            await db.insert(taskCompletions).values({
+              taskId: currentTask.id,
+              completedDate: completionDate,
+              userId: user.id
+            });
+          }
+        } else {
+          await db
+            .delete(taskCompletions)
+            .where(
+              and(
+                eq(taskCompletions.taskId, currentTask.id),
+                eq(taskCompletions.completedDate, completionDate)
+              )
+            );
+        }
+
+        wsManager.broadcastTaskUpdate(currentTask.id, currentTask.columnId, 'updated');
+        return {
+          success: true,
+          recurring: true,
+          taskId: currentTask.id,
+          columnId: currentTask.columnId,
+          completed: body.completed,
+          instanceDate: completionDate
+        };
+      }
+
+      const [currentColumn] = await db
+        .select()
+        .from(columns)
+        .where(eq(columns.id, currentTask.columnId));
+
+      if (!currentColumn) {
+        set.status = 400;
+        return { error: 'Task column not found' };
+      }
+
+      const boardColumns = await db
+        .select({ id: columns.id, name: columns.name })
+        .from(columns)
+        .where(eq(columns.boardId, currentColumn.boardId));
+
+      const targetColumnId = resolveCompletionColumnId(
+        boardColumns,
+        body.completed,
+        currentTask.columnId
+      );
+
+      const [updated] = await db
+        .update(tasks)
+        .set({
+          columnId: targetColumnId,
+          updatedAt: new Date()
+        })
+        .where(eq(tasks.id, currentTask.id))
+        .returning();
+
+      const reminderSync = new ReminderSyncService(db);
+      await reminderSync.syncReminders({
+        userId: user.id,
+        taskId: updated.id,
+        taskTitle: updated.title,
+        columnId: updated.columnId,
+        dueDate: updated.dueDate
+      });
+
+      wsManager.broadcastTaskUpdate(updated.id, updated.columnId, 'updated');
+
+      return {
+        success: true,
+        recurring: false,
+        task: {
+          ...updated,
+          link: updated.metadata?.link,
+          completed: body.completed,
+          completionState: body.completed ? 'completed' : 'active'
+        }
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        completed: t.Boolean(),
+        instanceDate: t.Optional(t.String())
+      })
+    }
+  )
   .delete(
     '/:id',
-    async ({ params, db }) => {
-      const [deleted] = await db.delete(tasks).where(eq(tasks.id, params.id)).returning();
+    async ({ params, db, user, set }) => {
+      const [existing] = await db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.id, params.id), eq(tasks.userId, user.id)));
+
+      if (!existing) {
+        set.status = 404;
+        return { error: 'Task not found' };
+      }
+
+      const [deleted] = await db.transaction(async (tx) => {
+        await tx
+          .update(pomodoroSessions)
+          .set({ taskId: null })
+          .where(and(eq(pomodoroSessions.taskId, params.id), eq(pomodoroSessions.userId, user.id)));
+
+        await tx
+          .update(pomodoroActiveState)
+          .set({ taskId: null })
+          .where(
+            and(eq(pomodoroActiveState.taskId, params.id), eq(pomodoroActiveState.userId, user.id))
+          );
+
+        return tx
+          .delete(tasks)
+          .where(and(eq(tasks.id, params.id), eq(tasks.userId, user.id)))
+          .returning();
+      });
 
       // Broadcast task deletion
       wsManager.broadcastTaskUpdate(deleted.id, deleted.columnId, 'deleted');
@@ -463,13 +668,11 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
   .post(
     '/bulk-complete',
     async ({ body, db, user }) => {
-      const { taskIds, completed = true } = body;
+      const { taskIds, completed = true, instanceDate } = body;
 
       if (!taskIds || taskIds.length === 0) {
         return { success: false, message: 'No task IDs provided', updated: [] };
       }
-
-      const targetColumnName = completed ? 'Done' : 'In Progress';
 
       // Process tasks in parallel using Promise.all
       const results = await Promise.all(
@@ -486,6 +689,45 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
               return null;
             }
 
+            if (currentTask.recurringPattern) {
+              const completionDate = normalizeCompletionDate(instanceDate);
+              if (completed) {
+                const existing = await db
+                  .select()
+                  .from(taskCompletions)
+                  .where(
+                    and(
+                      eq(taskCompletions.taskId, taskId),
+                      eq(taskCompletions.completedDate, completionDate)
+                    )
+                  );
+
+                if (existing.length === 0) {
+                  await db.insert(taskCompletions).values({
+                    taskId,
+                    completedDate: completionDate,
+                    userId: user.id
+                  });
+                }
+              } else {
+                await db
+                  .delete(taskCompletions)
+                  .where(
+                    and(
+                      eq(taskCompletions.taskId, taskId),
+                      eq(taskCompletions.completedDate, completionDate)
+                    )
+                  );
+              }
+
+              wsManager.broadcastTaskUpdate(taskId, currentTask.columnId, 'updated');
+              return {
+                ...currentTask,
+                instanceDate: completionDate,
+                completed
+              };
+            }
+
             // Get the current column to find the board
             const [currentColumn] = await db
               .select()
@@ -499,22 +741,22 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
 
             const boardId = currentColumn.boardId;
 
-            // Find the target column
-            const [targetColumn] = await db
-              .select()
+            const boardColumns = await db
+              .select({ id: columns.id, name: columns.name })
               .from(columns)
-              .where(and(eq(columns.boardId, boardId), eq(columns.name, targetColumnName)));
+              .where(eq(columns.boardId, boardId));
 
-            if (!targetColumn) {
-              console.warn(`${targetColumnName} column not found in board ${boardId}`);
-              return null;
-            }
+            const targetColumnId = resolveCompletionColumnId(
+              boardColumns,
+              completed,
+              currentTask.columnId
+            );
 
             // Update the task
             const [updated] = await db
               .update(tasks)
               .set({
-                columnId: targetColumn.id,
+                columnId: targetColumnId,
                 updatedAt: new Date()
               })
               .where(eq(tasks.id, taskId))
@@ -546,7 +788,8 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
     {
       body: t.Object({
         taskIds: t.Array(t.String()),
-        completed: t.Optional(t.Boolean())
+        completed: t.Optional(t.Boolean()),
+        instanceDate: t.Optional(t.String())
       })
     }
   )

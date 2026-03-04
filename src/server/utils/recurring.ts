@@ -1,5 +1,6 @@
 import type { Task } from '../../shared/types/board';
 import type { CalendarEvent } from '../../shared/types/calendar';
+import { isColumnDone } from './taskCompletion';
 
 type RecurringTaskSource = Task | CalendarEvent;
 
@@ -32,7 +33,7 @@ export function expandRecurringTasks(
       if (taskDueDate >= startDate && taskDueDate <= endDate) {
         events.push({
           ...formattedTask,
-          completed: task.columnName?.toLowerCase() === 'done'
+          completed: task.columnName ? isColumnDone(task.columnName) : false
         });
       }
       continue;
@@ -190,7 +191,7 @@ export function expandRecurringTasks(
         events.push({
           ...formattedTask,
           dueDate: task.dueDate,
-          completed: task.columnName?.toLowerCase() === 'done'
+          completed: task.columnName ? isColumnDone(task.columnName) : false
         });
       }
     }

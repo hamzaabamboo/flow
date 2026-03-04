@@ -111,6 +111,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             <Button
               variant="outline"
               onClick={() => setShowCommandBar(true)}
+              aria-label="Open command bar"
               gap="3"
               justifyContent="flex-start"
               borderColor="border.default"
@@ -127,7 +128,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
               <Search width="16" height="16" />
               <Text display={{ base: 'none', sm: 'inline' }}>Search or type a command...</Text>
               <HStack display={{ base: 'none', md: 'flex' }} gap="1" ml="auto">
-                <Kbd>⌘</Kbd>
+                <Kbd>Ctrl/Cmd</Kbd>
                 <Kbd>K</Kbd>
               </HStack>
             </Button>
@@ -145,6 +146,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
               variant="solid"
               size="sm"
               onClick={() => setShowQuickAdd(true)}
+              aria-label="Quick Add"
               gap="2"
               justifyContent="space-between"
               borderRadius="lg"

@@ -568,6 +568,7 @@ export default function AgendaPage() {
                 size={{ base: 'xs', sm: 'sm' }}
                 onClick={handleAutoOrganize}
                 loading={autoOrganizeMutation.isPending}
+                aria-label="Auto Organize"
               >
                 <Sparkles width="16" height="16" />
                 <Box display={{ base: 'none', sm: 'block' }}>Auto Organize</Box>
@@ -581,6 +582,7 @@ export default function AgendaPage() {
                   setEditingTask(null);
                   setIsTaskDialogOpen(true);
                 }}
+                aria-label="New Task"
               >
                 <Plus width="16" height="16" />
                 <Box display={{ base: 'none', sm: 'block' }}>New Task</Box>

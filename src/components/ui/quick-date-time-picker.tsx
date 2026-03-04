@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format, addDays, addWeeks, setHours, setMinutes, startOfDay } from 'date-fns';
 import { parseDate } from '@internationalized/date';
 import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
@@ -17,16 +17,30 @@ interface QuickDateTimePickerProps {
 
 type PresetOption = 'today_morning' | 'tonight' | 'tomorrow' | 'next_week' | 'custom';
 
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 /**
  * Quick Date Time Picker with preset buttons and full calendar component.
  * Works with Date objects and provides common presets like "Today 9 AM", "Tonight 8 PM", etc.
  */
 export function QuickDateTimePicker({ value, onChange, size = 'md' }: QuickDateTimePickerProps) {
+  const toLocalDateString = (date: Date) => format(date, 'yyyy-MM-dd');
+
   const [selectedPreset, setSelectedPreset] = useState<PresetOption>('custom');
   const [customDate, setCustomDate] = useState<string>(
-    value ? format(value, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+    value ? toLocalDateString(value) : toLocalDateString(new Date())
   );
   const [customTime, setCustomTime] = useState<string>(value ? format(value, 'HH:mm') : '09:00');
+
+  useEffect(() => {
+    if (!value) return;
+    setSelectedPreset('custom');
+    setCustomDate(toLocalDateString(value));
+    setCustomTime(format(value, 'HH:mm'));
+  }, [value]);
 
   const getPresetDate = (preset: PresetOption): Date | null => {
     const now = new Date();
@@ -41,10 +55,9 @@ export function QuickDateTimePicker({ value, onChange, size = 'md' }: QuickDateT
       case 'next_week':
         return setMinutes(setHours(startOfDay(addWeeks(now, 1)), 9), 0); // 9:00 AM next week
       case 'custom':
-        // Build date from custom date + time
         if (!customDate) return null;
         const [hours, minutes] = customTime.split(':').map(Number);
-        const date = new Date(customDate);
+        const date = parseLocalDate(customDate);
         return setMinutes(setHours(date, hours), minutes);
     }
   };
@@ -61,7 +74,7 @@ export function QuickDateTimePicker({ value, onChange, size = 'md' }: QuickDateT
 
     if (dateStr && customTime) {
       const [hours, minutes] = customTime.split(':').map(Number);
-      const date = new Date(dateStr);
+      const date = parseLocalDate(dateStr);
       onChange(setMinutes(setHours(date, hours), minutes));
     }
   };
@@ -72,7 +85,7 @@ export function QuickDateTimePicker({ value, onChange, size = 'md' }: QuickDateT
 
     if (customDate && timeStr) {
       const [hours, minutes] = timeStr.split(':').map(Number);
-      const date = new Date(customDate);
+      const date = parseLocalDate(customDate);
       onChange(setMinutes(setHours(date, hours), minutes));
     }
   };

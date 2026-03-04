@@ -19,6 +19,7 @@ import type { CalendarEvent } from '../../shared/types/calendar';
 import type { Task, TaskMetadata } from '../../shared/types/board';
 import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 import { logger } from '../logger';
+import { isColumnDone } from '../utils/taskCompletion';
 
 // Public iCal route (no auth required)
 export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).decorate('db', db).get(
@@ -73,12 +74,21 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
 
       // Use UTC date directly - ical-generator handles timezone conversion
       const dueDate = new Date(task.dueDate);
-      const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+      const jstComponents = getJstDateComponents(dueDate);
+      const jstDateKey = `${jstComponents.year}-${String(jstComponents.month).padStart(2, '0')}-${String(jstComponents.day).padStart(2, '0')}`;
+      const isAllDayDeadline =
+        jstComponents.hours === 0 && jstComponents.minutes === 0 && jstComponents.seconds === 0;
+      const eventStart = isAllDayDeadline
+        ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day))
+        : dueDate;
+      const eventEnd = isAllDayDeadline
+        ? new Date(Date.UTC(jstComponents.year, jstComponents.month - 1, jstComponents.day + 1))
+        : new Date(dueDate.getTime() + 60 * 60 * 1000);
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const taskUrl = task.boardId
         ? `${frontendUrl}/board/${task.boardId}`
-        : `${frontendUrl}/agenda?date=${dueDate.toISOString().split('T')[0]}`;
+        : `${frontendUrl}/agenda?date=${jstDateKey}`;
 
       // Build description with metadata link if available
       let eventDescription = task.description || '';
@@ -90,16 +100,17 @@ export const publicCalendarRoutes = new Elysia({ prefix: '/api/calendar' }).deco
 
       const event = calendar.createEvent({
         id: task.id,
-        start: dueDate,
-        end: endDate,
+        start: eventStart,
+        end: eventEnd,
         summary: `[${task.space || 'work'}] ${task.title}`,
         description: eventDescription || undefined,
         categories: [{ name: task.space || 'work' }, { name: task.boardName || 'tasks' }],
+        allDay: isAllDayDeadline,
         url: taskUrl
       });
 
       // Set status - CANCELLED if in Done column, otherwise CONFIRMED
-      const isCompleted = task.columnName?.toLowerCase() === 'done';
+      const isCompleted = task.columnName ? isColumnDone(task.columnName) : false;
       event.status(isCompleted ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED);
 
       // Set priority
@@ -255,16 +266,16 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
   .decorate('db', db)
   .use(withAuth())
   // Get iCal feed URL (returns the URL for subscription)
-  .get('/feed-url', ({ user }) => {
+  .get('/feed-url', ({ user, request }) => {
     // Generate a secure token for the user's calendar feed
     const token = createHash('sha256')
       .update(`${user.id}-${process.env.CALENDAR_SECRET || 'hamflow-calendar'}`)
       .digest('hex');
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.BASE_URL || new URL(request.url).origin;
 
     return {
-      url: `${frontendUrl}/api/calendar/ical/${user.id}/${token}`,
+      url: `${baseUrl}/api/calendar/ical/${user.id}/${token}`,
       instructions:
         'Add this URL to your calendar app (Google Calendar, Apple Calendar, Outlook, etc.) as a subscription'
     };
@@ -408,7 +419,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
 
         // Filter out completed tasks (in "Done" column) unless they're recurring
         const filteredNoDueDateTasks = noDueDateTasks.filter((task) => {
-          const isNotDone = task.columnName?.toLowerCase() !== 'done';
+          const isNotDone = task.columnName ? !isColumnDone(task.columnName) : true;
           const isRecurring = !!task.recurringPattern;
           return isNotDone || isRecurring;
         });
@@ -431,33 +442,38 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
       type TaskWithJoinedData = (typeof allTasks)[number];
 
       // Helper to format tasks
-      const formatTask = (task: TaskWithJoinedData): CalendarEvent => ({
-        ...(task as unknown as CalendarEvent),
-        description: (task.description as string | null | undefined) ?? undefined,
-        dueDate: (task.dueDate as Date | null) ? (task.dueDate as Date).toISOString() : undefined,
-        priority: (task.priority as string | null | undefined) ?? undefined,
-        labels: (task.labels as string[] | null | undefined) ?? undefined,
-        recurringPattern: (task.recurringPattern as string | null | undefined) ?? undefined,
-        recurringEndDate: (task.recurringEndDate as Date | null)
-          ? (task.recurringEndDate as Date).toISOString()
-          : undefined,
-        parentTaskId: (task.parentTaskId as string | null | undefined) ?? undefined,
-        space: (task.space as string | null | undefined) ?? undefined,
-        boardId: (task.boardId as string | null | undefined) ?? undefined,
-        boardName: (task.boardName as string | null | undefined) ?? undefined,
-        columnName: (task.columnName as string | null | undefined) ?? undefined,
-        link: (task.metadata as TaskMetadata | null)?.link ?? undefined,
-        createdAt: (task.createdAt as Date | undefined)?.toISOString(),
-        updatedAt: (task.updatedAt as Date | undefined)?.toISOString(),
-        subtasks: subtasksData
-          .filter((st) => st.taskId === (task.id as string))
-          .map((st) => ({
-            ...st,
-            completed: st.completed ?? false,
-            createdAt: st.createdAt.toISOString(),
-            updatedAt: st.updatedAt.toISOString()
-          }))
-      });
+      const formatTask = (task: TaskWithJoinedData): CalendarEvent => {
+        const completed = task.columnName ? isColumnDone(task.columnName) : false;
+        return {
+          ...(task as unknown as CalendarEvent),
+          description: (task.description as string | null | undefined) ?? undefined,
+          dueDate: (task.dueDate as Date | null) ? (task.dueDate as Date).toISOString() : undefined,
+          priority: (task.priority as string | null | undefined) ?? undefined,
+          labels: (task.labels as string[] | null | undefined) ?? undefined,
+          recurringPattern: (task.recurringPattern as string | null | undefined) ?? undefined,
+          recurringEndDate: (task.recurringEndDate as Date | null)
+            ? (task.recurringEndDate as Date).toISOString()
+            : undefined,
+          parentTaskId: (task.parentTaskId as string | null | undefined) ?? undefined,
+          space: (task.space as string | null | undefined) ?? undefined,
+          boardId: (task.boardId as string | null | undefined) ?? undefined,
+          boardName: (task.boardName as string | null | undefined) ?? undefined,
+          columnName: (task.columnName as string | null | undefined) ?? undefined,
+          completed,
+          completionState: completed ? 'completed' : 'active',
+          link: (task.metadata as TaskMetadata | null)?.link ?? undefined,
+          createdAt: (task.createdAt as Date | undefined)?.toISOString(),
+          updatedAt: (task.updatedAt as Date | undefined)?.toISOString(),
+          subtasks: subtasksData
+            .filter((st) => st.taskId === (task.id as string))
+            .map((st) => ({
+              ...st,
+              completed: st.completed ?? false,
+              createdAt: st.createdAt.toISOString(),
+              updatedAt: st.updatedAt.toISOString()
+            }))
+        };
+      };
 
       const tasksWithSubtasks = allTasks.map(formatTask);
 
@@ -532,7 +548,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         // 1. NON-RECURRING OVERDUE
         const overdueNonRecurring = overdueTasksRaw.filter((task) => {
           if (!task.dueDate || task.recurringPattern) return false;
-          const isNotDone = task.columnName?.toLowerCase() !== 'done';
+          const isNotDone = task.columnName ? !isColumnDone(task.columnName) : true;
           const isPast = new Date(task.dueDate) < startDate;
           return isPast && isNotDone;
         });
@@ -546,6 +562,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
               space: t.space as 'work' | 'personal',
               type: 'task' as const,
               completed: false,
+              completionState: 'active' as const,
               instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
               dueDate: t.dueDate ? new Date(t.dueDate) : undefined
             } as unknown as CalendarEvent);
@@ -653,7 +670,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
         const upcomingNonRecurring = upcomingTasksRaw.filter((task) => {
           if (!task.dueDate || task.recurringPattern) return false;
           // Only show if not done
-          return task.columnName?.toLowerCase() !== 'done';
+          return task.columnName ? !isColumnDone(task.columnName) : true;
         });
 
         for (const t of upcomingNonRecurring) {
@@ -663,6 +680,7 @@ export const calendarRoutes = new Elysia({ prefix: '/calendar' })
               space: t.space as 'work' | 'personal',
               type: 'task' as const,
               completed: false,
+              completionState: 'active' as const,
               instanceDate: t.dueDate?.toISOString().split('T')[0] || '',
               dueDate: t.dueDate ? new Date(t.dueDate) : undefined
             });

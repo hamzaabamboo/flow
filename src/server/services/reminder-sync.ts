@@ -5,6 +5,8 @@ import { DEFAULT_REMINDER_MINUTES_BEFORE } from '../../shared/constants';
 import { logger } from '../logger';
 import { isColumnDone } from '../utils/taskCompletion';
 
+const DEFAULT_REMINDER_OFFSETS_MINUTES = [24 * 60, 6 * 60, 3 * 60, 60, 15, 0];
+
 interface ReminderSyncOptions {
   userId: string;
   taskId: string;
@@ -16,6 +18,24 @@ interface ReminderSyncOptions {
 
 export class ReminderSyncService {
   constructor(private db: Database) {}
+
+  private getReminderMessage(minutesBefore: number, taskTitle: string): string {
+    if (minutesBefore === 0) {
+      return `Task due at deadline: ${taskTitle}`;
+    }
+
+    if (minutesBefore % (24 * 60) === 0) {
+      const days = minutesBefore / (24 * 60);
+      return `Task due in ${days} day${days === 1 ? '' : 's'}: ${taskTitle}`;
+    }
+
+    if (minutesBefore % 60 === 0) {
+      const hours = minutesBefore / 60;
+      return `Task due in ${hours} hour${hours === 1 ? '' : 's'}: ${taskTitle}`;
+    }
+
+    return `Task due in ${minutesBefore} minutes: ${taskTitle}`;
+  }
 
   /**
    * Sync reminders for a task
@@ -73,52 +93,31 @@ export class ReminderSyncService {
         return;
       }
 
-      // STEP 5: Calculate and create TWO reminders (15 min before + at due time)
+      // STEP 5: Calculate reminders from standard offsets plus optional override
       const now = new Date();
-      const remindersToCreate = [];
-
-      // First reminder: 15 minutes before (always)
-      const firstReminderTime = new Date(dueDate);
-      firstReminderTime.setMinutes(firstReminderTime.getMinutes() - 15);
-
-      if (firstReminderTime > now) {
-        remindersToCreate.push({
-          userId,
-          taskId,
-          reminderTime: firstReminderTime,
-          message: `Task due in 15 minutes: ${taskTitle}`,
-          sent: false,
-          platform: null
-        });
+      const reminderOffsets = new Set<number>(DEFAULT_REMINDER_OFFSETS_MINUTES);
+      if (Number.isFinite(minutesBefore) && minutesBefore >= 0) {
+        reminderOffsets.add(Math.floor(minutesBefore));
       }
 
-      // Second reminder: At due time (or use custom minutesBefore if specified)
-      const secondReminderTime = new Date(dueDate);
-      if (minutesBefore !== 15) {
-        // If user specified custom time, use it for second reminder
-        secondReminderTime.setMinutes(secondReminderTime.getMinutes() - minutesBefore);
-      }
-      // Otherwise, second reminder is at due time (no subtraction)
+      const remindersToCreate = [...reminderOffsets]
+        .toSorted((a, b) => b - a)
+        .map((offsetMinutes) => {
+          const reminderTime = new Date(dueDate);
+          reminderTime.setMinutes(reminderTime.getMinutes() - offsetMinutes);
 
-      if (secondReminderTime > now) {
-        const minutesUntilDue = Math.max(
-          0,
-          Math.floor((dueDate.getTime() - secondReminderTime.getTime()) / (60 * 1000))
-        );
-        const message =
-          minutesUntilDue === 0
-            ? `Task is due now: ${taskTitle}`
-            : `Task due in ${minutesUntilDue} minutes: ${taskTitle}`;
+          if (reminderTime <= now) return null;
 
-        remindersToCreate.push({
-          userId,
-          taskId,
-          reminderTime: secondReminderTime,
-          message,
-          sent: false,
-          platform: null
-        });
-      }
+          return {
+            userId,
+            taskId,
+            reminderTime,
+            message: this.getReminderMessage(offsetMinutes, taskTitle),
+            sent: false,
+            platform: null
+          };
+        })
+        .filter((value): value is NonNullable<typeof value> => value !== null);
 
       // If both reminders are in the past but due date is in future, create one for now + 1 minute
       if (remindersToCreate.length === 0 && dueDate > now) {

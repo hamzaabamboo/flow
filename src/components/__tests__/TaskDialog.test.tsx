@@ -161,6 +161,38 @@ describe('TaskDialog', () => {
     expect(handleSubmit).toHaveBeenCalled();
   });
 
+  it('should preserve existing date when only time is changed in edit mode', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const taskDueDate = '2030-05-20T12:30:00.000Z';
+    let submittedDueDate: string | null = null;
+
+    const handleSubmit = vi.fn((e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const formData = new FormData(e.currentTarget);
+      submittedDueDate = formData.get('dueDate') as string;
+    });
+
+    render(
+      <TaskDialog
+        open={true}
+        onOpenChange={mockOnOpenChange}
+        onSubmit={handleSubmit}
+        mode="edit"
+        task={{ id: 'task-1', title: 'Task', dueDate: taskDueDate } as Task}
+      />,
+      { wrapper }
+    );
+
+    const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
+    expect(timeInput).toBeTruthy();
+    fireEvent.change(timeInput, { target: { value: '13:45' } });
+
+    await user.click(screen.getByRole('button', { name: /Update Task/i }));
+    expect(handleSubmit).toHaveBeenCalled();
+    expect(submittedDueDate).not.toBeNull();
+    expect(submittedDueDate!.startsWith('2030-05-20')).toBe(true);
+  });
+
   it('should handle subtasks addition and removal', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     render(

@@ -21,12 +21,13 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
     };
   })
   // List available collections
-  .get('/collections', async ({ db, user }) => {
+  .get('/collections', async ({ db, user, set }) => {
     const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
     const userClient = dbUser?.settings ? createOutlineClient(dbUser.settings) : null;
 
     if (!userClient || !userClient.isEnabled()) {
-      throw errorResponse('Outline integration is not configured', 400);
+      set.status = 400;
+      return errorResponse('Outline integration is not configured');
     }
 
     try {
@@ -34,22 +35,21 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
       return successResponse(collections);
     } catch (error) {
       logger.error({ error }, 'Failed to list Outline collections');
-      throw errorResponse(
-        error instanceof Error ? error.message : 'Failed to list collections',
-        500
-      );
+      set.status = 500;
+      return errorResponse(error instanceof Error ? error.message : 'Failed to list collections');
     }
   })
   // Create a new note and optionally link it to a task
   .post(
     '/create',
-    async ({ body, db, user }) => {
+    async ({ body, db, user, set }) => {
       // Get user's Outline client
       const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
       const userClient = dbUser?.settings ? createOutlineClient(dbUser.settings) : null;
 
       if (!userClient || !userClient.isEnabled()) {
-        throw errorResponse('Outline integration is not configured', 400);
+        set.status = 400;
+        return errorResponse('Outline integration is not configured');
       }
 
       try {
@@ -72,7 +72,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
             .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
           if (!task) {
-            throw errorResponse('Task not found', 404);
+            set.status = 404;
+            return errorResponse('Task not found');
           }
 
           // Update task with noteId
@@ -98,7 +99,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         );
       } catch (error) {
         logger.error({ error }, 'Error creating note');
-        throw errorResponse(error instanceof Error ? error.message : 'Failed to create note', 500);
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to create note');
       }
     },
     {
@@ -113,13 +115,14 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
   // Search for notes
   .post(
     '/search',
-    async ({ body, db, user }) => {
+    async ({ body, db, user, set }) => {
       // Get user's Outline client
       const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
       const userClient = dbUser?.settings ? createOutlineClient(dbUser.settings) : null;
 
       if (!userClient || !userClient.isEnabled()) {
-        throw errorResponse('Outline integration is not configured', 400);
+        set.status = 400;
+        return errorResponse('Outline integration is not configured');
       }
 
       try {
@@ -144,7 +147,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         return { documents };
       } catch (error) {
         logger.error({ error }, 'Error searching notes');
-        throw errorResponse(error instanceof Error ? error.message : 'Failed to search notes', 500);
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to search notes');
       }
     },
     {
@@ -159,13 +163,14 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
   // Link an existing note to a task
   .post(
     '/link',
-    async ({ body, db, user }) => {
+    async ({ body, db, user, set }) => {
       // Get user's Outline client
       const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
       const userClient = dbUser?.settings ? createOutlineClient(dbUser.settings) : null;
 
       if (!userClient || !userClient.isEnabled()) {
-        throw errorResponse('Outline integration is not configured', 400);
+        set.status = 400;
+        return errorResponse('Outline integration is not configured');
       }
 
       try {
@@ -178,14 +183,16 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
         if (!task) {
-          throw errorResponse('Task not found', 404);
+          set.status = 404;
+          return errorResponse('Task not found');
         }
 
         // Verify note exists in Outline
         try {
           await userClient.getDocument(noteId);
         } catch {
-          throw errorResponse('Note not found in Outline', 404);
+          set.status = 404;
+          return errorResponse('Note not found in Outline');
         }
 
         // Update task with noteId
@@ -202,7 +209,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         return successResponse({ taskId, noteId }, 'Note linked successfully');
       } catch (error) {
         logger.error({ error }, 'Error linking note');
-        throw errorResponse(error instanceof Error ? error.message : 'Failed to link note', 500);
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to link note');
       }
     },
     {
@@ -215,7 +223,7 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
   // Unlink a note from a task
   .delete(
     '/unlink/:taskId',
-    async ({ params, db, user }) => {
+    async ({ params, db, user, set }) => {
       const { taskId } = params;
 
       try {
@@ -226,11 +234,13 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
         if (!task) {
-          throw errorResponse('Task not found', 404);
+          set.status = 404;
+          return errorResponse('Task not found');
         }
 
         if (!task.noteId) {
-          throw errorResponse('Task has no linked note', 400);
+          set.status = 400;
+          return errorResponse('Task has no linked note');
         }
 
         // Remove noteId from task
@@ -247,7 +257,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         return successResponse(null, 'Note unlinked successfully');
       } catch (error) {
         logger.error({ error }, 'Error unlinking note');
-        throw errorResponse(error instanceof Error ? error.message : 'Failed to unlink note', 500);
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to unlink note');
       }
     },
     {
@@ -259,13 +270,14 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
   // Get note details by ID
   .get(
     '/:noteId',
-    async ({ params, db, user }) => {
+    async ({ params, db, user, set }) => {
       // Get user's Outline client
       const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
       const userClient = dbUser?.settings ? createOutlineClient(dbUser.settings) : null;
 
       if (!userClient || !userClient.isEnabled()) {
-        throw errorResponse('Outline integration is not configured', 400);
+        set.status = 400;
+        return errorResponse('Outline integration is not configured');
       }
 
       try {
@@ -283,7 +295,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         };
       } catch (error) {
         logger.error({ error }, 'Error fetching note');
-        throw errorResponse(error instanceof Error ? error.message : 'Failed to fetch note', 500);
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to fetch note');
       }
     },
     {
@@ -295,7 +308,7 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
   // Get note for a specific task
   .get(
     '/task/:taskId',
-    async ({ params, db, user }) => {
+    async ({ params, db, user, set }) => {
       const { taskId } = params;
 
       try {
@@ -310,7 +323,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)));
 
         if (!task) {
-          throw errorResponse('Task not found', 404);
+          set.status = 404;
+          return errorResponse('Task not found');
         }
 
         if (!task.noteId) {
@@ -356,10 +370,8 @@ export const notesRoutes = new Elysia({ prefix: '/notes' })
         }
       } catch (error) {
         logger.error({ error }, 'Error fetching task note');
-        throw errorResponse(
-          error instanceof Error ? error.message : 'Failed to fetch task note',
-          500
-        );
+        set.status = 500;
+        return errorResponse(error instanceof Error ? error.message : 'Failed to fetch task note');
       }
     },
     {

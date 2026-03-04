@@ -5,6 +5,7 @@ import { boards, columns, tasks } from '../../../drizzle/schema';
 import { autoOrganizer, AutoOrganizeOutputSchema } from '../../mastra/agents/autoOrganizer';
 import { nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
 import type { AutoOrganizeResponse } from '../../shared/types/autoOrganize';
+import { isColumnDone } from '../utils/taskCompletion';
 import type { z } from 'zod';
 
 export const autoOrganizeRoutes = new Elysia({ prefix: '/tasks/auto-organize' })
@@ -150,8 +151,7 @@ export const autoOrganizeRoutes = new Elysia({ prefix: '/tasks/auto-organize' })
 
         // Filter out completed tasks (those in "Done" column)
         const ongoingTasks = allTasks.filter((task) => {
-          const columnName = task.columnName?.toLowerCase();
-          return columnName !== 'done';
+          return task.columnName ? !isColumnDone(task.columnName) : true;
         });
 
         const completedTasksSkipped = allTasks.length - ongoingTasks.length;

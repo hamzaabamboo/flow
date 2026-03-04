@@ -51,24 +51,31 @@ describe('ReminderSyncService', () => {
       }
     });
 
-    await service.syncReminders(mockOptions);
+    const futureDueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    await service.syncReminders({
+      ...mockOptions,
+      dueDate: futureDueDate
+    });
 
     expect(mockDelete).toHaveBeenCalled();
     expect(mockInsert).toHaveBeenCalled();
-    // Should create 2 reminders (15 min before + at due time which is also 15 min if not specified?
-    // Wait, the code says:
-    // Second reminder: At due time (or use custom minutesBefore if specified)
-    // if (minutesBefore !== 15) { secondReminderTime.setMinutes(...) }
-    // Since minutesBefore is 15, secondReminderTime remains same as dueDate.
 
     const createdValues = mockValues.mock.calls[0][0];
-    expect(createdValues.length).toBe(2);
+    expect(createdValues.length).toBe(6);
+    expect(createdValues.some((r: { message: string }) => r.message.includes('1 day'))).toBe(true);
+    expect(createdValues.some((r: { message: string }) => r.message.includes('6 hours'))).toBe(
+      true
+    );
+    expect(createdValues.some((r: { message: string }) => r.message.includes('3 hours'))).toBe(
+      true
+    );
+    expect(createdValues.some((r: { message: string }) => r.message.includes('1 hour'))).toBe(true);
   });
 
-  it('should not create reminders if task is in "Done" column', async () => {
+  it('should not create reminders if task is in a semantic completion column', async () => {
     asMock(mockDb.query.columns.findFirst).mockResolvedValue({
       id: 'c1',
-      name: 'Done',
+      name: 'Completed',
       board: { id: 'b1', settings: {} }
     });
 
@@ -109,10 +116,9 @@ describe('ReminderSyncService', () => {
 
     expect(mockInsert).toHaveBeenCalled();
     const createdValues = mockValues.mock.calls[0][0];
-    // It should contain a reminder for the due time (message "due now")
-    expect(createdValues.some((r: { message: string }) => r.message.includes('due now'))).toBe(
-      true
-    );
+    expect(
+      createdValues.some((r: { message: string }) => r.message.includes('due at deadline'))
+    ).toBe(true);
   });
 
   it('getReminderSettings should return defaults if no board settings', async () => {

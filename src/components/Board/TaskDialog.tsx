@@ -618,6 +618,7 @@ export function TaskDialog({
                               <IconButton
                                 size="xs"
                                 variant="ghost"
+                                aria-label={`Remove label ${label}`}
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -704,6 +705,7 @@ export function TaskDialog({
                             />
                             <IconButton
                               size="sm"
+                              aria-label="Add subtask"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();

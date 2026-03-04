@@ -72,6 +72,14 @@ The application will be available at:
 - `bun db:studio` - Open Drizzle Studio for database management
 - `bun lint` - Run ESLint
 - `bun type-check` - Check TypeScript types
+- `bun test` - Run unit and integration tests
+- `bun test:endpoints` - Run consumer-style API sweep across all public/protected endpoints
+
+### API Notes
+
+- [Task Completion, Recurrence, Reminders, and Calendar Consistency](docs/TASK_COMPLETION_AND_REMINDERS.md)
+- [AI API Key Consumer Guide](docs/AI_API_KEY_CONSUMER_GUIDE.md)
+- `scripts/test-endpoints.ts` validates endpoint contracts as an API consumer (auth, boards, columns, tasks, recurrence, reminders, calendar/ical, notes, command, webhooks, cleanup)
 
 ## Project Structure
 

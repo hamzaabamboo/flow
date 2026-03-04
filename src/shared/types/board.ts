@@ -21,6 +21,7 @@ export interface Task {
   columnName?: string | null;
   space?: 'work' | 'personal';
   completed?: boolean;
+  completionState?: 'active' | 'completed';
   createdAt?: string;
   updatedAt?: string;
   labels?: string[];

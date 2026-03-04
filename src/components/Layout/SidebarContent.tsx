@@ -168,7 +168,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           <Command style={{ marginRight: '12px' }} width="20" height="20" />
           Command
           <Box ml="auto" color="fg.subtle" fontSize="xs">
-            ⌘K
+            Ctrl/Cmd K
           </Box>
         </Button>
 

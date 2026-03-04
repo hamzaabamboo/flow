@@ -9,6 +9,7 @@ export interface CalendarEvent {
   dueDate?: string | Date;
   priority?: string;
   completed?: boolean;
+  completionState?: 'active' | 'completed';
   type: 'task' | 'reminder' | 'habit' | 'external';
   space?: string;
   recurringPattern?: string;

@@ -190,6 +190,34 @@ describe('Calendar Routes', () => {
       expect(expandRecurringTasks).toHaveBeenCalled();
     });
 
+    it('should exclude completed-column tasks from upcoming non-recurring results', async () => {
+      const completedUpcomingTask = {
+        id: 'up-1',
+        title: 'Completed upcoming',
+        dueDate: new Date((end + 86400) * 1000),
+        userId: 'user-1',
+        columnName: 'Completed',
+        space: 'work'
+      };
+
+      const mockSelect = asMock(db.select);
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([completedUpcomingTask])); // Upcoming Non-Recurring
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Upcoming Recurring
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
+
+      const response = await app.handle(
+        new Request(
+          `http://localhost/calendar/events?start=${start}&end=${end}&includeUpcoming=true`
+        )
+      );
+
+      const data = await response.json();
+      expect(data).toHaveLength(0);
+    });
+
     it('should include overdue tasks if requested', async () => {
       const overdueTask = {
         id: 'ov-1',
@@ -361,6 +389,57 @@ describe('Calendar Routes', () => {
   });
 
   describe('iCal Generation Details', () => {
+    it('should render JST midnight deadlines as all-day events', async () => {
+      const { createHash } = await import('crypto');
+      const token = createHash('sha256').update(`user-1-test-secret`).digest('hex');
+
+      const midnightDeadlineTask = {
+        id: 'deadline-1',
+        title: 'Date-only deadline',
+        dueDate: '2026-03-09T15:00:00.000Z', // 2026-03-10 00:00:00 JST
+        userId: 'user-1',
+        recurringPattern: null
+      };
+
+      const mockSelect = asMock(db.select);
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([midnightDeadlineTask]));
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
+
+      const response = await app.handle(
+        new Request(`http://localhost/api/calendar/ical/user-1/${token}`)
+      );
+      const text = await response.text();
+
+      expect(text).toContain('SUMMARY:[work] Date-only deadline');
+      expect(text).toContain('DTSTART;VALUE=DATE:20260310');
+    });
+
+    it('should set STATUS:CANCELLED for Completed column tasks', async () => {
+      const { createHash } = await import('crypto');
+      const token = createHash('sha256').update(`user-1-test-secret`).digest('hex');
+
+      const completedTask = {
+        id: 'completed-1',
+        title: 'Completed task',
+        dueDate: new Date('2026-03-10T03:00:00.000Z'),
+        userId: 'user-1',
+        recurringPattern: null,
+        columnName: 'Completed'
+      };
+
+      const mockSelect = asMock(db.select);
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([completedTask]));
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([]));
+
+      const response = await app.handle(
+        new Request(`http://localhost/api/calendar/ical/user-1/${token}`)
+      );
+      const text = await response.text();
+
+      expect(text).toContain('SUMMARY:[work] Completed task');
+      expect(text).toContain('STATUS:CANCELLED');
+    });
+
     it('should handle all recurring patterns', async () => {
       const { createHash } = await import('crypto');
       const token = createHash('sha256').update(`user-1-test-secret`).digest('hex');

@@ -1209,6 +1209,7 @@ export default function SettingsPage() {
                             variant="ghost"
                             size="sm"
                             colorPalette="red"
+                            aria-label={`Delete token ${token.name}`}
                             onClick={() => {
                               if (
                                 window.confirm(

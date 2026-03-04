@@ -118,4 +118,32 @@ describe('Auto Organize Routes', () => {
     const json = await res.json();
     expect(json.summary).toBe('AI Summary');
   });
+
+  it('should exclude tasks in semantic completion columns from analysis context', async () => {
+    const apiMock = db;
+    asMock(apiMock.select)
+      .mockReturnValueOnce(createMockQueryBuilder([{ id: 'b1', name: 'B1', space: 'work' }]))
+      .mockReturnValueOnce(createMockQueryBuilder([{ id: 'c1', name: 'C1', boardId: 'b1' }]))
+      .mockReturnValueOnce(
+        createMockQueryBuilder([
+          { id: 'active-task', title: 'Active', columnId: 'c1', columnName: 'To Do' },
+          { id: 'completed-task', title: 'Completed', columnId: 'c1', columnName: 'Completed' }
+        ])
+      );
+
+    const res = await app.handle(
+      new Request('http://localhost/tasks/auto-organize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ space: 'work' })
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const generateCall = asMock(autoOrganizer.generate).mock.calls.at(-1);
+    const content = generateCall?.[0]?.[0]?.content as string;
+
+    expect(content).toContain('active-task');
+    expect(content).not.toContain('completed-task');
+  });
 });

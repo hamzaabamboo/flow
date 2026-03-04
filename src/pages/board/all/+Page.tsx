@@ -189,9 +189,9 @@ export default function AllTasksPage() {
   const groupedTasks = {
     todo: filteredTasks.filter((t) => !isTaskCompleted(t) && t.columnName === 'To Do'),
     inProgress: filteredTasks.filter((t) => !isTaskCompleted(t) && t.columnName === 'In Progress'),
-    done: filteredTasks.filter((t) => isTaskCompleted(t) || t.columnName === 'Done'),
+    done: filteredTasks.filter((t) => isTaskCompleted(t)),
     other: filteredTasks.filter(
-      (t) => !isTaskCompleted(t) && !['To Do', 'In Progress', 'Done'].includes(t.columnName)
+      (t) => !isTaskCompleted(t) && !['To Do', 'In Progress'].includes(t.columnName)
     )
   };
 
