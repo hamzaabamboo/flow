@@ -1,32 +1,38 @@
 'use client';
 import type { Assign } from '@ark-ui/react';
-import { Avatar } from '@ark-ui/react/avatar';
+import {
+  AvatarRoot,
+  AvatarFallback,
+  AvatarImage,
+  AvatarContext,
+} from '@ark-ui/react/avatar';
+import type {
+  AvatarRootBaseProps,
+  AvatarFallbackBaseProps,
+  AvatarImageBaseProps,
+  AvatarStatusChangeDetails,
+} from '@ark-ui/react/avatar';
 import { type AvatarVariantProps, avatar } from 'styled-system/recipes';
 import type { ComponentProps, HTMLStyledProps } from 'styled-system/types';
 import { createStyleContext } from './utils/create-style-context';
 
-const { withRootProvider, withProvider, withContext } = createStyleContext(avatar);
+const { withProvider, withContext } = createStyleContext(avatar);
 
-export type RootProviderProps = ComponentProps<typeof RootProvider>;
-export const RootProvider = withRootProvider<Assign<Avatar.RootProviderProps, AvatarVariantProps>>(
-  Avatar.RootProvider
-);
-
-export type RootProps = ComponentProps<typeof Root>;
 export const Root = withProvider<
   HTMLDivElement,
-  Assign<Assign<HTMLStyledProps<'div'>, Avatar.RootBaseProps>, AvatarVariantProps>
->(Avatar.Root, 'root');
+  Assign<Assign<HTMLStyledProps<'div'>, AvatarRootBaseProps>, AvatarVariantProps>
+>(AvatarRoot, 'root');
+export type RootProps = ComponentProps<typeof Root>;
 
 export const Fallback = withContext<
   HTMLSpanElement,
-  Assign<HTMLStyledProps<'span'>, Avatar.FallbackBaseProps>
->(Avatar.Fallback, 'fallback');
+  Assign<HTMLStyledProps<'span'>, AvatarFallbackBaseProps>
+>(AvatarFallback, 'fallback');
 
 export const Image = withContext<
   HTMLImageElement,
-  Assign<HTMLStyledProps<'img'>, Avatar.ImageBaseProps>
->(Avatar.Image, 'image');
+  Assign<HTMLStyledProps<'img'>, AvatarImageBaseProps>
+>(AvatarImage, 'image');
 
-export { AvatarContext as Context } from '@ark-ui/react/avatar';
-export type { AvatarStatusChangeDetails as StatusChangeDetails } from '@ark-ui/react/avatar';
+export { AvatarContext as Context };
+export type { AvatarStatusChangeDetails as StatusChangeDetails };

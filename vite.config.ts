@@ -17,7 +17,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
   ssr: {
-    // noExternal: ['react']
+    noExternal: ['@ark-ui/react']
   },
   logLevel: 'info',
   plugins: [
