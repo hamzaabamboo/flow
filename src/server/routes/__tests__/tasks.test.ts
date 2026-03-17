@@ -126,11 +126,23 @@ describe('Task Routes', () => {
     it('should fetch tasks for a column', async () => {
       const mockRows = [
         {
-          task: { id: 'task-1', title: 'Task 1', columnId: 'col-1', metadata: {} },
+          task: {
+            id: 'task-1',
+            title: 'Task 1',
+            columnId: 'col-1',
+            metadata: {},
+            completed: false
+          },
           columnName: 'To Do'
         },
         {
-          task: { id: 'task-2', title: 'Task 2', columnId: 'col-1', metadata: {} },
+          task: {
+            id: 'task-2',
+            title: 'Task 2',
+            columnId: 'col-1',
+            metadata: {},
+            completed: true
+          },
           columnName: 'Completed'
         }
       ];
@@ -185,15 +197,30 @@ describe('Task Routes', () => {
 
     it('should filter tasks by semantic completion state', async () => {
       const mockTasks = [
-        { id: 'task-1', title: 'Task 1', columnId: 'col-1', columnName: 'Done', metadata: {} },
+        {
+          id: 'task-1',
+          title: 'Task 1',
+          columnId: 'col-1',
+          columnName: 'Done',
+          metadata: {},
+          completed: true
+        },
         {
           id: 'task-2',
           title: 'Task 2',
           columnId: 'col-1',
           columnName: 'Completed',
-          metadata: {}
+          metadata: {},
+          completed: true
         },
-        { id: 'task-3', title: 'Task 3', columnId: 'col-1', columnName: 'To Do', metadata: {} }
+        {
+          id: 'task-3',
+          title: 'Task 3',
+          columnId: 'col-1',
+          columnName: 'To Do',
+          metadata: {},
+          completed: false
+        }
       ];
 
       vi.mocked(db.select).mockReturnValue(createMockQueryBuilder(mockTasks));
@@ -322,6 +349,41 @@ describe('Task Routes', () => {
       const data = await response.json();
       expect(response.status).toBe(200);
       expect(data).toEqual(toResponse(updatedTask));
+    });
+
+    it('should complete a non-recurring task by moving columns', async () => {
+      const mockTask = { id: 't1', columnId: 'c1', title: 'T', recurringPattern: null };
+      const currentColumn = { id: 'c1', boardId: 'b1', name: 'To Do' };
+      const boardColumns = [
+        { id: 'c1', name: 'To Do' },
+        { id: 'c2', name: 'Completed' }
+      ];
+      const updatedTask = { ...mockTask, columnId: 'c2' };
+      const mockUpdateBuilder = createMockUpdateBuilder([updatedTask]);
+      const setSpy = (mockUpdateBuilder as unknown as { set: ReturnType<typeof vi.fn> }).set;
+
+      vi.mocked(db.select)
+        .mockReturnValueOnce(createMockQueryBuilder([mockTask]))
+        .mockReturnValueOnce(createMockQueryBuilder([currentColumn]))
+        .mockReturnValueOnce(createMockQueryBuilder(boardColumns));
+      vi.mocked(db.update).mockReturnValue(mockUpdateBuilder);
+
+      const response = await app.handle(
+        new Request('http://localhost/tasks/t1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            completed: true
+          })
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(setSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columnId: 'c2'
+        })
+      );
     });
 
     it('should handle subtasks update', async () => {

@@ -57,6 +57,7 @@ export default function AgendaPage() {
 
   const autoOrganizeMutation = useAutoOrganize();
   const applyAutoOrganizeMutation = useApplyAutoOrganize();
+  const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
 
   const taskActions = useTaskActions({
     onTaskEdit: (task) => {
@@ -75,38 +76,34 @@ export default function AgendaPage() {
     isLoading: isLoadingEvents,
     isError: isErrorEvents
   } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar', 'events', selectedDate, viewMode, currentSpace],
+    queryKey: ['calendar', 'events', selectedDateKey, viewMode, currentSpace],
     queryFn: async () => {
       let start: Date, end: Date;
 
       if (viewMode === 'day') {
-        start = new Date(selectedDate);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(selectedDate);
-        end.setHours(23, 59, 59, 999);
+        start = jstToUtc(`${selectedDateKey}T00:00:00`);
+        end = jstToUtc(`${selectedDateKey}T23:59:59`);
       } else {
         const weekStart = startOfWeek(selectedDate);
         const weekEnd = endOfWeek(selectedDate);
-        start = new Date(weekStart);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(weekEnd);
-        end.setHours(23, 59, 59, 999);
+        start = jstToUtc(`${format(weekStart, 'yyyy-MM-dd')}T00:00:00`);
+        end = jstToUtc(`${format(weekEnd, 'yyyy-MM-dd')}T23:59:59`);
       }
 
       const startUnix = Math.floor(start.getTime() / 1000);
       const endUnix = Math.ceil(end.getTime() / 1000);
-
-      const { data, error } = await api.api.calendar.events.get({
-        query: {
-          start: startUnix.toString(),
-          end: endUnix.toString(),
-          space: currentSpace,
-          ...(viewMode === 'day' ? { includeOverdue: 'true', includeUpcoming: 'true' } : {}),
-          includeNoDueDate: 'true'
-        }
+      const query = new URLSearchParams({
+        start: startUnix.toString(),
+        end: endUnix.toString(),
+        space: currentSpace,
+        includeNoDueDate: 'true',
+        ...(viewMode === 'day' ? { includeOverdue: 'true', includeUpcoming: 'true' } : {})
       });
-      if (error) throw new Error('Failed to fetch events');
-      return data as CalendarEvent[];
+      const response = await fetch(`/api/calendar/events?${query.toString()}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch events');
+      return (await response.json()) as CalendarEvent[];
     }
   });
 
@@ -330,17 +327,13 @@ export default function AgendaPage() {
       let start: Date, end: Date;
 
       if (viewMode === 'day') {
-        start = new Date(selectedDate);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(selectedDate);
-        end.setHours(23, 59, 59, 999);
+        start = jstToUtc(`${selectedDateKey}T00:00:00`);
+        end = jstToUtc(`${selectedDateKey}T23:59:59`);
       } else {
         const weekStart = startOfWeek(selectedDate);
         const weekEnd = endOfWeek(selectedDate);
-        start = new Date(weekStart);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(weekEnd);
-        end.setHours(23, 59, 59, 999);
+        start = jstToUtc(`${format(weekStart, 'yyyy-MM-dd')}T00:00:00`);
+        end = jstToUtc(`${format(weekEnd, 'yyyy-MM-dd')}T23:59:59`);
       }
 
       const startUnix = Math.floor(start.getTime() / 1000);
@@ -385,24 +378,20 @@ export default function AgendaPage() {
       return [];
     }
 
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-
     const overdue: CalendarEvent[] = [];
 
     events.forEach((event) => {
       if (!event.dueDate || isTaskCompleted(event)) return;
 
-      const eventDate = new Date(event.dueDate);
+      const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
 
-      if (eventDate < startOfToday && !event.isUpcoming) {
+      if (eventDateKey < selectedDateKey) {
         overdue.push(event);
       }
     });
 
     return overdue;
-  }, [events, viewMode]);
+  }, [events, selectedDateKey, viewMode]);
 
   const unscheduledAndUpcomingTasks = useMemo(() => {
     if (!events) {
@@ -410,8 +399,6 @@ export default function AgendaPage() {
     }
 
     const tasks: CalendarEvent[] = [];
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
 
     events.forEach((event) => {
       if (isTaskCompleted(event)) return;
@@ -421,8 +408,9 @@ export default function AgendaPage() {
         return;
       }
 
-      const dueDate = new Date(event.dueDate);
-      if (dueDate > today) {
+      const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
+
+      if (eventDateKey > selectedDateKey) {
         tasks.push({ ...event, isUpcoming: true });
       }
     });
@@ -433,7 +421,7 @@ export default function AgendaPage() {
       if (!b.dueDate) return 1;
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     });
-  }, [events]);
+  }, [events, selectedDateKey]);
 
   const groupedEvents = useMemo(() => {
     const grouped: Record<string, CalendarEvent[]> = {};
@@ -452,11 +440,7 @@ export default function AgendaPage() {
     events?.forEach((event) => {
       if (!event.dueDate) return;
 
-      const eventDate = new Date(event.dueDate);
-      const year = eventDate.getFullYear();
-      const month = String(eventDate.getMonth() + 1).padStart(2, '0');
-      const day = String(eventDate.getDate()).padStart(2, '0');
-      const dateKey = `${year}-${month}-${day}`;
+      const dateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
 
       if (grouped[dateKey]) {
         grouped[dateKey].push(event);
@@ -471,22 +455,23 @@ export default function AgendaPage() {
       return { total: 0, completed: 0, remaining: 0, overdue: 0, todo: 0 };
     }
 
-    const now = new Date();
     let filteredEvents: CalendarEvent[];
 
     if (viewMode === 'week') {
       const weekStart = startOfWeek(selectedDate);
       const weekEnd = endOfWeek(selectedDate);
+      const weekStartKey = format(weekStart, 'yyyy-MM-dd');
+      const weekEndKey = format(weekEnd, 'yyyy-MM-dd');
       filteredEvents = events.filter((event) => {
         if (!event.dueDate) return false;
-        const eventDate = new Date(event.dueDate);
-        return eventDate >= weekStart && eventDate <= weekEnd;
+        const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
+        return eventDateKey >= weekStartKey && eventDateKey <= weekEndKey;
       });
     } else {
-      const dayKey = format(selectedDate, 'yyyy-MM-dd');
       filteredEvents = events.filter((event) => {
         if (!event.dueDate) return false;
-        return format(new Date(event.dueDate), 'yyyy-MM-dd') === dayKey;
+        const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
+        return eventDateKey === selectedDateKey;
       });
     }
 
@@ -494,14 +479,14 @@ export default function AgendaPage() {
     const overdue = filteredEvents.filter((event) => {
       if (isTaskCompleted(event)) return false;
       if (!event.dueDate) return false;
-      const dueDate = new Date(event.dueDate);
-      return dueDate < now;
+      const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
+      return eventDateKey < selectedDateKey;
     }).length;
     const todo = filteredEvents.filter((event) => {
       if (isTaskCompleted(event)) return false;
       if (!event.dueDate) return false;
-      const dueDate = new Date(event.dueDate);
-      return dueDate >= now;
+      const eventDateKey = event.instanceDate || format(new Date(event.dueDate), 'yyyy-MM-dd');
+      return eventDateKey >= selectedDateKey;
     }).length;
 
     const incompleteHabitsCount =
@@ -516,7 +501,7 @@ export default function AgendaPage() {
       overdue,
       todo: todo + incompleteHabitsCount
     };
-  }, [events, viewMode, selectedDate, habits]);
+  }, [events, viewMode, selectedDate, selectedDateKey, habits]);
 
   return (
     <Box data-space={currentSpace} p={{ base: '2', md: '4' }}>
@@ -708,7 +693,7 @@ export default function AgendaPage() {
                 />
                 <AgendaDayView
                   selectedDate={selectedDate}
-                  events={(groupedEvents[format(selectedDate, 'yyyy-MM-dd')] || []).filter(
+                  events={(groupedEvents[selectedDateKey] || []).filter(
                     (event) => !overdueTasks.includes(event)
                   )}
                   onToggleComplete={completeTask}

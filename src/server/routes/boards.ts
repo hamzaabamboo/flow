@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { eq, and, inArray, desc } from 'drizzle-orm';
 import { boards, columns, tasks } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
-import { isColumnDone } from '../utils/taskCompletion';
+import { getTaskCompletionState } from '../utils/taskCompletion';
 import { wsManager } from '../websocket';
 import { errorResponse, successResponse } from '../utils/errors';
 import { verifyBoardOwnership } from '../utils/ownership';
@@ -274,8 +274,8 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       }
 
       const totalTasks = boardTasks.length;
-      const completedTasks = boardTasks.filter(
-        (taskItem) => taskItem.columnName && isColumnDone(taskItem.columnName)
+      const completedTasks = boardTasks.filter((taskItem) =>
+        getTaskCompletionState(taskItem)
       ).length;
       const incompleteTasks = totalTasks - completedTasks;
 
@@ -292,7 +292,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
           if (columnTasks.length > 0) {
             summary += `### ${column.name} (${columnTasks.length})\n`;
             for (const task of columnTasks) {
-              const status = task.columnName && isColumnDone(task.columnName) ? '[x]' : '[ ]';
+              const status = getTaskCompletionState(task) ? '[x]' : '[ ]';
               const priority = task.priority ? ` [${task.priority}]` : '';
               const dueDate = task.dueDate
                 ? ` (Due: ${new Date(task.dueDate).toLocaleDateString()})`
@@ -305,7 +305,7 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       } else {
         summary += `**Tasks:**\n\n`;
         for (const task of boardTasks) {
-          const status = task.columnName && isColumnDone(task.columnName) ? '[x]' : '[ ]';
+          const status = getTaskCompletionState(task) ? '[x]' : '[ ]';
           const priority = task.priority ? ` [${task.priority}]` : '';
           const dueDate = task.dueDate
             ? ` (Due: ${new Date(task.dueDate).toLocaleDateString()})`

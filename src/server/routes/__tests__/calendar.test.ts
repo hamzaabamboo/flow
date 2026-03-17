@@ -190,6 +190,35 @@ describe('Calendar Routes', () => {
       expect(expandRecurringTasks).toHaveBeenCalled();
     });
 
+    it('should dedupe duplicate recurring instances before returning events', async () => {
+      const duplicateInstance = {
+        id: 'rec-dup',
+        title: 'Duplicate recurring',
+        dueDate: new Date('2024-01-15T10:00:00Z'),
+        instanceDate: '2024-01-15',
+        type: 'task',
+        completed: false,
+        completionState: 'active'
+      };
+
+      asMock(expandRecurringTasks).mockReturnValueOnce([duplicateInstance, duplicateInstance]);
+
+      const mockSelect = asMock(db.select);
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Main
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Recurring
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // Completions
+      mockSelect.mockReturnValueOnce(createMockQueryBuilder([])); // External
+
+      const response = await app.handle(
+        new Request(`http://localhost/calendar/events?start=${start}&end=${end}`)
+      );
+
+      const data = await response.json();
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('rec-dup');
+      expect(data[0].instanceDate).toBe('2024-01-15');
+    });
+
     it('should exclude completed-column tasks from upcoming non-recurring results', async () => {
       const completedUpcomingTask = {
         id: 'up-1',

@@ -1,8 +1,25 @@
 import type { Task } from '../../shared/types/board';
 import type { CalendarEvent } from '../../shared/types/calendar';
-import { isColumnDone } from './taskCompletion';
+import { getTaskCompletionState } from './taskCompletion';
 
 type RecurringTaskSource = Task | CalendarEvent;
+
+const toInstanceDateKey = (date: Date) => date.toISOString().split('T')[0];
+
+const isWithinWindow = (date: Date, startDate: Date, endDate: Date) =>
+  date >= startDate && date <= endDate;
+
+const buildRecurringEvent = (
+  formattedTask: CalendarEvent,
+  dueDate: Date,
+  isCompleted: boolean
+): CalendarEvent => ({
+  ...formattedTask,
+  dueDate,
+  completed: isCompleted,
+  completionState: isCompleted ? 'completed' : 'active',
+  instanceDate: toInstanceDateKey(dueDate)
+});
 
 export function expandRecurringTasks(
   tasks: RecurringTaskSource[],
@@ -33,7 +50,7 @@ export function expandRecurringTasks(
       if (taskDueDate >= startDate && taskDueDate <= endDate) {
         events.push({
           ...formattedTask,
-          completed: task.columnName ? isColumnDone(task.columnName) : false
+          completed: getTaskCompletionState(task)
         });
       }
       continue;
@@ -61,8 +78,11 @@ export function expandRecurringTasks(
       ) {
         const instance = new Date(currentDay);
         instance.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
+        if (!isWithinWindow(instance, startDate, effectiveEndDate)) {
+          continue;
+        }
 
-        const dateStr = instance.toISOString().split('T')[0];
+        const dateStr = toInstanceDateKey(instance);
 
         // Strict date check for recurringEndDate
         if (recurringEndDate && new Date(dateStr) > recurringEndDate) {
@@ -70,13 +90,7 @@ export function expandRecurringTasks(
         }
 
         const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
-
-        events.push({
-          ...formattedTask,
-          dueDate: instance,
-          completed: isCompleted,
-          instanceDate: dateStr
-        });
+        events.push(buildRecurringEvent(formattedTask, instance, isCompleted));
       }
     } else if (pattern === 'weekly') {
       const current = new Date(Math.max(taskDueDate.getTime(), startDate.getTime()));
@@ -88,20 +102,14 @@ export function expandRecurringTasks(
         current.setUTCDate(current.getUTCDate() + 1)
       ) {
         if (current >= startDate && current.getUTCDay() === taskDueDate.getUTCDay()) {
-          const dateStr = current.toISOString().split('T')[0];
+          const dateStr = toInstanceDateKey(current);
 
           if (recurringEndDate && new Date(dateStr) > recurringEndDate) {
             break;
           }
 
           const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
-
-          events.push({
-            ...formattedTask,
-            dueDate: new Date(current),
-            completed: isCompleted,
-            instanceDate: dateStr
-          });
+          events.push(buildRecurringEvent(formattedTask, new Date(current), isCompleted));
         }
       }
     } else if (pattern === 'biweekly') {
@@ -120,20 +128,14 @@ export function expandRecurringTasks(
 
           // Only include if it's an even number of weeks from the start
           if (weeksDiff % 2 === 0) {
-            const dateStr = current.toISOString().split('T')[0];
+            const dateStr = toInstanceDateKey(current);
 
             if (recurringEndDate && new Date(dateStr) > recurringEndDate) {
               break;
             }
 
             const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
-
-            events.push({
-              ...formattedTask,
-              dueDate: new Date(current),
-              completed: isCompleted,
-              instanceDate: dateStr
-            });
+            events.push(buildRecurringEvent(formattedTask, new Date(current), isCompleted));
           }
         }
       }
@@ -147,20 +149,14 @@ export function expandRecurringTasks(
         current.setUTCMonth(current.getUTCMonth() + 1)
       ) {
         if (current >= startDate) {
-          const dateStr = current.toISOString().split('T')[0];
+          const dateStr = toInstanceDateKey(current);
 
           if (recurringEndDate && new Date(dateStr) > recurringEndDate) {
             break;
           }
 
           const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
-
-          events.push({
-            ...formattedTask,
-            dueDate: new Date(current),
-            completed: isCompleted,
-            instanceDate: dateStr
-          });
+          events.push(buildRecurringEvent(formattedTask, new Date(current), isCompleted));
         }
       }
     } else if (pattern === 'end_of_month') {
@@ -182,20 +178,14 @@ export function expandRecurringTasks(
         lastDay.setUTCHours(taskDueDate.getUTCHours(), taskDueDate.getUTCMinutes(), 0, 0);
 
         if (lastDay >= startDate && lastDay <= effectiveEndDate) {
-          const dateStr = lastDay.toISOString().split('T')[0];
+          const dateStr = toInstanceDateKey(lastDay);
 
           if (recurringEndDate && new Date(dateStr) > recurringEndDate) {
             break;
           }
 
           const isCompleted = completionMap.get(task.id)?.has(dateStr) ?? false;
-
-          events.push({
-            ...formattedTask,
-            dueDate: new Date(lastDay),
-            completed: isCompleted,
-            instanceDate: dateStr
-          });
+          events.push(buildRecurringEvent(formattedTask, new Date(lastDay), isCompleted));
         }
       }
     } else {
@@ -203,7 +193,7 @@ export function expandRecurringTasks(
         events.push({
           ...formattedTask,
           dueDate: task.dueDate,
-          completed: task.columnName ? isColumnDone(task.columnName) : false
+          completed: getTaskCompletionState(task)
         });
       }
     }

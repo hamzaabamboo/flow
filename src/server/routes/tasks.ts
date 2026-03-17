@@ -12,7 +12,7 @@ import {
 } from '../../../drizzle/schema';
 import { wsManager } from '../websocket';
 import { ReminderSyncService } from '../services/reminder-sync';
-import { isColumnDone, resolveCompletionColumnId } from '../utils/taskCompletion';
+import { getTaskCompletionState, resolveCompletionColumnId } from '../utils/taskCompletion';
 import { nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
 
 function getTodayJstDateString() {
@@ -34,8 +34,10 @@ function normalizeCompletionDate(instanceDate?: string) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function withCompletionState<T extends { columnName?: string | null }>(task: T) {
-  const completed = task.columnName ? isColumnDone(task.columnName) : false;
+function withCompletionState<T extends { columnName?: string | null; completed?: boolean | null }>(
+  task: T
+) {
+  const completed = getTaskCompletionState(task);
   return {
     ...task,
     completed,
@@ -412,16 +414,13 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
               .from(columns)
               .where(eq(columns.boardId, currentColumn.boardId));
 
-            const targetColumnId = resolveCompletionColumnId(
+            updateData.columnId = resolveCompletionColumnId(
               boardColumns,
               body.completed,
               currentTask.columnId
             );
-
-            updateData.columnId = targetColumnId;
           }
         }
-        delete updateData.completed;
       }
       if (body.labels !== undefined) updateData.labels = body.labels;
       if (body.recurringPattern !== undefined) updateData.recurringPattern = body.recurringPattern;
@@ -728,7 +727,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
               };
             }
 
-            // Get the current column to find the board
             const [currentColumn] = await db
               .select()
               .from(columns)
@@ -739,12 +737,10 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
               return null;
             }
 
-            const boardId = currentColumn.boardId;
-
             const boardColumns = await db
               .select({ id: columns.id, name: columns.name })
               .from(columns)
-              .where(eq(columns.boardId, boardId));
+              .where(eq(columns.boardId, currentColumn.boardId));
 
             const targetColumnId = resolveCompletionColumnId(
               boardColumns,
@@ -752,7 +748,6 @@ export const tasksRoutes = new Elysia({ prefix: '/tasks' })
               currentTask.columnId
             );
 
-            // Update the task
             const [updated] = await db
               .update(tasks)
               .set({

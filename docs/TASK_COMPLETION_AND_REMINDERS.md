@@ -2,11 +2,10 @@
 
 ## Completion Semantics
 
-HamFlow now treats both `Done` and `Completed` columns as completed states.
+HamFlow treats `Done` and `Completed` columns as semantic completion states for non-recurring tasks.
 
-Server-side completion logic uses semantic resolution instead of hardcoded column names:
-- Complete task (`completed: true`): move to first completion column (`done` or `completed`) when available.
-- Uncomplete task (`completed: false`): move to `In Progress`, then `To Do`, then first non-completed column.
+- API responses expose normalized `completed` and `completionState` fields.
+- Backend storage for non-recurring tasks still uses semantic column transitions underneath.
 
 ## Recurring Tasks
 
@@ -20,7 +19,7 @@ For recurring tasks:
 
 ### Normalized Completion Fields (Consumer Contract)
 
-Task read endpoints now expose normalized completion fields so consumers do not need to infer from raw column names:
+Task read endpoints expose normalized completion fields so consumers do not need to infer from raw column names:
 - `completed: boolean`
 - `completionState: "active" | "completed"`
 
@@ -48,7 +47,7 @@ Body fields:
 
 Behavior:
 - Non-recurring tasks: semantic column transition.
-- Recurring tasks: instance completion log update (no parent column move).
+- Recurring tasks: instance completion log update.
 
 ### `POST /tasks/:id/completion`
 
@@ -103,4 +102,4 @@ This fixes date-only deadlines showing as timed events and keeps Agenda + iCal b
 
 ## Auto-Organize Consistency
 
-Auto-organize now uses the same semantic completion detection (`Done` + `Completed`) before generating suggestions, so completed tasks are consistently excluded from re-organization.
+Auto-organize uses the same semantic completion detection before generating suggestions, so completed tasks are consistently excluded from re-organization.

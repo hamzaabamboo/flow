@@ -1,11 +1,12 @@
 import { Elysia, t } from 'elysia';
 import type { z } from 'zod';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, ilike, desc } from 'drizzle-orm';
 import { withAuth } from '../auth/withAuth';
 import { inboxItems, reminders, boards, columns, tasks } from '../../../drizzle/schema';
 import type { CommandIntentSchema } from '../../mastra/agents/commandProcessor';
 import { commandProcessor } from '../../mastra/agents/commandProcessor';
 import { jstToUtc, nowInJst, getJstDateComponents } from '../../shared/utils/timezone';
+import { resolveCompletionColumnId } from '../utils/taskCompletion';
 
 export const commandRoutes = new Elysia({ prefix: '/command' })
   .use(withAuth())
@@ -393,6 +394,52 @@ export const commandRoutes = new Elysia({ prefix: '/command' })
             return {
               success: true,
               data: reminder
+            };
+
+          case 'complete_task':
+            if (!data.taskRef) {
+              throw new Error('Task reference is required');
+            }
+
+            const [task] = await db
+              .select()
+              .from(tasks)
+              .where(and(eq(tasks.userId, user.id), ilike(tasks.title, data.taskRef as string)))
+              .orderBy(desc(tasks.updatedAt))
+              .limit(1);
+
+            if (!task) {
+              throw new Error('Task not found');
+            }
+
+            const [currentColumn] = await db
+              .select()
+              .from(columns)
+              .where(eq(columns.id, task.columnId));
+
+            if (!currentColumn) {
+              throw new Error('Task column not found');
+            }
+
+            const boardColumns = await db
+              .select({ id: columns.id, name: columns.name })
+              .from(columns)
+              .where(eq(columns.boardId, currentColumn.boardId));
+
+            const targetColumnId = resolveCompletionColumnId(boardColumns, true, task.columnId);
+
+            const [completedTask] = await db
+              .update(tasks)
+              .set({
+                columnId: targetColumnId,
+                updatedAt: new Date()
+              })
+              .where(eq(tasks.id, task.id))
+              .returning();
+
+            return {
+              success: true,
+              data: completedTask
             };
 
           default:

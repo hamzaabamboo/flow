@@ -3,7 +3,7 @@ import { eq, and, gte, lte } from 'drizzle-orm';
 import { db as database } from '../db';
 import { tasks, columns, boards, inboxItems } from '../../../drizzle/schema';
 import { withAuth } from '../auth/withAuth';
-import { isTaskCompleted } from '../utils/taskCompletion';
+import { getTaskCompletionState } from '../utils/taskCompletion';
 import { jstToUtc, getJstDateComponents } from '../../shared/utils/timezone';
 
 interface Habit {
@@ -59,7 +59,7 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
 
       // Count incomplete tasks (due today or overdue)
       const incompleteTasks = tasksWithColumns.filter((task) => {
-        if (isTaskCompleted(task.columnName)) return false;
+        if (getTaskCompletionState(task)) return false;
         if (!task.dueDate) return false;
         // Compare dates only (strip time)
         const dueDate = new Date(task.dueDate);
@@ -79,9 +79,7 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
       const incompleteHabits = habits.filter((h) => !h.completedToday);
 
       // Count all incomplete tasks (for Tasks badge)
-      const allIncompleteTasks = tasksWithColumns.filter(
-        (task) => !isTaskCompleted(task.columnName)
-      );
+      const allIncompleteTasks = tasksWithColumns.filter((task) => !getTaskCompletionState(task));
 
       return {
         inbox: inboxCount,
@@ -135,7 +133,7 @@ export const statsRoutes = new Elysia({ prefix: '/stats' })
         .where(tasksWhere);
 
       // Filter to only completed tasks (in Done columns)
-      const completedTasks = allTasks.filter((task) => isTaskCompleted(task.columnName));
+      const completedTasks = allTasks.filter((task) => getTaskCompletionState(task));
 
       // Group by JST date (not UTC date)
       const groupedByDate: Record<

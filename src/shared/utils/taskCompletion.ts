@@ -16,15 +16,17 @@ export function isTaskCompleted(
         recurringPattern?: string | null;
       }
 ): boolean {
+  if ('completed' in task && typeof task.completed === 'boolean') {
+    return task.completed;
+  }
+
   if (
     'instanceDate' in task &&
     task.instanceDate &&
-    'completed' in task &&
-    task.completed !== undefined &&
     'recurringPattern' in task &&
     task.recurringPattern
   ) {
-    return task.completed;
+    return false;
   }
 
   if (task.columnName && isColumnDone(task.columnName)) {

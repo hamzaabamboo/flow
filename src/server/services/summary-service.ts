@@ -8,7 +8,7 @@ import {
 } from '../../../drizzle/schema';
 import type { Database } from '../db';
 import { logger } from '../logger';
-import { isColumnDone } from '../utils/taskCompletion';
+import { getTaskCompletionState } from '../utils/taskCompletion';
 
 export class SummaryService {
   constructor(
@@ -58,9 +58,7 @@ export class SummaryService {
         .orderBy(tasks.dueDate, tasks.priority);
 
       // Filter out completed tasks (those in Done column)
-      const overdueTasks = overdueTasksRaw.filter(
-        (task) => !task.columnName || !isColumnDone(task.columnName)
-      );
+      const overdueTasks = overdueTasksRaw.filter((task) => !getTaskCompletionState(task));
 
       // Get tasks due today for all selected spaces
       const todayTasksRaw = await this.db
@@ -89,9 +87,7 @@ export class SummaryService {
         .orderBy(tasks.priority, tasks.dueDate);
 
       // Filter out completed tasks (those in Done column)
-      const todayTasks = todayTasksRaw.filter(
-        (task) => !task.columnName || !isColumnDone(task.columnName)
-      );
+      const todayTasks = todayTasksRaw.filter((task) => !getTaskCompletionState(task));
 
       // Get upcoming tasks (next 7 days)
       const upcomingTasksRaw = await this.db
@@ -120,9 +116,7 @@ export class SummaryService {
         .orderBy(tasks.dueDate, tasks.priority);
 
       // Filter out completed tasks (those in Done column)
-      const upcomingTasks = upcomingTasksRaw.filter(
-        (task) => !task.columnName || !isColumnDone(task.columnName)
-      );
+      const upcomingTasks = upcomingTasksRaw.filter((task) => !getTaskCompletionState(task));
 
       // Format message
       const spaceLabel = spaces.length === 2 ? 'work & personal' : spaces[0];
@@ -227,9 +221,7 @@ export class SummaryService {
         );
 
       // Filter to only tasks in Done column
-      const completedToday = completedTodayRaw.filter(
-        (task) => task.columnName && isColumnDone(task.columnName)
-      );
+      const completedToday = completedTodayRaw.filter((task) => getTaskCompletionState(task));
 
       // Get unfinished tasks that were due today or overdue
       const unfinishedTasksRaw = await this.db
@@ -256,9 +248,7 @@ export class SummaryService {
         .orderBy(tasks.dueDate);
 
       // Filter out completed tasks (those in Done column)
-      const unfinishedTasks = unfinishedTasksRaw.filter(
-        (task) => !task.columnName || !isColumnDone(task.columnName)
-      );
+      const unfinishedTasks = unfinishedTasksRaw.filter((task) => !getTaskCompletionState(task));
 
       // Get today's habits for all spaces
       const todayDay = today.getDay();

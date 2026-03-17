@@ -160,4 +160,41 @@ describe('expandRecurringTasks', () => {
     const events = expandRecurringTasks([task], start, end, new Map());
     expect(events.length).toBe(0);
   });
+
+  it('should not leak previous JST-day recurring instances into the current window', () => {
+    const task: Task = {
+      ...baseTask,
+      id: 'jst-daily',
+      dueDate: new Date('2025-01-01T04:00:00Z').toISOString(),
+      recurringPattern: 'daily'
+    };
+
+    const start = new Date('2026-03-09T15:00:00Z');
+    const end = new Date('2026-03-10T14:59:59Z');
+
+    const events = expandRecurringTasks([task], start, end, new Map());
+
+    expect(events.map((event) => event.instanceDate)).toEqual(['2026-03-10']);
+  });
+
+  it('should derive recurring instance completionState from instance completion, not parent column', () => {
+    const task: Task = {
+      ...baseTask,
+      id: 'done-recurring',
+      dueDate: new Date('2025-01-01T10:00:00Z').toISOString(),
+      recurringPattern: 'daily',
+      columnName: 'Done',
+      completed: true,
+      completionState: 'completed'
+    };
+
+    const start = new Date('2025-01-02T00:00:00Z');
+    const end = new Date('2025-01-02T23:59:59Z');
+
+    const events = expandRecurringTasks([task], start, end, new Map());
+
+    expect(events).toHaveLength(1);
+    expect(events[0].completed).toBe(false);
+    expect(events[0].completionState).toBe('active');
+  });
 });

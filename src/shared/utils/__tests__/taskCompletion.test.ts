@@ -25,7 +25,13 @@ describe('shared taskCompletion utils', () => {
     expect(isTaskCompleted(recurringTaskIncomplete)).toBe(false);
   });
 
-  it('isTaskCompleted should check column name for regular tasks', () => {
+  it('isTaskCompleted should prefer explicit completion state for regular tasks', () => {
+    expect(isTaskCompleted({ completed: true, columnName: 'To Do' })).toBe(true);
+    expect(isTaskCompleted({ completed: false, columnName: 'Done' })).toBe(false);
+    expect(isTaskCompleted({ completed: false, columnName: null })).toBe(false);
+  });
+
+  it('isTaskCompleted should only fall back to column name when completion state is absent', () => {
     expect(isTaskCompleted({ columnName: 'Done' })).toBe(true);
     expect(isTaskCompleted({ columnName: 'Completed' })).toBe(true);
     expect(isTaskCompleted({ columnName: 'To Do' })).toBe(false);

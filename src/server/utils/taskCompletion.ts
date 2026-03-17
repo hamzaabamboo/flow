@@ -15,6 +15,21 @@ export function isTaskCompleted(columnName?: string | null): boolean {
   return isColumnDone(columnName);
 }
 
+export function getTaskCompletionState(task: {
+  completed?: boolean | null;
+  columnName?: string | null;
+}) {
+  if (typeof task.completed === 'boolean') {
+    return task.completed;
+  }
+
+  if (task.columnName) {
+    return isColumnDone(task.columnName);
+  }
+
+  return false;
+}
+
 export interface CompletionColumn {
   id: string;
   name: string;

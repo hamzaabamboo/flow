@@ -100,9 +100,19 @@ describe('AgendaPage', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
     vi.clearAllMocks();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(mockEvents), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      )
+    );
 
     const apiMock = api.api;
-    asMock(apiMock.calendar.events.get).mockResolvedValue({ data: mockEvents, error: null });
     asMock(apiMock.habits.get).mockResolvedValue({ data: mockHabits, error: null });
     asMock(apiMock.boards.get).mockResolvedValue({ data: [], error: null });
 
@@ -160,6 +170,7 @@ describe('AgendaPage', () => {
   it('should handle view mode toggle', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AgendaPage />);
+    await screen.findByText('Task 1');
     const weekBtn = screen.getByRole('button', { name: 'Week' });
     await user.click(weekBtn);
     expect(await screen.findByText('Weekly Stats')).toBeInTheDocument();
@@ -213,7 +224,17 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    asMock(api.api.calendar.events.get).mockResolvedValue({ data: [extEvent], error: null });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify([extEvent]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      )
+    );
 
     renderWithProviders(<AgendaPage />);
 
@@ -234,15 +255,73 @@ describe('AgendaPage', () => {
       status: 'todo',
       completed: false
     };
-    asMock(api.api.calendar.events.get).mockResolvedValue({
-      data: [upcomingTask],
-      error: null
-    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify([upcomingTask]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      )
+    );
 
     renderWithProviders(<AgendaPage />);
 
     expect(await screen.findByText('Future Task')).toBeInTheDocument();
     expect(screen.getByText(/Upcoming & Unscheduled/i)).toBeInTheDocument();
+  });
+
+  it('should bucket agenda tasks relative to the selected date', async () => {
+    window.history.replaceState({}, '', '/?date=2026-04-07');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: 'over-1',
+                title: 'Selected Date Overdue',
+                dueDate: '2026-04-06T00:00:00.000Z',
+                status: 'todo',
+                completed: false,
+                space: 'personal'
+              },
+              {
+                id: 'today-1',
+                title: 'Selected Date Today',
+                dueDate: '2026-04-07T00:00:00.000Z',
+                status: 'todo',
+                completed: false,
+                space: 'personal'
+              },
+              {
+                id: 'up-1',
+                title: 'Selected Date Upcoming',
+                dueDate: '2026-04-09T00:00:00.000Z',
+                status: 'todo',
+                completed: false,
+                space: 'personal'
+              }
+            ]),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          )
+        )
+      )
+    );
+
+    renderWithProviders(<AgendaPage />);
+
+    expect(await screen.findByText('Selected Date Overdue')).toBeInTheDocument();
+    expect(screen.getByText('Selected Date Today')).toBeInTheDocument();
+    expect(screen.getByText('Selected Date Upcoming')).toBeInTheDocument();
+    expect(screen.getByText(/Tuesday, Apr 7, 2026/i)).toBeInTheDocument();
   });
 
   it('should handle applying auto-organize suggestions', async () => {
