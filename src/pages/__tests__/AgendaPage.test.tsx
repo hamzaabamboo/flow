@@ -214,6 +214,25 @@ describe('AgendaPage', () => {
     expect(patchMock).toHaveBeenCalled();
   });
 
+  it('should allow completing overdue tasks from the agenda day view', async () => {
+    const user = userEvent.setup();
+    const patchMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+    asMock(api.api.tasks).mockImplementation(() => ({
+      patch: patchMock
+    }));
+
+    renderWithProviders(<AgendaPage />);
+
+    const checkbox = await screen.findByLabelText(/Complete task: Overdue Task/i);
+    await user.click(checkbox);
+
+    expect(patchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completed: true
+      })
+    );
+  });
+
   it('should handle copying external event to task', async () => {
     const user = userEvent.setup();
     const extEvent = {

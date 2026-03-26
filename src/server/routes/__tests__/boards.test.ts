@@ -131,6 +131,48 @@ describe('Board Routes', () => {
       expect(board1.columns).toHaveLength(1);
     });
 
+    it('should allow fetching boards without a space filter', async () => {
+      const mockBoards = [{ id: 'board-1', name: 'Work Board', userId: 'user-1', space: 'work' }];
+      const mockColumns = [{ id: 'col-1', boardId: 'board-1', name: 'To Do' }];
+
+      vi.mocked(db.select)
+        .mockReturnValueOnce(createMockQueryBuilder(mockBoards))
+        .mockReturnValueOnce(createMockQueryBuilder(mockColumns));
+
+      const response = await app.handle(new Request('http://localhost/boards'));
+
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toHaveLength(1);
+      expect(data[0]).toMatchObject({
+        id: 'board-1',
+        columns: mockColumns
+      });
+    });
+
+    it('should allow auto space for AI-driven board lookups', async () => {
+      const mockBoards = [
+        { id: 'board-1', name: 'Work Board', userId: 'user-1', space: 'work' },
+        { id: 'board-2', name: 'Personal Board', userId: 'user-1', space: 'personal' }
+      ];
+      const mockColumns = [
+        { id: 'col-1', boardId: 'board-1', name: 'To Do' },
+        { id: 'col-2', boardId: 'board-2', name: 'Inbox' }
+      ];
+
+      vi.mocked(db.select)
+        .mockReturnValueOnce(createMockQueryBuilder(mockBoards))
+        .mockReturnValueOnce(createMockQueryBuilder(mockColumns));
+
+      const response = await app.handle(new Request('http://localhost/boards?space=auto'));
+
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toHaveLength(2);
+    });
+
     it('should filter by space', async () => {
       vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([]));
 

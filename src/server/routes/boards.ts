@@ -12,6 +12,9 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
   .get(
     '/',
     async ({ query, db, user }) => {
+      const shouldFilterBySpace =
+        query.space === 'work' || query.space === 'personal';
+
       // Fetch boards sorted by most recent update
       const userBoards = await db
         .select({
@@ -25,7 +28,9 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
         })
         .from(boards)
         .where(
-          and(eq(boards.userId, user.id), eq(boards.space, query.space as 'work' | 'personal'))
+          shouldFilterBySpace
+            ? and(eq(boards.userId, user.id), eq(boards.space, query.space))
+            : eq(boards.userId, user.id)
         )
         .orderBy(desc(boards.updatedAt));
 
@@ -56,7 +61,11 @@ export const boardRoutes = new Elysia({ prefix: '/boards' })
       return userBoards;
     },
     {
-      query: t.Object({ space: t.String() })
+      query: t.Optional(
+        t.Object({
+          space: t.Optional(t.String())
+        })
+      )
     }
   )
   .get(

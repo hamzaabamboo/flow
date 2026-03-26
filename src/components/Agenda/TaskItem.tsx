@@ -90,7 +90,7 @@ export function TaskItem({
               <Box color="colorPalette.default">
                 <Calendar width="20" height="20" />
               </Box>
-            ) : !(isOverdue && hideCheckboxOnOverdue) ? (
+            ) : (
               <Checkbox
                 size="sm"
                 checked={completed}
@@ -98,7 +98,7 @@ export function TaskItem({
                 onClick={(e) => e.stopPropagation()}
                 aria-label={`Complete task: ${event.title}`}
               />
-            ) : null}
+            )}
             <VStack flex="1" gap="1" alignItems="start">
               <HStack gap="2" alignItems="center" flexWrap="wrap">
                 <LinkifiedText
